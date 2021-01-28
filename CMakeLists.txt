@@ -10,6 +10,11 @@ project(overallApp)
 find_package(jetson-utils)
 find_package(jetson-inference)
 
+# Realsense and OpenCV
+find_package( realsense2 REQUIRED )
+find_package( OpenCV REQUIRED )
+include_directories( ${OpenCV_INCLUDE_DIRS} )
+
 # CUDA and Qt4 are required
 find_package(CUDA)
 find_package(Qt4)
@@ -22,4 +27,4 @@ add_definitions(${QT_DEFINITIONS})
 cuda_add_executable(overallApp overallApp.cpp serverDroneStatus.cpp droneNavigation.cpp cameraMulti.cpp)
 
 # link my-recognition to jetson-inference library
-target_link_libraries(overallApp jetson-inference)
+target_link_libraries(overallApp jetson-inference realsense2 ${OpenCV_LIBS})

@@ -1,11 +1,15 @@
 #pragma once
 
+#include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
+#include <opencv2/opencv.hpp>   // Include OpenCV API
 #include <thread>
 
 typedef int image;
 
 class cameraFrame {
 public:
+    cameraFrame();
+    ~cameraFrame();
     image getImageRGB();
     image getImageDepth();
     image getImageIR();
@@ -18,10 +22,21 @@ public:
 
 private:
     // whatever needed for each type
+    cv::Mat* pRGB;
+    cv::Mat* pDepth;
+    cv::Mat* pIR;
+    cv::Mat* pREdge;
+};
+
+class camera_RS {
+public:
+    rs2::pipeline pipe;
+    rs2::config cfg;
 };
 
 class cameraMulti {
 public:
+    ~cameraMulti();
     enum cameraType {
         cameraMulti_CV,
         cameraMulti_RS };
@@ -42,25 +57,15 @@ public:
     void operator()(void* pCallbackFrame, void* pCallbackData);
 
 protected:
-    cameraMulti(cameraType);
+    cameraMulti(cameraType, cameraFeatures);
+
+    void run_RS();
 
 private:
     void (*callbackFrame)(cameraFrame*, void*);
     void* pCallbackData;
+
+    camera_RS* pCameraRS;
+    cameraType type;
+    cameraFeatures features;
 };
-
-inline cameraMulti* cameraMulti::OpenCamera(cameraType type, cameraFeatures features)
-{
-    return nullptr;
-}
-
-inline void cameraMulti::runCameraLoop()
-{
-    while (true) {
-        cameraFrame* pFrame = nullptr;
-        if (callbackFrame != nullptr) {
-            callbackFrame(pFrame, pCallbackData);
-        }
-    }
-}
-
