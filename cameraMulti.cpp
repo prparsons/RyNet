@@ -15,6 +15,11 @@ bool cameraFrame::hasDepth() const
     return true;
 }
 
+bool cameraFrame::hasREdge() const
+{
+    return false;
+}
+
 image cameraFrame::getImageRGB()
 {
     return 0;
@@ -26,6 +31,11 @@ image cameraFrame::getImageDepth()
 }
 
 image cameraFrame::getImageIR()
+{
+    return 0;
+}
+
+image cameraFrame::getImageREdge()
 {
     return 0;
 }

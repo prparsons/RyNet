@@ -68,7 +68,7 @@ int main( int argc, char** argv )
     bool bContinueFlight = true;
     std::thread server((ServerLoop()));
     Navigator_SimpleObstruct2D nav;
-	Drive_TwinTrack drive;
+	Drive_TwinTrack drive(nav);
     DroneNavigation navSystem(nav, drive);
     std::thread client(navSystem);
     //std::thread client((DroneNavigation()));

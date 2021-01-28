@@ -17,29 +17,31 @@ void updateDepthCamera(cameraFrame* pFrame, void* pNavigator)
         printf("updateDepthCamera:frame has no rgb\n");
         return;
     }
+    bool bDepth = pFrame->hasDepth();
+    bool bIR = pFrame->hasIR();
+    bool bREdge = pFrame->hasREdge();
     image imageRGB = pFrame->getImageRGB();
-    if (pFrame->hasDepth()) {
+    nav.newImageRGB(imageRGB, !(bDepth || bIR || bREdge));
+    if (bDepth) {
         image imageDepth = pFrame->getImageDepth();
-        nav.checkObstruct(imageRGB, imageDepth);
-        nav.checkAltitude(imageRGB, imageDepth);
-    } else {
-        nav.checkObstruct(imageRGB);
-        nav.checkAltitude(imageRGB);
+        nav.newImageDepth(imageDepth, !(bIR || bREdge));
     }
-    if (pFrame->hasIR()) {
+    if (bIR) {
         image imageIR = pFrame->getImageIR();
-        nav.checkTerrain(imageRGB, imageIR);
-    } else {
-        nav.checkTerrain(imageRGB);
+        nav.newImageIR(imageIR, !bREdge);
+    } 
+    if (bREdge) {
+        image imageREdge = pFrame->getImageREdge();
+        nav.newImageREdge(imageREdge, true);
     }
-    nav.checkAnimals(imageRGB);
 }
 
 // *****
 // Drive
 
-Drive::Drive()
-: fSpeed(0)
+Drive::Drive(Navigator& _nav)
+: nav(_nav)
+, fSpeed(0)
 , fSteer(0)
 , fClimb(0)
 {
@@ -50,6 +52,8 @@ Drive::Drive()
 
 Navigator_SimpleObstruct2D::Navigator_SimpleObstruct2D()
 : bIsDirty(false)
+, bNewImgRGB(false)
+, bNewImgDepth(false)
 , pCamera(nullptr)
 {
     cameraMulti::cameraFeatures features = cameraMulti::cameraFeatures(cameraMulti::cameraMulti_RGB | cameraMulti::cameraMulti_Depth);
@@ -67,35 +71,115 @@ Navigator_SimpleObstruct2D::~Navigator_SimpleObstruct2D()
     }
 }
 
-bool Navigator_SimpleObstruct2D::checkTerrain(image imgRGB)
+void Navigator_SimpleObstruct2D::newImageRGB(image _imgRGB, bool bSignal)
 {
-    return false;
+    ThreadLock locker(mtImages);
+    locker.lock();
+    bNewImgRGB = true;
+    imgRGB = _imgRGB; // copying is slow...need a single shareable read instance
+    locker.unlock();
+    if (bSignal) {
+        if (psigImages != nullptr) {
+            psigImages->signal();
+        }
+    }
 }
 
-bool Navigator_SimpleObstruct2D::checkObstruct(image imgRGB, image imgDepth)
+void Navigator_SimpleObstruct2D::newImageDepth(image _imgDepth, bool bSignal)
 {
-    return false;
+    ThreadLock locker(mtImages);
+    locker.lock();
+    bNewImgDepth = true;
+    imgDepth = _imgDepth;
+    locker.unlock();
+    if (bSignal) {
+        if (psigImages != nullptr) {
+            psigImages->signal();
+        }
+    }
 }
 
-void Navigator_SimpleObstruct2D::operator()(Signal)
+float Navigator_SimpleObstruct2D::getObstructDirection()
 {
+    return 0.0;
+}
+
+float Navigator_SimpleObstruct2D::getObstructSpeed()
+{
+    return 0.0;
+}
+
+bool Navigator_SimpleObstruct2D::processTerrain()
+{
+    return false; // This one isn't bothering with terrain
+}
+
+bool Navigator_SimpleObstruct2D::processObstruct()
+{
+    return false; // This should figure out speed, and turn left if something is in the way
+}
+
+bool Navigator_SimpleObstruct2D::processAnimals()
+{
+    return false; // Use this possibly for altitude?
+}
+
+void Navigator_SimpleObstruct2D::operator()(Signal* psigMain)
+{
+    Signal& sigMain = *psigMain;
+    Signal sigImages;
+    psigImages = new Signal(sigImages);
+
     if (pCamera == nullptr) {
         printf("No camera\n");
         return;
     }
     std::thread thrCamera(*pCamera, (void*)&updateDepthCamera, (void*)this);
 
-    //Nav Loop here
+    bool bDone = false;
+    do {
+        sigImages.wait();
+
+        if (!(bNewImgDepth && bNewImgRGB)) continue; // Wait until new images of both
+        if (processObstruct()) {
+            bIsDirty = true;
+            sigMain.signal();
+        }
+
+        bNewImgDepth = false;
+        bNewImgRGB = false;
+        bool bSignal = false;
+        bSignal = processTerrain();
+        bSignal = processAnimals() || bSignal;
+        if (bSignal) {
+            bIsDirty = true;
+            sigMain.signal();
+        }
+        break;
+    } while(!bDone);
 
     thrCamera.join();
+    delete psigMain;
+    delete psigImages;
 }
 
 // ***************
 // Drive_TwinTrack
 
+Drive_TwinTrack::Drive_TwinTrack(Navigator& nav)
+: Drive(nav)
+{
+}
+
 bool Drive_TwinTrack::_decide()
 {
-    return false;
+    // Tell the nav it isn't dirty anymore
+    float _fSteer = nav.getObstructDirection();
+    float _fSpeed = nav.getObstructSpeed();
+
+    fSpeed = _fSpeed;
+    fSteer = _fSteer;
+    return true;
 }
 
 // ***************
@@ -111,25 +195,21 @@ DroneNavigation::DroneNavigation(Navigator& _nav, Drive& _drive)
 void DroneNavigation::operator()(void)
 {
     printf("DroneNavigation Thread\n");
-    Signal signalNav;
-    std::thread thrNav(nav, signalNav);
+    std::thread thrNav(nav, new Signal(signalMainMessage));
     bool bDone = false;
     do {
         if (nav.isDirty()) {
+            nav.setClean();
             _decide();
-            if (bNeedGuidance) {
-                _sendGuidance();
-                bNeedGuidance = false;
-            }
         }
-        signalNav.wait(drive.getLoopTimeoutMS());
+        signalMainMessage.wait(drive.getLoopTimeoutMS());
     } while (!bDone);
 }
 
 void DroneNavigation::_decide()
 {
     if (drive._decide()) {
-        bNeedGuidance = true;
+       _sendGuidance();
     }
 }
 

@@ -3,25 +3,31 @@
 #include "cameraMulti.h"
 #include "locksignal.h"
 
+
 class Navigator {
 public:
     virtual ~Navigator() {}
-    virtual bool checkTerrain(image imgRGB) { return false; }
-    virtual bool checkTerrain(image imgRGB, image imgIR) { return false; }
-    virtual bool checkObstruct(image imgRGB) { return false; }
-    virtual bool checkObstruct(image imgRGB, image imgDepth) { return false; }
-    virtual bool checkAnimals(image imgRGB) { return false; }
-    virtual bool checkAltitude(image imgRGB) { return false; }
-    virtual bool checkAltitude(image imgRGB, image imgDepth) { return false; }
+    virtual void newImageRGB(image imgRGB, bool bSignal) { }
+    virtual void newImageIR(image imgIR, bool bSignal) { }
+    virtual void newImageDepth(image imgDepth, bool bSignal) { }
+    virtual void newImageREdge(image newImageREdge, bool bSignal) { }
+    
+    virtual float getTerrainDirection() { return 0.0; }
+    virtual float getTerrainSpeed() { return 0.0; }
+    virtual float getTerrainClimb() { return 0.0; }
+    virtual float getObstructDirection() { return 0.0; }
+    virtual float getObstructSpeed() { return 0.0; }
+    virtual float getObstructClimb() { return 0.0; }
 
     virtual bool isDirty() const { return false; }
+    virtual void setClean() {}
 
-    virtual void operator()(Signal) {}
+    virtual void operator()(Signal*) {}
 };
 
 class Drive {
 public:
-    Drive();
+    Drive(Navigator& nav);
     virtual ~Drive() {}
 
     virtual bool _decide() = 0;
@@ -33,6 +39,7 @@ public:
     virtual int getLoopTimeoutMS() const { return 100;}
 
 protected:
+    Navigator& nav;
     float fSpeed;
     float fSteer;
     float fClimb;
@@ -43,22 +50,34 @@ public:
     Navigator_SimpleObstruct2D();
     virtual ~Navigator_SimpleObstruct2D();
     
-    virtual bool checkTerrain(image imgRGB) override;
-    virtual bool checkObstruct(image imgRGB, image imgDepth) override;
-
+    virtual void newImageRGB(image imgRGB, bool bSignal) override;
+    virtual void newImageDepth(image imgDepth, bool bSignal) override;
+    virtual float getObstructDirection() override;
+    virtual float getObstructSpeed() override;
 
     virtual bool isDirty() const override { return bIsDirty; }
+    virtual void setClean() override { bIsDirty = false; }
 
-    virtual void operator()(Signal) override;
+    virtual void operator()(Signal*) override;
 
 private:
-    bool bIsDirty;
+    bool processTerrain();
+    bool processObstruct();
+    bool processAnimals();
 
+    bool bIsDirty;
+    bool bNewImgRGB;
+    bool bNewImgDepth;
     cameraMulti* pCamera;
+    Signal* psigImages;
+    image imgRGB;
+    image imgDepth;
+    Mutex mtImages;
 };
 
 class Drive_TwinTrack: public Drive {
 public:
+    Drive_TwinTrack(Navigator& nav);
     virtual bool _decide() override;
 };
 
@@ -72,7 +91,7 @@ public:
     void _sendGuidance();
 
 private:
-    bool bNeedGuidance;
+    Signal signalMainMessage;
 
     Navigator& nav;
     Drive& drive;
