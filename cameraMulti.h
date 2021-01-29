@@ -4,12 +4,17 @@
 #include <opencv2/opencv.hpp>   // Include OpenCV API
 #include <thread>
 
-typedef int image;
+typedef cv::Mat image;
+
+class cameraMulti;
 
 class cameraFrame {
 public:
     cameraFrame();
+    cameraFrame(const cameraFrame& other);
+    cameraFrame& operator=(const cameraFrame& other);
     ~cameraFrame();
+
     image getImageRGB();
     image getImageDepth();
     image getImageIR();
@@ -26,6 +31,8 @@ private:
     cv::Mat* pDepth;
     cv::Mat* pIR;
     cv::Mat* pREdge;
+    int* piCount;
+    friend class cameraMulti;
 };
 
 class camera_RS {

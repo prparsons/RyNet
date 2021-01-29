@@ -67,11 +67,12 @@ int main( int argc, char** argv )
     // Clear (delete) memory: cudaFreeHost
     bool bContinueFlight = true;
     std::thread server((ServerLoop()));
-    Navigator_SimpleObstruct2D nav;
-	Drive_TwinTrack drive(nav);
-    DroneNavigation navSystem(nav, drive);
+
+    DroneNavigation<Drive_TwinTrack> navSystem;
+	Navigator_SimpleObstruct2D* pNav = new Navigator_SimpleObstruct2D;
+	navSystem.addNav(pNav);
     std::thread client(navSystem);
-    //std::thread client((DroneNavigation()));
+	
     do {
         server.join();
         client.join();

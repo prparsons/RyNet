@@ -36,11 +36,23 @@ void updateDepthCamera(cameraFrame* pFrame, void* pNavigator)
     }
 }
 
+float activ_null(const float& f) { return f; }
+
+
+// *********
+// Navigator
+
+Navigator::Navigator(float (*_activ)(const float&))
+: activ(_activ)
+{
+
+}
+
 // *****
 // Drive
 
-Drive::Drive(Navigator& _nav)
-: nav(_nav)
+Drive::Drive(std::vector<Navigator*>& _arNav)
+: arNav(_arNav)
 , fSpeed(0)
 , fSteer(0)
 , fClimb(0)
@@ -51,7 +63,7 @@ Drive::Drive(Navigator& _nav)
 // Navigator_SimpleObstruct2D
 
 Navigator_SimpleObstruct2D::Navigator_SimpleObstruct2D()
-: bIsDirty(false)
+: Navigator(&activ_null)
 , bNewImgRGB(false)
 , bNewImgDepth(false)
 , pCamera(nullptr)
@@ -99,16 +111,6 @@ void Navigator_SimpleObstruct2D::newImageDepth(image _imgDepth, bool bSignal)
     }
 }
 
-float Navigator_SimpleObstruct2D::getObstructDirection()
-{
-    return 0.0;
-}
-
-float Navigator_SimpleObstruct2D::getObstructSpeed()
-{
-    return 0.0;
-}
-
 bool Navigator_SimpleObstruct2D::processTerrain()
 {
     return false; // This one isn't bothering with terrain
@@ -142,19 +144,17 @@ void Navigator_SimpleObstruct2D::operator()(Signal* psigMain)
 
         if (!(bNewImgDepth && bNewImgRGB)) continue; // Wait until new images of both
         if (processObstruct()) {
-            bIsDirty = true;
+            flagDirty |= Navigator::SPEED | Navigator::STEER;
             sigMain.signal();
         }
 
         bNewImgDepth = false;
         bNewImgRGB = false;
-        bool bSignal = false;
-        bSignal = processTerrain();
-        bSignal = processAnimals() || bSignal;
-        if (bSignal) {
-            bIsDirty = true;
+        if (processTerrain()) {
+            flagDirty |= Navigator::STEER;
             sigMain.signal();
         }
+        processAnimals();
         break;
     } while(!bDone);
 
@@ -163,57 +163,25 @@ void Navigator_SimpleObstruct2D::operator()(Signal* psigMain)
     delete psigImages;
 }
 
+float Navigator_SimpleObstruct2D::_getConfidenceRaw()
+{
+    return 1.0;
+}
+
 // ***************
 // Drive_TwinTrack
 
-Drive_TwinTrack::Drive_TwinTrack(Navigator& nav)
-: Drive(nav)
+Drive_TwinTrack::Drive_TwinTrack(std::vector<Navigator*>& arNav)
+: Drive(arNav)
 {
 }
 
-bool Drive_TwinTrack::_decide()
+bool Drive_TwinTrack::_decide(Navigator&, Navigator::dirty)
 {
     // Tell the nav it isn't dirty anymore
-    float _fSteer = nav.getObstructDirection();
-    float _fSpeed = nav.getObstructSpeed();
+    float _fSteer = arNav[0]->getSpeed();
+    float _fSpeed = arNav[0]->getSteer();
 
     fSpeed = _fSpeed;
     fSteer = _fSteer;
-    return true;
-}
-
-// ***************
-// DroneNavigation
-
-DroneNavigation::DroneNavigation(Navigator& _nav, Drive& _drive)
-: nav(_nav)
-, drive(_drive)
-{
-    printf("DroneNavigation\n");
-}
-
-void DroneNavigation::operator()(void)
-{
-    printf("DroneNavigation Thread\n");
-    std::thread thrNav(nav, new Signal(signalMainMessage));
-    bool bDone = false;
-    do {
-        if (nav.isDirty()) {
-            nav.setClean();
-            _decide();
-        }
-        signalMainMessage.wait(drive.getLoopTimeoutMS());
-    } while (!bDone);
-}
-
-void DroneNavigation::_decide()
-{
-    if (drive._decide()) {
-       _sendGuidance();
-    }
-}
-
-void DroneNavigation::_sendGuidance()
-{
-
 }

@@ -7,33 +7,55 @@ cameraFrame::cameraFrame()
 , pDepth(nullptr)
 , pIR(nullptr)
 , pREdge(nullptr)
+, piCount(new int(0))
 {
 
 }
 
+cameraFrame::cameraFrame(const cameraFrame& other)
+{
+    (*this) = other;
+}
+
+cameraFrame& cameraFrame::operator=(const cameraFrame& other)
+{
+    pRGB = other.pRGB;
+    pDepth = other.pDepth;
+    pIR = other.pIR;
+    pREdge = other.pREdge;
+    piCount = other.piCount;
+    (*piCount)++;
+}
+
 cameraFrame::~cameraFrame()
 {
-    if (pRGB) delete pRGB;
-    if (pDepth) delete pDepth;
-    if (pIR) delete pIR;
-    if (pREdge) delete pREdge;
+    if (--(*piCount) == 0) {
+        delete pRGB;
+        delete pDepth;
+        delete pIR;
+        delete pREdge;
+        delete piCount;
+    }
 }
 
 cameraMulti* cameraMulti::OpenCamera(cameraType type, cameraFeatures features)
 {
     cameraMulti* pReturn = new cameraMulti(type, features);
-    return nullptr;
+    if (pReturn->pCameraRS == nullptr) {
+        delete pReturn;
+        return nullptr;
+    }
+    return pReturn;
 }
 
 cameraMulti::cameraMulti(cameraType type, cameraFeatures features)
 : pCameraRS(nullptr)
 {
-    pCameraRS = new camera_RS;
     if (type == cameraMulti_RS) {
+        pCameraRS = new camera_RS;
         if (features & cameraMulti_Depth) {
             pCameraRS->cfg.enable_stream(RS2_STREAM_DEPTH, 1280, 720);
         }
-
     }
 }
 
@@ -64,22 +86,22 @@ bool cameraFrame::hasREdge() const
 
 image cameraFrame::getImageRGB()
 {
-    return 0;
+    return image();
 }
 
 image cameraFrame::getImageDepth()
 {
-    return 0;
+    return image();
 }
 
 image cameraFrame::getImageIR()
 {
-    return 0;
+    return image();
 }
 
 image cameraFrame::getImageREdge()
 {
-    return 0;
+    return image();
 }
 
 void cameraMulti::runCameraLoop()
@@ -118,6 +140,9 @@ void cameraMulti::run_RS()
         const int h = depth.as<rs2::video_frame>().get_height();
 
         // Create OpenCV matrix of size (w,h) from the colorized depth data
-        Mat image(Size(w, h), CV_8UC3, (void*)depth.get_data(), Mat::AUTO_STEP);
+        //Mat image(Size(w, h), CV_8UC3, (void*)depth.get_data(), Mat::AUTO_STEP);
+        cameraFrame frame;
+        frame.pDepth = new Mat(Size(w, h), CV_8UC3, (void*)depth.get_data(), Mat::AUTO_STEP);
+        callbackFrame(&frame, pCallbackData);
     } while (!bDone);
 }
