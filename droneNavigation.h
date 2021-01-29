@@ -12,6 +12,7 @@ public:
     virtual void newImageRGB(image imgRGB, bool bSignal) { }
     virtual void newImageIR(image imgIR, bool bSignal) { }
     virtual void newImageDepth(image imgDepth, bool bSignal) { }
+    virtual void newImageDepthRaw(cameraFrame_depth depthRaw, bool bSignal) { }
     virtual void newImageREdge(image newImageREdge, bool bSignal) { }
 
     enum dirty {
@@ -85,6 +86,7 @@ public:
     
     virtual void newImageRGB(image imgRGB, bool bSignal) override;
     virtual void newImageDepth(image imgDepth, bool bSignal) override;
+    virtual void newImageDepthRaw(cameraFrame_depth depthRaw, bool bSignal) override;
 
     virtual void operator()(Signal*) override;
 
@@ -98,10 +100,12 @@ private:
 
     bool bNewImgRGB;
     bool bNewImgDepth;
+    bool bNewImgDepthRaw;
     cameraMulti* pCamera;
     Signal* psigImages;
     image imgRGB;
     image imgDepth;
+    cameraFrame_depth *pDepthRaw;
     Mutex mtImages;
 };
 

@@ -5,6 +5,11 @@
 #include <unistd.h>
 #include "cameraMulti.h"
 
+
+#define MIN_RANGE 0.6
+//#define FRAME_WIDTH 848
+//#define FRAME_HEIGHT 480
+
 void updateDepthCamera(cameraFrame* pFrame, void* pNavigator)
 {
     if (pFrame == nullptr || pNavigator == nullptr) {
@@ -66,7 +71,9 @@ Navigator_SimpleObstruct2D::Navigator_SimpleObstruct2D()
 : Navigator(&activ_null)
 , bNewImgRGB(false)
 , bNewImgDepth(false)
+, bNewImgDepthRaw(false)
 , pCamera(nullptr)
+, pDepthRaw(nullptr)
 {
     cameraMulti::cameraFeatures features = cameraMulti::cameraFeatures(cameraMulti::cameraMulti_RGB | cameraMulti::cameraMulti_Depth);
     pCamera = cameraMulti::OpenCamera(cameraMulti::cameraMulti_RS, features);
@@ -80,6 +87,9 @@ Navigator_SimpleObstruct2D::~Navigator_SimpleObstruct2D()
 {
     if (pCamera != nullptr) {
         delete pCamera;
+    }
+    if (pDepthRaw) {
+        delete pDepthRaw;
     }
 }
 
@@ -111,6 +121,21 @@ void Navigator_SimpleObstruct2D::newImageDepth(image _imgDepth, bool bSignal)
     }
 }
 
+void Navigator_SimpleObstruct2D::newImageDepthRaw(cameraFrame_depth _depthRaw, bool bSignal)
+{ 
+    ThreadLock locker(mtImages);
+    locker.lock();
+    bNewImgDepthRaw = true;
+    if (pDepthRaw) delete pDepthRaw;
+    pDepthRaw = new cameraFrame_depth(_depthRaw);
+    locker.unlock();
+    if (bSignal) {
+        if (psigImages != nullptr) {
+            psigImages->signal();
+        }
+    }
+}
+
 bool Navigator_SimpleObstruct2D::processTerrain()
 {
     return false; // This one isn't bothering with terrain
@@ -118,6 +143,74 @@ bool Navigator_SimpleObstruct2D::processTerrain()
 
 bool Navigator_SimpleObstruct2D::processObstruct()
 {
+    ThreadLock locker(mtImages);
+    locker.lock();
+    if (pDepthRaw == nullptr) {
+        printf("Not any raw data\n");
+        return false;
+    }
+    cameraFrame_depth depthRaw(*pDepthRaw);
+    locker.unlock();
+    {
+        //scoped_timer Timer("detect OpenMP loop");
+    bool arRegions[4][4];
+        // Use decimation filter to downsample
+        //rs2::decimation_filter downsample(8);
+        //frame = frame.apply_filter(downsample).as<rs2::depth_frame>();
+    const int iRegionWidth = depthRaw.getWidth() / 4;
+    const int iRegionHeight = depthRaw.getHeight() / 4;
+        // Dividing the frame in 16 sections (4x4)
+        //const int iRegionWidth = frame.get_width() / 4;
+        //const int iRegionHeight = frame.get_height() / 4;
+        // Return true if we find anything
+        bool bReturn = false;
+        // For each region find the minimum value in that region. Ignore zeroes,
+        //  since that's what RS uses for invalid values (need to verify this)
+        
+        // Can we use any simd here?
+        // With the decimation filter enabled threading slows things down
+        //#pragma omp parallel for
+        for (int iRegionX = 0; iRegionX < 4; iRegionX++) {
+            for (int iRegionY = 0; iRegionY < 4; iRegionY++) {
+                const int iStartX = iRegionX * iRegionWidth;
+                //const int iEndX = iRegionX == 3 ? frame.get_width() : iStartX + iRegionWidth;
+    const int iEndX = iRegionX == 3 ? depthRaw.getWidth() : iStartX + iRegionWidth;
+                bool bClose = false;
+    point pt;
+    pt.iXY[0] = iStartX;
+    for (int& x = pt.iXY[0]; x < iEndX; x++) {
+                //for (int x = iStartX; x < iEndX; x++) {
+                    const int iStartY = iRegionY * iRegionHeight;
+                    //const int iEndY = iRegionY == 3 ? frame.get_height() : iStartY + iRegionHeight;
+    const int iEndY = iRegionY == 3 ? depthRaw.getHeight() : iStartY + iRegionHeight;
+    pt.iXY[1] = iStartY;
+    for (int& y = pt.iXY[1]; y < iEndY; y++) {
+                    //for (int y = iStartY; y < iEndY; y++) {
+                        //float fValue = frame.get_distance(x, y);
+    float fValue = depthRaw[{x, y}];
+                        if ((fValue < MIN_RANGE) && (fValue != 0.0)) {
+                            bClose = true;
+                            break;
+                        }
+                    }
+                    if (bClose) {
+                        break;
+                    }
+                }
+                arRegions[iRegionX][iRegionY] = bClose;
+                bReturn = bReturn || bClose;
+            }
+        }
+
+    if (bReturn) {
+        for (int i = 1; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                if (arRegions[i][j]) return true;
+            }
+        }
+        return false;
+    }
+    }
     return false; // This should figure out speed, and turn left if something is in the way
 }
 
@@ -142,18 +235,22 @@ void Navigator_SimpleObstruct2D::operator()(Signal* psigMain)
     do {
         sigImages.wait();
 
-        if (!(bNewImgDepth && bNewImgRGB)) continue; // Wait until new images of both
+        if (!(bNewImgDepth && bNewImgDepthRaw&& bNewImgRGB)) continue; // Wait until new images of both
+        // Very first thing check for obstructions. If there are, immediately signal that speed/steer have been affected
         if (processObstruct()) {
             flagDirty |= Navigator::SPEED | Navigator::STEER;
             sigMain.signal();
         }
-
+        // After that, check terrain
         bNewImgDepth = false;
         bNewImgRGB = false;
+        bNewImgDepthRaw = false;
         if (processTerrain()) {
+            // If somewhere else looks better, flag steering
             flagDirty |= Navigator::STEER;
             sigMain.signal();
         }
+        // After navigation, see if we detected any animals (caching training images)
         processAnimals();
         break;
     } while(!bDone);

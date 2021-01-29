@@ -8,6 +8,28 @@ typedef cv::Mat image;
 
 class cameraMulti;
 
+struct point {
+    int iXY[2];
+};
+
+class cameraFrame_depth:protected rs2::depth_frame {
+public:
+    cameraFrame_depth(const rs2::depth_frame& _frame);
+    ~cameraFrame_depth();
+
+    float operator[](const point& xy) const { return get_distance(xy.iXY[0], xy.iXY[1]); }
+    int getMetersPerUnit() const { return get_units(); }
+
+    int getWidth() const { return get_width(); }
+    int getHeight() const { return get_height(); }
+
+    void applyDecimationFilter();
+
+private:
+    rs2::decimation_filter* pDownsample;
+};
+
+
 class cameraFrame {
 public:
     cameraFrame();
@@ -17,6 +39,7 @@ public:
 
     image getImageRGB();
     image getImageDepth();
+    cameraFrame_depth getImageDepthRaw();
     image getImageIR();
     image getImageREdge();
 
@@ -31,6 +54,7 @@ private:
     cv::Mat* pDepth;
     cv::Mat* pIR;
     cv::Mat* pREdge;
+    cameraFrame_depth* pDepthRaw;
     int* piCount;
     friend class cameraMulti;
 };
@@ -52,7 +76,10 @@ public:
         cameraMulti_RGB = 0x01,
         cameraMulti_IR = 0x02,
         cameraMulti_Depth = 0x04,
-        cameraMulti_REdge = 0x08 };
+        cameraMulti_REdge = 0x08,
+
+        cameraMulti_DownsampleDepth = 0x10
+    };
 
     static cameraMulti* OpenCamera(cameraType type, cameraFeatures features);
     static bool isCameraTypeAvail(cameraType type);

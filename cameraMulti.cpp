@@ -2,11 +2,35 @@
 
 using namespace cv;
 
+cameraFrame_depth::cameraFrame_depth(const rs2::depth_frame& _frame)
+: rs2::depth_frame(_frame)
+, pDownsample(nullptr)
+{
+
+}
+
+cameraFrame_depth::~cameraFrame_depth()
+{
+    if (pDownsample) {
+        delete pDownsample;
+    }
+}
+
+void cameraFrame_depth::applyDecimationFilter()
+{
+    pDownsample = new rs2::decimation_filter(8);
+    *this = apply_filter(*pDownsample).as<rs2::depth_frame>();
+}
+
+// ***********
+// cameraFrame
+
 cameraFrame::cameraFrame()
 : pRGB(nullptr)
 , pDepth(nullptr)
 , pIR(nullptr)
 , pREdge(nullptr)
+, pDepthRaw(nullptr)
 , piCount(new int(0))
 {
 
@@ -24,6 +48,7 @@ cameraFrame& cameraFrame::operator=(const cameraFrame& other)
     pIR = other.pIR;
     pREdge = other.pREdge;
     piCount = other.piCount;
+    pDepthRaw = other.pDepthRaw;
     (*piCount)++;
 }
 
@@ -32,11 +57,60 @@ cameraFrame::~cameraFrame()
     if (--(*piCount) == 0) {
         delete pRGB;
         delete pDepth;
+        delete pDepthRaw;
         delete pIR;
         delete pREdge;
         delete piCount;
     }
 }
+
+bool cameraFrame::hasRGB() const
+{
+    return pRGB != nullptr;
+}
+
+bool cameraFrame::hasIR() const
+{
+    return pIR != nullptr;
+}
+
+bool cameraFrame::hasDepth() const
+{
+    return pDepth != nullptr;
+}
+
+bool cameraFrame::hasREdge() const
+{
+    return pREdge != nullptr;
+}
+
+image cameraFrame::getImageRGB()
+{
+    return *pRGB;
+}
+
+image cameraFrame::getImageDepth()
+{
+    return *pDepth;
+}
+
+cameraFrame_depth cameraFrame::getImageDepthRaw()
+{
+    return *pDepthRaw;
+}
+
+image cameraFrame::getImageIR()
+{
+    return *pIR;
+}
+
+image cameraFrame::getImageREdge()
+{
+    return *pREdge;
+}
+
+// ***********
+// cameraMulti
 
 cameraMulti* cameraMulti::OpenCamera(cameraType type, cameraFeatures features)
 {
@@ -64,56 +138,11 @@ cameraMulti::~cameraMulti()
     if (pCameraRS != nullptr) delete pCameraRS;
 }
 
-bool cameraFrame::hasRGB() const
-{
-    return true;
-}
-
-bool cameraFrame::hasIR() const
-{
-    return true;
-}
-
-bool cameraFrame::hasDepth() const
-{
-    return true;
-}
-
-bool cameraFrame::hasREdge() const
-{
-    return false;
-}
-
-image cameraFrame::getImageRGB()
-{
-    return image();
-}
-
-image cameraFrame::getImageDepth()
-{
-    return image();
-}
-
-image cameraFrame::getImageIR()
-{
-    return image();
-}
-
-image cameraFrame::getImageREdge()
-{
-    return image();
-}
-
 void cameraMulti::runCameraLoop()
 {
-    /*
-    while (true) {
-        cameraFrame* pFrame = nullptr;
-        if (callbackFrame != nullptr) {
-            callbackFrame(pFrame, pCallbackData);
-        }
+    if (type == cameraMulti_RS) {
+        run_RS();
     }
-    */
 }
 
 void cameraMulti::operator()(void* pCallbackFrame, void* _pCallbackData)
@@ -126,14 +155,21 @@ void cameraMulti::operator()(void* pCallbackFrame, void* _pCallbackData)
 void cameraMulti::run_RS()
 {
     // Declare depth colorizer for pretty visualization of depth data
-    rs2::colorizer color_map;
+    rs2::colorizer color_map(2); // 2 should give us a white to black color map
 
     pCameraRS->pipe.start();
     bool bDone = false;
     do {
         rs2::frameset data = pCameraRS->pipe.wait_for_frames(); // Wait for next set of frames from the camera
-        //data = data.apply_filter(filter);
-        rs2::frame depth = data.get_depth_frame().apply_filter(color_map);
+        // Create camera frame
+        cameraFrame frame;
+        // Save the raw depth. If applying the decimation filter, before/after color map makes a difference in 
+        //      how big the image is
+        frame.pDepthRaw = new cameraFrame_depth(data.get_depth_frame());
+        if (features & cameraMulti_DownsampleDepth) {
+            frame.pDepthRaw->applyDecimationFilter();
+        }
+        rs2::frame depth = ((rs2::frame*)frame.pDepthRaw)->apply_filter(color_map);
 
         // Query frame size (width and height)
         const int w = depth.as<rs2::video_frame>().get_width();
@@ -141,7 +177,6 @@ void cameraMulti::run_RS()
 
         // Create OpenCV matrix of size (w,h) from the colorized depth data
         //Mat image(Size(w, h), CV_8UC3, (void*)depth.get_data(), Mat::AUTO_STEP);
-        cameraFrame frame;
         frame.pDepth = new Mat(Size(w, h), CV_8UC3, (void*)depth.get_data(), Mat::AUTO_STEP);
         callbackFrame(&frame, pCallbackData);
     } while (!bDone);
