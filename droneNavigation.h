@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "cameraMulti.h"
+#include "comms.h"
 #include "locksignal.h"
 
 class Navigator {
@@ -125,8 +126,7 @@ public:
 
     void addNav(Navigator* pNav);
 
-private:    
-    void _decide();
+private:
     void _sendGuidance();
 
     Signal signalMainMessage;
@@ -164,7 +164,6 @@ void DroneNavigation<DriveType>::operator()(void)
 
     bool bDone = false;
     do {
-            _decide();
         for (int i = 0; i < arNav.size(); i++) {
             Navigator::dirty isDirty = arNav[i]->isDirty();
             if (isDirty) {
@@ -185,13 +184,16 @@ void DroneNavigation<DriveType>::addNav(Navigator* pNav)
 }
 
 template<class DriveType>
-void DroneNavigation<DriveType>::_decide()
-{
-
-}
-
-template<class DriveType>
 void DroneNavigation<DriveType>::_sendGuidance()
 {
-
+    char strCommand[500];
+    snprintf(   strCommand, 
+                500,
+                "<page><command><speed>%1.5f</speed></command><command><steer>%1.5f</steer></command><command><climb>%1.5f</climb></command></page>",
+                drive.getSpeed(),
+                drive.getSteer(),
+                drive.getClimb());
+    if (!sendXML(strCommand)) {
+        printf("Failed to send guidance\n");
+    }
 }

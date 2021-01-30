@@ -75,6 +75,8 @@ Navigator_SimpleObstruct2D::Navigator_SimpleObstruct2D()
 , pCamera(nullptr)
 , pDepthRaw(nullptr)
 {
+    fSpeed = 0.5;
+
     cameraMulti::cameraFeatures features = cameraMulti::cameraFeatures(cameraMulti::cameraMulti_RGB | cameraMulti::cameraMulti_Depth);
     pCamera = cameraMulti::OpenCamera(cameraMulti::cameraMulti_RS, features);
     if (pCamera == nullptr) {
@@ -206,11 +208,14 @@ bool Navigator_SimpleObstruct2D::processObstruct()
         for (int i = 1; i < 3; i++) {
             for (int j = 0; j < 3; j++) {
                 if (arRegions[i][j]) return true;
+                fSteer = -1.0;
             }
         }
+        fSteer = 0;
         return false;
     }
     }
+    fSteer = 0;
     return false; // This should figure out speed, and turn left if something is in the way
 }
 
@@ -281,4 +286,40 @@ bool Drive_TwinTrack::_decide(Navigator&, Navigator::dirty)
 
     fSpeed = _fSpeed;
     fSteer = _fSteer;
+}
+
+bool sendXML(const char* strMessage)
+{
+	int socket_desc;
+	struct sockaddr_in server;
+	
+	//Create socket
+	socket_desc = socket(AF_INET , SOCK_STREAM , 0);
+	if (socket_desc == -1)
+	{
+		printf("Could not create socket");
+	}
+		
+	server.sin_addr.s_addr = inet_addr(HOST);
+	server.sin_family = AF_INET;
+	server.sin_port = htons( PORT );
+
+	//Connect to remote server
+	if (connect(socket_desc , (struct sockaddr *)&server , sizeof(server)) < 0)
+	{
+		puts("connect error");
+		return 1;
+	}
+	
+	puts("Connected\n");
+	
+	//Send some data
+	if( send(socket_desc , strMessage , strlen(strMessage) , 0) < 0)
+	{
+		puts("Send failed");
+		return false;
+	}
+	puts("Data Send\n");
+	
+	return true;
 }
