@@ -224,45 +224,46 @@ bool Navigator_SimpleObstruct2D::processAnimals()
     return false; // Use this possibly for altitude?
 }
 
-void Navigator_SimpleObstruct2D::operator()(Signal* psigMain)
+void Navigator_SimpleObstruct2D::_run(Signal* psigMain)
 {
     try {
-    Signal& sigMain = *psigMain;
-    Signal sigImages;
-    psigImages = new Signal(sigImages);
+        Signal& sigMain = *psigMain;
+        Signal sigImages;
+        psigImages = new Signal(sigImages);
 
-    if (pCamera == nullptr) {
-        printf("No camera\n");
-        return;
-    }
-    std::thread thrCamera(*pCamera, (void*)&updateDepthCamera, (void*)this);
-
-    do {
-        sigImages.wait();
-
-        if (!(bNewImgDepth && bNewImgDepthRaw&& bNewImgRGB)) continue; // Wait until new images of both
-        // Very first thing check for obstructions. If there are, immediately signal that speed/steer have been affected
-        if (processObstruct()) {
-            flagDirty |= Navigator::SPEED | Navigator::STEER;
-            sigMain.signal();
+        if (pCamera == nullptr) {
+            printf("No camera\n");
+            return;
         }
-        // After that, check terrain
-        bNewImgDepth = false;
-        bNewImgRGB = false;
-        bNewImgDepthRaw = false;
-        if (processTerrain()) {
-            // If somewhere else looks better, flag steering
-            flagDirty |= Navigator::STEER;
-            sigMain.signal();
-        }
-        // After navigation, see if we detected any animals (caching training images)
-        processAnimals();
-        break;
-    } while(!ss.shouldStop());
-    pCamera->ss.stop();
-    thrCamera.join();
-    delete psigMain;
-    delete psigImages;
+        //std::thread thrCamera(*pCamera, (void*)&updateDepthCamera, (void*)this);
+        std::thread thrCamera(&cameraMulti::run, pCamera, (void*)&updateDepthCamera, (void*)this);
+
+        do {
+            sigImages.wait();
+
+            if (!(bNewImgDepth && bNewImgDepthRaw&& bNewImgRGB)) continue; // Wait until new images of both
+            // Very first thing check for obstructions. If there are, immediately signal that speed/steer have been affected
+            if (processObstruct()) {
+                flagDirty |= Navigator::SPEED | Navigator::STEER;
+                sigMain.signal();
+            }
+            // After that, check terrain
+            bNewImgDepth = false;
+            bNewImgRGB = false;
+            bNewImgDepthRaw = false;
+            if (processTerrain()) {
+                // If somewhere else looks better, flag steering
+                flagDirty |= Navigator::STEER;
+                sigMain.signal();
+            }
+            // After navigation, see if we detected any animals (caching training images)
+            processAnimals();
+            break;
+        } while(!ss.shouldStop());
+        pCamera->ss.stop();
+        thrCamera.join();
+        delete psigMain;
+        delete psigImages;
     } catch (rs2::error e) {
         std::cout << "Camera Error. Type: " << e.get_type() << std::endl;
         std::cout << "Camera Error. Function: " << e.get_failed_function() << std::endl;

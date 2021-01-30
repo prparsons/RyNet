@@ -145,7 +145,7 @@ void cameraMulti::runCameraLoop()
     }
 }
 
-void cameraMulti::operator()(void* pCallbackFrame, void* _pCallbackData)
+void cameraMulti::run(void* pCallbackFrame, void* _pCallbackData)
 {
     callbackFrame = (void(*)(cameraFrame*, void*))pCallbackFrame;
     pCallbackData = _pCallbackData;

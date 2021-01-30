@@ -41,7 +41,8 @@ public:
 
     //void setActivationFunction(activ _activ_func) { active_func = _active_func; }
 
-    virtual void operator()(Signal*) { }
+    virtual void run(Signal* psigMain) { _run(psigMain); }
+    virtual void _run(Signal* psigMain) = 0;
     StopSignal ss;
 
 protected:
@@ -90,7 +91,7 @@ public:
     virtual void newImageDepth(image imgDepth, bool bSignal) override;
     virtual void newImageDepthRaw(cameraFrame_depth depthRaw, bool bSignal) override;
 
-    virtual void operator()(Signal*) override;
+    virtual void _run(Signal* psigMain) override;
 
 protected:
     virtual float _getConfidenceRaw() override;
@@ -123,7 +124,8 @@ public:
     DroneNavigation();
     ~DroneNavigation();
 
-    void operator()(void);
+    void run();
+    StopSignal ss;
 
     void addNav(Navigator* pNav);
 
@@ -155,16 +157,15 @@ DroneNavigation<DriveType>::~DroneNavigation()
 }
 
 template<class DriveType>
-void DroneNavigation<DriveType>::operator()(void)
+void DroneNavigation<DriveType>::run(void)
 {
-    printf("DroneNavigation Thread\n");
+    std::cout << "DroneNavigation Thread\n";
     // std::system_error if the thread could not be started.
     std::vector<std::thread*> arNavThreads(arNav.size());
     for (int i = 0; i < arNav.size(); i++) {
-        arNavThreads[i] = new std::thread(*(arNav[i]), new Signal(signalMainMessage));
+        arNavThreads[i] = new std::thread(&Navigator::run, arNav[i], new Signal(signalMainMessage));
     }
 
-    bool bDone = false;
     do {
         for (int i = 0; i < arNav.size(); i++) {
             Navigator::dirty isDirty = arNav[i]->isDirty();
@@ -176,7 +177,7 @@ void DroneNavigation<DriveType>::operator()(void)
             }
         }
         signalMainMessage.wait(drive.getLoopTimeoutMS());
-    } while (!bDone);
+    } while (!ss.shouldStop());
     for (int i = 0; i< arNav.size(); i++) {
         arNav[i]->ss.stop();
         arNavThreads[i]->join();

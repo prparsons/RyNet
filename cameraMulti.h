@@ -88,9 +88,9 @@ public:
 
     void runCameraLoop();
     cameraFrame* waitForCamera();
-    void operator()(void* pCallbackFrame, void* pCallbackData);
+    void run(void* pCallbackFrame, void* pCallbackData);
     StopSignal ss;
-    
+
 protected:
     cameraMulti(cameraType, cameraFeatures);
 
