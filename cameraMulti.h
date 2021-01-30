@@ -4,10 +4,10 @@
 #include <opencv2/opencv.hpp>   // Include OpenCV API
 #include <thread>
 
+#include "locksignal.h"
+
 typedef cv::Mat image;
-
 class cameraMulti;
-
 struct point {
     int iXY[2];
 };
@@ -89,7 +89,8 @@ public:
     void runCameraLoop();
     cameraFrame* waitForCamera();
     void operator()(void* pCallbackFrame, void* pCallbackData);
-
+    StopSignal ss;
+    
 protected:
     cameraMulti(cameraType, cameraFeatures);
 

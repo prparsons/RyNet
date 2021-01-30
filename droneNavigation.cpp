@@ -226,6 +226,7 @@ bool Navigator_SimpleObstruct2D::processAnimals()
 
 void Navigator_SimpleObstruct2D::operator()(Signal* psigMain)
 {
+    try {
     Signal& sigMain = *psigMain;
     Signal sigImages;
     psigImages = new Signal(sigImages);
@@ -236,7 +237,6 @@ void Navigator_SimpleObstruct2D::operator()(Signal* psigMain)
     }
     std::thread thrCamera(*pCamera, (void*)&updateDepthCamera, (void*)this);
 
-    bool bDone = false;
     do {
         sigImages.wait();
 
@@ -258,11 +258,32 @@ void Navigator_SimpleObstruct2D::operator()(Signal* psigMain)
         // After navigation, see if we detected any animals (caching training images)
         processAnimals();
         break;
-    } while(!bDone);
-
+    } while(!ss.shouldStop());
+    pCamera->ss.stop();
     thrCamera.join();
     delete psigMain;
     delete psigImages;
+    } catch (rs2::error e) {
+        std::cout << "Camera Error. Type: " << e.get_type() << std::endl;
+        std::cout << "Camera Error. Function: " << e.get_failed_function() << std::endl;
+        std::cout << "Camera Error. Args: " << e.get_failed_args() << std::endl;
+
+        static int iRetryCount = 0;
+        // Try 3 times to restart the camera
+        if (iRetryCount++ < 3) {
+            std::cout << "Camera Error. Restart attempt: " << iRetryCount << std::endl;
+            //figure out if thread is running...if so stop it
+            delete pCamera;
+            ss.reset();
+            pCamera = cameraMulti::OpenCamera(cameraMulti::cameraMulti_RS, cameraMulti::cameraFeatures(cameraMulti::cameraMulti_RGB | cameraMulti::cameraMulti_Depth));
+            if (pCamera != nullptr) {
+                delete psigMain;
+                //this needs to be a function I can call
+            } else {
+                std::cout << "Camera Error. Unable to create new camera.\n";
+            }
+        }
+    }
 }
 
 float Navigator_SimpleObstruct2D::_getConfidenceRaw()

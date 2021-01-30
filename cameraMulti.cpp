@@ -158,7 +158,6 @@ void cameraMulti::run_RS()
     rs2::colorizer color_map(2); // 2 should give us a white to black color map
 
     pCameraRS->pipe.start();
-    bool bDone = false;
     do {
         rs2::frameset data = pCameraRS->pipe.wait_for_frames(); // Wait for next set of frames from the camera
         // Create camera frame
@@ -179,5 +178,5 @@ void cameraMulti::run_RS()
         //Mat image(Size(w, h), CV_8UC3, (void*)depth.get_data(), Mat::AUTO_STEP);
         frame.pDepth = new Mat(Size(w, h), CV_8UC3, (void*)depth.get_data(), Mat::AUTO_STEP);
         callbackFrame(&frame, pCallbackData);
-    } while (!bDone);
+    } while (!ss.shouldStop());
 }

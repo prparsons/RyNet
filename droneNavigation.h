@@ -42,6 +42,7 @@ public:
     //void setActivationFunction(activ _activ_func) { active_func = _active_func; }
 
     virtual void operator()(Signal*) { }
+    StopSignal ss;
 
 protected:
     virtual float _getConfidenceRaw() { return 0.0; }
@@ -157,6 +158,7 @@ template<class DriveType>
 void DroneNavigation<DriveType>::operator()(void)
 {
     printf("DroneNavigation Thread\n");
+    // std::system_error if the thread could not be started.
     std::vector<std::thread*> arNavThreads(arNav.size());
     for (int i = 0; i < arNav.size(); i++) {
         arNavThreads[i] = new std::thread(*(arNav[i]), new Signal(signalMainMessage));
@@ -175,6 +177,10 @@ void DroneNavigation<DriveType>::operator()(void)
         }
         signalMainMessage.wait(drive.getLoopTimeoutMS());
     } while (!bDone);
+    for (int i = 0; i< arNav.size(); i++) {
+        arNav[i]->ss.stop();
+        arNavThreads[i]->join();
+    }
 }
 
 template<class DriveType>

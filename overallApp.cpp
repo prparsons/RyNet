@@ -72,7 +72,7 @@ int main( int argc, char** argv )
 	Navigator_SimpleObstruct2D* pNav = new Navigator_SimpleObstruct2D;
 	navSystem.addNav(pNav);
     std::thread client(navSystem);
-	
+	// std::system_error if the thread could not be started.
     do {
         server.join();
         client.join();
