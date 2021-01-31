@@ -29,7 +29,8 @@ void updateDepthCamera(cameraFrame* pFrame, void* pNavigator)
     nav.newImageRGB(imageRGB, !(bDepth || bIR || bREdge));
     if (bDepth) {
         image imageDepth = pFrame->getImageDepth();
-        nav.newImageDepth(imageDepth, !(bIR || bREdge));
+        nav.newImageDepth(imageDepth, false);
+        nav.newImageDepthRaw(pFrame->getImageDepthRaw(), !(bIR || bREdge));
     }
     if (bIR) {
         image imageIR = pFrame->getImageIR();
@@ -207,8 +208,10 @@ bool Navigator_SimpleObstruct2D::processObstruct()
     if (bReturn) {
         for (int i = 1; i < 3; i++) {
             for (int j = 0; j < 3; j++) {
-                if (arRegions[i][j]) return true;
-                fSteer = -1.0;
+                if (arRegions[i][j]) {
+                    fSteer = -1.0;
+                    return true;
+                }
             }
         }
         fSteer = 0;
@@ -240,17 +243,24 @@ void Navigator_SimpleObstruct2D::_run(Signal* psigMain)
 
         do {
             sigImages.wait();
-
-            if (!(bNewImgDepth && bNewImgDepthRaw&& bNewImgRGB)) continue; // Wait until new images of both
+            
+            ThreadLock locker(mtImages);
+            locker.lock();
+            if (!(bNewImgDepth && bNewImgDepthRaw && bNewImgRGB)) {
+                locker.unlock();
+                continue; // Wait until new images of both
+            }
+            bNewImgDepth = false;
+            bNewImgRGB = false;
+            bNewImgDepthRaw = false;
+            locker.unlock();
+            
             // Very first thing check for obstructions. If there are, immediately signal that speed/steer have been affected
             if (processObstruct()) {
                 flagDirty |= Navigator::SPEED | Navigator::STEER;
                 sigMain.signal();
             }
             // After that, check terrain
-            bNewImgDepth = false;
-            bNewImgRGB = false;
-            bNewImgDepthRaw = false;
             if (processTerrain()) {
                 // If somewhere else looks better, flag steering
                 flagDirty |= Navigator::STEER;
@@ -258,7 +268,6 @@ void Navigator_SimpleObstruct2D::_run(Signal* psigMain)
             }
             // After navigation, see if we detected any animals (caching training images)
             processAnimals();
-            break;
         } while(!ss.shouldStop());
         pCamera->ss.stop();
         thrCamera.join();
@@ -302,12 +311,20 @@ Drive_TwinTrack::Drive_TwinTrack(std::vector<Navigator*>& arNav)
 
 bool Drive_TwinTrack::_decide(Navigator&, Navigator::dirty)
 {
+    return _decide();
+}
+
+bool Drive_TwinTrack::_decide()
+{
     // Tell the nav it isn't dirty anymore
-    float _fSteer = arNav[0]->getSpeed();
-    float _fSpeed = arNav[0]->getSteer();
+    float _fSteer = arNav[0]->getSteer();
+    float _fSpeed = arNav[0]->getSpeed();
+
+    bool bReturn = (fSpeed != _fSpeed) || (fSteer != _fSteer);
 
     fSpeed = _fSpeed;
     fSteer = _fSteer;
+    return bReturn;
 }
 
 bool sendXML(const char* strMessage)

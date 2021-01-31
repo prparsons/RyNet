@@ -31,7 +31,7 @@ cameraFrame::cameraFrame()
 , pIR(nullptr)
 , pREdge(nullptr)
 , pDepthRaw(nullptr)
-, piCount(new int(0))
+, piCount(new int(1))
 {
 
 }
@@ -122,8 +122,10 @@ cameraMulti* cameraMulti::OpenCamera(cameraType type, cameraFeatures features)
     return pReturn;
 }
 
-cameraMulti::cameraMulti(cameraType type, cameraFeatures features)
+cameraMulti::cameraMulti(cameraType _type, cameraFeatures _features)
 : pCameraRS(nullptr)
+, type(_type)
+, features(_features)
 {
     if (type == cameraMulti_RS) {
         pCameraRS = new camera_RS;
@@ -170,13 +172,20 @@ void cameraMulti::run_RS()
         }
         rs2::frame depth = ((rs2::frame*)frame.pDepthRaw)->apply_filter(color_map);
 
-        // Query frame size (width and height)
-        const int w = depth.as<rs2::video_frame>().get_width();
-        const int h = depth.as<rs2::video_frame>().get_height();
+        // Query depth frame size (width and height)
+        int w = depth.as<rs2::video_frame>().get_width();
+        int h = depth.as<rs2::video_frame>().get_height();
 
         // Create OpenCV matrix of size (w,h) from the colorized depth data
         //Mat image(Size(w, h), CV_8UC3, (void*)depth.get_data(), Mat::AUTO_STEP);
         frame.pDepth = new Mat(Size(w, h), CV_8UC3, (void*)depth.get_data(), Mat::AUTO_STEP);
+
+        // Now handle the rgb
+        rs2::frame rgb = data.get_color_frame();
+        w = rgb.as<rs2::video_frame>().get_width();
+        h = rgb.as<rs2::video_frame>().get_height();
+        frame.pRGB = new Mat(Size(w, h), CV_8UC3, (void*)rgb.get_data(), Mat::AUTO_STEP);
+
         callbackFrame(&frame, pCallbackData);
     } while (!ss.shouldStop());
 }

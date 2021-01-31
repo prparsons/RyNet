@@ -68,6 +68,7 @@ public:
     virtual ~Drive() {}
 
     virtual bool _decide(Navigator& nav, Navigator::dirty isDirty) = 0;
+    virtual bool _decide() = 0;
 
     float getSpeed() const { return fSpeed; }
     float getSteer() const { return fSteer; }
@@ -116,6 +117,7 @@ class Drive_TwinTrack: public Drive {
 public:
     Drive_TwinTrack(std::vector<Navigator*>& arNav);
     virtual bool _decide(Navigator& nav, Navigator::dirty isDirty) override;
+    virtual bool _decide() override;
 };
 
 template<class DriveType>
@@ -167,13 +169,22 @@ void DroneNavigation<DriveType>::run(void)
     }
 
     do {
+        bool bDecisionMade = false;
         for (int i = 0; i < arNav.size(); i++) {
             Navigator::dirty isDirty = arNav[i]->isDirty();
             if (isDirty) {
                 arNav[i]->setClean();
+                bDecisionMade = true;
                 if (drive._decide(*(arNav[i]), isDirty)) {
+                    printf("Dirty guidance send\n");
                     _sendGuidance();
                 }
+            }
+        }
+        if (!bDecisionMade) {
+            if (drive._decide()) {
+                printf("Clean guidance send\n");
+                _sendGuidance();
             }
         }
         signalMainMessage.wait(drive.getLoopTimeoutMS());
