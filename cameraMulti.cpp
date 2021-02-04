@@ -117,6 +117,7 @@ cameraMulti* cameraMulti::OpenCamera(cameraType type, cameraFeatures features)
     cameraMulti* pReturn = new cameraMulti(type, features);
     if (pReturn->pCameraRS == nullptr) {
         delete pReturn;
+        printf("cameraMulti didn't have valid pCameraRS - deleted\n");
         return nullptr;
     }
     return pReturn;
@@ -127,6 +128,7 @@ cameraMulti::cameraMulti(cameraType _type, cameraFeatures _features)
 , type(_type)
 , features(_features)
 {
+    printf("cameraMulti::cameraMulti\n");
     if (type == cameraMulti_RS) {
         pCameraRS = new camera_RS;
         if (features & cameraMulti_Depth) {
@@ -156,12 +158,30 @@ void cameraMulti::run(void* pCallbackFrame, void* _pCallbackData)
 
 void cameraMulti::run_RS()
 {
+    printf("cameraMulti::run_RS\n");
     // Declare depth colorizer for pretty visualization of depth data
     rs2::colorizer color_map(2); // 2 should give us a white to black color map
-
-    pCameraRS->pipe.start();
+    rs2::pipeline_profile pipelineInfo = pCameraRS->pipe.start();
+    if (!pipelineInfo) {
+        printf("cameraMulti error\n");
+        return;
+    }
     do {
-        rs2::frameset data = pCameraRS->pipe.wait_for_frames(); // Wait for next set of frames from the camera
+        rs2::frameset data;
+        try {
+            if (!pCameraRS->pipe.try_wait_for_frames(&data)) {
+                printf("cam fail\n");
+                return;
+            }; // Wait for next set of frames from the camera
+        } catch (rs2::error e) {
+            printf("wait fail, tryin 1 more time; %d\n", e.get_type());
+            std::this_thread::sleep_for (std::chrono::seconds(1));
+            try {
+                data = pCameraRS->pipe.wait_for_frames();
+            } catch(rs2::error) {
+                return;
+            }
+        }
         // Create camera frame
         cameraFrame frame;
         // Save the raw depth. If applying the decimation filter, before/after color map makes a difference in 

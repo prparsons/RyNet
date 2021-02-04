@@ -93,6 +93,7 @@ public:
 
 protected:
     cameraMulti(cameraType, cameraFeatures);
+    cameraMulti(const cameraMulti&);
 
     void run_RS();
 

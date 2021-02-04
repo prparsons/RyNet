@@ -87,7 +87,9 @@ inline StopSignal::StopSignal(const StopSignal& o)
 , piCount(o.piCount)
 , ul(*pm, std::defer_lock)
 {
+    ul.lock();
     *(piCount)++;
+    ul.unlock();
 }
 
 inline StopSignal::~StopSignal()
