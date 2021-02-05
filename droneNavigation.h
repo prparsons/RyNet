@@ -56,9 +56,12 @@ void DroneNavigation<DriveType>::run(void)
     }
 
     do {
+        printf("MainLoop\n");
         for (int i = 0; i < arNav.size(); i++) {
+            printf("MainLoop[%d]\n", i);
             Navigator::dirty isDirty = arNav[i]->isDirty();
             if (isDirty) {
+                printf("DroneNavigation::run isDirty true\n");
                 arNav[i]->setClean();
                 if (!drive.isPlanValid(*(arNav[i]), isDirty)) {
                     printf("Creating new plan\n");

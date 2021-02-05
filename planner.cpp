@@ -25,14 +25,21 @@ Drive_TwinTrack::Drive_TwinTrack(std::vector<Navigator*>& arNav)
 
 bool Drive_TwinTrack::isPlanValid(Navigator& nav, Navigator::dirty)
 {
-    return (fSpeed != nav.getSpeed()) || (fSteer != nav.getOrientation());
+    printf("Drive:%.1f;%.1f  Nav:%.1f;%.1f\n", fSpeed, fSteer, nav.getSpeed(), nav.getOrientation().fYaw);
+    bool bReturn = (fSpeed == nav.getSpeed()) && (fSteer == nav.getOrientation().fYaw);
+    if (bReturn) {
+        printf("isPlanValid(true)\n");
+        return true;
+    }
+    printf("isPlanValid(false)\n");
+    return false;
 }
 
 void Drive_TwinTrack::createNewPlan()
 {
-    printf("Drive_TwinTrack::_decide\n");
+    printf("Drive_TwinTrack::createNewPlan\n");
     // Tell the nav it isn't dirty anymore
-    float _fSteer = arNav[0]->getOrientation();
+    float _fSteer = arNav[0]->getOrientation().fYaw;
     float _fSpeed = arNav[0]->getSpeed();
 
     fSpeed = _fSpeed;
@@ -77,7 +84,7 @@ void Drive_TwinTrackAdv::createNewPlan()
 {
     printf("Drive_TwinTrackAdv::_decide\n");
     // Tell the nav it isn't dirty anymore
-    float _fSteer = arNav[0]->getOrientation();
+    float _fSteer = arNav[0]->getOrientation().fYaw;
     float _fSpeed = arNav[0]->getSpeed();
 
     fSpeed = _fSpeed;

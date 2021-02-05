@@ -19,6 +19,7 @@ public:
     float getSpeed() const { return fSpeed; }
     float getSteer() const { return fSteer; }
     float getClimb() const { return fClimb; }
+    Orientation getOrient() const { return orient; }
 
     virtual int getLoopTimeoutMS() const { return 1000;}
 
@@ -30,8 +31,12 @@ protected:
     float fSpeed; // 0 <-> 1 stopped to max speed
     float fSteer; // -1 <-> 1 full left to full right
     float fClimb; // -1 <-> 1 full dive to full climb
+    float fMaxSteer; // Max steering in degrees per sec
+    float fMaxSpeed; // m/s
+    float fMaxClimb; // m/s
+    // Direction of travel
+    Orientation orient;
     
-    //Need location, orientation and velocity
     //Need mapping from equation t to realtime
     //Need way to get new speed settings while incrementing t the correct amount since last update (time() libraries?)
 };
@@ -54,4 +59,8 @@ public:
 protected:
     DestinationEquation createRoute(float fX, float fY);
     bool isRouteObstructed(DestinationEquation, std::vector<Obstruction>&);
+
+    std::vector<Destination> arDestAvg;
+    std::vector<float> arSpeedAvg;
+    std::vector<Orientation> arOrientAvg;
 };

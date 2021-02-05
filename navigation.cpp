@@ -127,6 +127,7 @@ Navigator_SimpleObstruct2D::Navigator_SimpleObstruct2D()
 , pDepthRaw(nullptr)
 {
     fSpeed = 0.5;
+    flagDirty |= Navigator::SPEED | Navigator::STEER;
 
     cameraMulti::cameraFeatures features = cameraMulti::cameraFeatures(cameraMulti::cameraMulti_RGB | cameraMulti::cameraMulti_Depth);
     pCamera = cameraMulti::OpenCamera(cameraMulti::cameraMulti_RS, features);
@@ -196,6 +197,7 @@ bool Navigator_SimpleObstruct2D::processTerrain()
 
 bool Navigator_SimpleObstruct2D::processObstruct()
 {
+    static float fLastSteer = 0;
     ThreadLock locker(mtImages);
     locker.lock();
     if (pDepthRaw == nullptr) {
@@ -259,17 +261,23 @@ bool Navigator_SimpleObstruct2D::processObstruct()
         for (int i = 1; i < 3; i++) {
             for (int j = 0; j < 3; j++) {
                 if (arRegions[i][j]) {
-                    fSteer = -1.0;
+                    orient.fYaw = -1.0;
+                    if (fLastSteer == orient.fYaw) return false;
+                    fLastSteer = orient.fYaw;
                     return true;
                 }
             }
         }
-        fSteer = 0;
-        return false;
+        orient.fYaw = 0;
+        if (fLastSteer == orient.fYaw) return false;
+        fLastSteer = orient.fYaw;
+        return true;
     }
     }
-    fSteer = 0;
-    return false; // This should figure out speed, and turn left if something is in the way
+    orient.fYaw = 0;
+    if (fLastSteer == orient.fYaw) return false;
+    fLastSteer = orient.fYaw;
+    return true;// This should figure out speed, and turn left if something is in the way
 }
 
 bool Navigator_SimpleObstruct2D::processAnimals()
@@ -308,6 +316,7 @@ void Navigator_SimpleObstruct2D::_run(Signal* psigMain)
             
             // Very first thing check for obstructions. If there are, immediately signal that speed/steer have been affected
             if (processObstruct()) {
+                printf("Nav loop dirty obstruction\n");
                 flagDirty |= Navigator::SPEED | Navigator::STEER;
                 sigMain.signal();
             }

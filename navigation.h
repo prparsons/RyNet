@@ -37,6 +37,15 @@ private:
     u_int8_t* uObstructed;
 };
 
+class Orientation {
+public:
+    Orientation(): fPitch(0), fRoll(0), fYaw(0) {}
+
+    float fPitch;
+    float fRoll;
+    float fYaw;
+};
+
 class Navigator {
 public:
     Navigator(float (*activ)(const float&));
@@ -56,7 +65,7 @@ public:
         DEST_Z = 0x20
     };
     float getSpeed() { return fSpeed; } // 0 <-> 1 modifier of current speed
-    float getOrientation() { return fSteer; } //-1 <-> +1 change orientation respective to direction of travel (-1 is look 180 left, 1 is 180 right)
+    Orientation getOrientation() { return orient; } //-1 <-> +1 change orientation respective to direction of travel (-1 is look 180 left, 1 is 180 right)
     float getConfidenceRaw() { return activ(_getConfidenceRaw()); }
     Destination getDest() { return dest; }
     float getConfidenceDest() { return activ(_getConfidenceDest()); }
@@ -78,7 +87,7 @@ protected:
     
     int flagDirty;
     float fSpeed;
-    float fSteer;
+    Orientation orient;
     Destination dest;
 
 private:
