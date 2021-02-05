@@ -56,22 +56,15 @@ void DroneNavigation<DriveType>::run(void)
     }
 
     do {
-        bool bDecisionMade = false;
         for (int i = 0; i < arNav.size(); i++) {
             Navigator::dirty isDirty = arNav[i]->isDirty();
             if (isDirty) {
                 arNav[i]->setClean();
-                bDecisionMade = true;
-                if (drive._decide(*(arNav[i]), isDirty)) {
-                    printf("Dirty guidance send\n");
+                if (!drive.isPlanValid(*(arNav[i]), isDirty)) {
+                    printf("Creating new plan\n");
+                    drive.createNewPlan();
                     _sendGuidance();
                 }
-            }
-        }
-        if (!bDecisionMade) {
-            if (drive._decide()) {
-                printf("Clean guidance send\n");
-                _sendGuidance();
             }
         }
         signalMainMessage.wait(drive.getLoopTimeoutMS());

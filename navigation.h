@@ -5,7 +5,10 @@
 
 class Destination {
 public:
-    Destination(): fX(0), fY(0), fZ(0) {}
+    Destination();
+
+    bool operator==(const Destination& other);
+    bool operator!=(const Destination& other);
 
     float fX, fY, fZ;
 };
@@ -15,6 +18,8 @@ public:
     DestinationEquation();
 
     Destination GetLocation(float fT) const;
+
+    float fT;
 
 private:
     float fA, fB, fC; // x(t)

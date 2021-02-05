@@ -41,6 +41,70 @@ void updateDepthCamera(cameraFrame* pFrame, void* pNavigator)
 
 float activ_null(const float& f) { return f; }
 
+// ***********
+// Destination
+
+Destination::Destination()
+: fX(0)
+, fY(0)
+, fZ(0)
+{
+
+}
+
+bool Destination::operator==(const Destination& other)
+{
+    return (int(fX * 1000) == int(other.fX * 1000)) && (int(fY * 1000) == int(other.fY * 1000)) && (int(fZ * 1000) == int(other.fZ * 1000));
+}
+
+bool Destination::operator!=(const Destination& other)
+{
+    return !(*this == other);
+}
+
+// *******************
+// DestinationEquation
+
+DestinationEquation::DestinationEquation()
+: fA(0)
+, fB(0)
+, fC(0)
+, fD(0)
+, fE(0)
+, fF(0)
+{
+
+}
+
+Destination DestinationEquation::GetLocation(float fT) const
+{
+    float fT2 = fT * fT;
+    Destination dest;
+    dest.fX = (fA * fT2) + (fB * fT) + fC;
+    dest.fY = (fD * fT2) + (fE * fT) + fF;
+
+    return dest;
+}
+
+// ***********
+// Obstruction
+
+Obstruction::Obstruction(int iWidth, int iHeight)
+: uObstructed(nullptr)
+{
+
+}
+
+Obstruction::~Obstruction()
+{
+
+}
+
+u_int8_t Obstruction::IsObstructed(const DestinationEquation&, float fTStart)
+{
+    return 0;
+}
+
 
 // *********
 // Navigator
