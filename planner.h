@@ -2,11 +2,7 @@
 
 #include "navigation.h"
 
-class RoutePlan {
-public:
-    Destination dest;
-    DestinationEquation route;
-};
+class Vertex;
 
 class DrivePlanner {
 public:
@@ -25,8 +21,8 @@ public:
 
 protected:
     std::vector<Navigator*>& arNav;
-    RoutePlan* pDesFinal; // Destination (pointer to bottom of route list)
-    std::vector<RoutePlan> arRoute; // List of routes to get to destination
+    DestinationEquation* pDesFinal; // Destination (pointer to bottom of route list)
+    std::vector<DestinationEquation> arRoute; // List of routes to get to destination
 
     float fSpeed; // 0 <-> 1 stopped to max speed
     float fSteer; // -1 <-> 1 full left to full right
@@ -47,6 +43,9 @@ public:
 
     virtual bool isPlanValid(Navigator& nav, Navigator::dirty isDirty) override;
     virtual void createNewPlan() override;
+
+private:
+    std::vector<float> arSteerAvg;
 };
 
 class Drive_TwinTrackAdv: public DrivePlanner {
@@ -57,8 +56,11 @@ public:
     virtual void createNewPlan() override;
 
 protected:
-    DestinationEquation createRoute(float fX, float fY);
+    DestinationEquation createRoute(Destination start, float fDx, float fDy, Destination dest);
     bool isRouteObstructed(DestinationEquation, std::vector<Obstruction>&);
+
+    void buildRouteTree(Destination dest, std::vector<Obstruction>& arObst);
+    Vertex** branch(Vertex& vert);
 
     std::vector<Destination> arDestAvg;
     std::vector<float> arSpeedAvg;

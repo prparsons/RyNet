@@ -18,6 +18,7 @@ public:
     DestinationEquation();
 
     Destination GetLocation(float fT) const;
+    float GetRouteLength() const { return 0; }
 
     float fT;
 

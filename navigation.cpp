@@ -301,14 +301,12 @@ void Navigator_SimpleObstruct2D::_run(Signal* psigMain)
 
         do {
             sigImages.wait(1000);
-            printf("Nav loop\n");
             ThreadLock locker(mtImages);
             locker.lock();
             if (!(bNewImgDepth && bNewImgDepthRaw && bNewImgRGB)) {
                 locker.unlock();
                 continue; // Wait until new images of both
             }
-            printf("Nav loop dirty\n");
             bNewImgDepth = false;
             bNewImgRGB = false;
             bNewImgDepthRaw = false;
