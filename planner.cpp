@@ -2,6 +2,8 @@
 
 #include <vector>
 
+class VertexList;
+
 class Vertex {
 public:
     explicit Vertex(DestinationEquation& route, Destination destFinal);
@@ -15,12 +17,37 @@ private:
     DestinationEquation route;
     float fDistanceToDest;
     Destination destFinal;
+
+    bool operator<(const Vertex& other) const;
+    bool operator>(const Vertex& other) const;
+    Vertex* pListNext;
+    Vertex* pListPrev;
+    friend class VertexList;
 };
+
+class VertexList {
+public:
+    VertexList();
+
+    void add(Vertex* pNew);
+    Vertex* pop();
+
+    bool isEmpty() const { return pHead == nullptr; }
+
+private:
+    Vertex* pHead;
+    Vertex* pPrevInsert;
+};
+
+// ******
+// Vertex
 
 Vertex::Vertex(DestinationEquation& _route, Destination _destFinal)
 : pParent(nullptr)
 , route(_route)
 , destFinal(_destFinal)
+, pListNext(nullptr)
+, pListPrev(nullptr)
 {
     Destination start = route.GetLocation(1);
     fDistanceToDest = sqrt( ((destFinal.fX - start.fX) * (destFinal.fX - start.fX)) +
@@ -44,6 +71,80 @@ float Vertex::GetDistance() const
 {
     if (pParent != nullptr) return pParent->GetDistance() + fDistanceToDest;
     return fDistanceToDest;
+}
+
+bool Vertex::operator<(const Vertex& other) const
+{
+    return GetDistance() < other.GetDistance();
+}
+
+bool Vertex::operator>(const Vertex& other) const
+{
+    return GetDistance() > other.GetDistance();
+}
+
+// ********
+// VertexList
+
+VertexList::VertexList()
+: pHead(nullptr)
+, pPrevInsert(nullptr)
+{
+
+}
+
+void VertexList::add(Vertex* pNew)
+{
+    // List empty
+    if (pHead == nullptr) {
+        pHead = pNew;
+        return;
+    }
+    // List not empty
+    if (pPrevInsert == nullptr) {
+        pPrevInsert = pHead;
+    }
+
+    // Move index towards end of array
+    while (*pNew > *pPrevInsert) {
+        if (pPrevInsert->pListNext == nullptr) break;
+        pPrevInsert = pPrevInsert->pListNext;
+    }
+    // Move index towards front of array
+    while (*pNew < *pPrevInsert) {
+        if (pPrevInsert->pListPrev == nullptr) break;
+        pPrevInsert = pPrevInsert->pListPrev;
+    }
+
+    // Check if it's the head
+    if (pPrevInsert == nullptr) {
+        pNew->pListNext = pHead;
+        pHead->pListPrev = pNew;
+        return;
+    }
+
+    // Insert it after pPrevInsert
+    Vertex* pNext = pPrevInsert->pListNext;
+    pPrevInsert->pListNext = pNew;
+    pNew->pListPrev = pPrevInsert;
+    pNew->pListNext = pNext;
+    // Set the next node's prev to this
+    if (pNext != nullptr) {
+        pNext->pListPrev = pNew;
+    }
+}
+
+Vertex* VertexList::pop()
+{
+    Vertex* pReturn = pHead;
+    if (pReturn == nullptr) return nullptr;
+    if (pHead->pListNext == nullptr) {
+        pHead = nullptr;
+    } else {
+        pHead = pHead->pListNext;
+        pHead->pListPrev = nullptr;
+    }
+    return pReturn;
 }
 
 
@@ -178,7 +279,7 @@ bool Drive_TwinTrackAdv::isRouteObstructed(DestinationEquation destEq, std::vect
 void Drive_TwinTrackAdv::buildRouteTree(Destination dest, std::vector<Obstruction>& arObst)
 {
     std::vector<Vertex*> vertList;
-    std::vector<Vertex*> leafList;
+    VertexList leafList;
     std::vector<Vertex*> solutionList;
 // NEED TO get CURRENT DIRECTION!!!
     float fDx;
@@ -187,9 +288,8 @@ void Drive_TwinTrackAdv::buildRouteTree(Destination dest, std::vector<Obstructio
     Vertex vertParent(start, dest);
     Vertex** arChilds = branch(vertParent);
     //verify they all are valid, add to leafList
-    while (leafList.size() > 0) {
-        Vertex* pVert = leafList[leafList.size()];
-        leafList.pop_back();
+    while (!leafList.isEmpty()) {
+        Vertex* pVert = leafList.pop();
         arChilds = branch(*pVert);
         for (int i = 0; i < 3; i++) {
             // Check validity
@@ -201,7 +301,7 @@ void Drive_TwinTrackAdv::buildRouteTree(Destination dest, std::vector<Obstructio
                 solutionList.push_back(arChilds[i]);
             } else {
                 //insert into leaf list smallest at the back
-                leafList.push_back(arChilds[i]);
+                leafList.add(arChilds[i]);
             }
         }
         vertList.push_back(pVert);
