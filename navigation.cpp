@@ -66,43 +66,131 @@ bool Destination::operator!=(const Destination& other)
 // DestinationEquation
 
 DestinationEquation::DestinationEquation()
-: fA(0)
+: bQuadratic(false)
+, fA(0)
 , fB(0)
 , fC(0)
 , fD(0)
 , fE(0)
 , fF(0)
+, fXSin(0)
+, fXCos(0)
+, fYSin(0)
+, fYCos(0)
+{
+
+}
+
+DestinationEquation::DestinationEquation(float _fA, float _fB, float _fC, float _fD, float _fE, float _fF)
+: bQuadratic(true)
+, fA(_fA)
+, fB(_fB)
+, fC(_fC)
+, fD(_fD)
+, fE(_fE)
+, fF(_fF)
+, fXSin(0)
+, fXCos(0)
+, fYSin(0)
+, fYCos(0)
+{
+
+}
+
+DestinationEquation::DestinationEquation(float _fXSin, float _fXCos, float _fC, float _fYSin, float _fYCos, float _fF, bool)
+: bQuadratic(false)
+, fXSin(0)
+, fXCos(0)
+, fC(_fC)
+, fYSin(0)
+, fYCos(0)
+, fF(_fF)
 {
 
 }
 
 Destination DestinationEquation::GetLocation(float fT) const
 {
-    float fT2 = fT * fT;
     Destination dest;
-    dest.fX = (fA * fT2) + (fB * fT) + fC;
-    dest.fY = (fD * fT2) + (fE * fT) + fF;
+    if (bQuadratic) {
+        const float fT2 = fT * fT;
+        dest.fX = (fA * fT2) + (fB * fT) + fC;
+        dest.fY = (fD * fT2) + (fE * fT) + fF;
+    } else {
+        const float fSin = sin(fT);
+        const float fCos = cos(fT);
+        dest.fX = (fXSin * fSin) + (fXCos * fCos) + fC;
+        dest.fY = (fYSin * fSin) + (fYCos * fCos) + fF;
+    }
 
     return dest;
+}
+
+void DestinationEquation::GetDeriv(float& fDx, float& fDy, float fT) const
+{
+    if (bQuadratic) {
+        fDx = (2 * fA * fT) + fB;
+        fDy = (2 * fD * fT) + fE;
+    } else {
+        const float fSin = sin(fT);
+        const float fCos = cos(fT);
+        fDx = (fXSin * fCos) - (fXCos * fSin);
+        fDy = (fYSin * fCos) - (fYCos * fSin);
+    }
 }
 
 // ***********
 // Obstruction
 
-Obstruction::Obstruction(int iWidth, int iHeight)
-: uObstructed(nullptr)
+Obstruction::Obstruction(float* arBuffer, int _iWidth, int _iHeight, float _fHorizFOV)
+: arObstructed(new float[_iWidth * _iHeight])
+, arAngles(new float[_iWidth])
+, fHorizFOV(_fHorizFOV)
+, iWidth(_iWidth)
+, iHeight(_iHeight)
+, iFloor(iHeight)
 {
-
-}
+    const int iSize = iWidth * iHeight;
+    for (int i = 0; i < iSize; i++) {
+        arObstructed[i] = arBuffer[i];
+    }
+    const float fMiddle = iWidth / 2;
+    const float fMaxAngle = fHorizFOV / 2;
+    for (int i = 0; i < iWidth; i++) {
+        arAngles[i] = float(i - fMiddle) / fMiddle;
+        arAngles[i] *= fMaxAngle;
+    }
+}//angle = (fMaxAngle * (i - fMiddle)) / fMiddle
+//angle * fMiddle = fMaxANgle * (i - fMiddle)
+// (angle * fMiddle) / fMaxAngle = i - fMiddle
+// (angle * fMiddle) / fMaxAngle + fMiddle = i
 
 Obstruction::~Obstruction()
 {
-
+    delete[] arObstructed;
+    delete[] arAngles;
 }
 
-u_int8_t Obstruction::IsObstructed(const DestinationEquation&, float fTStart)
+bool Obstruction::IsObstructed(const DestinationEquation& destEq, float fTStart)
 {
-    return 0;
+    float (*arObs)[iWidth] = (float(*)[iWidth])arObstructed;
+    Destination dest = destEq.GetLocation(0);
+    const float fMaxAngle = fHorizFOV / 2;
+    for (float fT = 0; fT <= 1.0; fT += .1) {
+        dest = destEq.GetLocation(fT);
+        float fAngle = atan2(dest.fX, dest.fY);
+        if (fAngle > fMaxAngle) return true;
+        float fDist = dest.fX / sin(fAngle);
+        // figure out index for fAngle
+        const float fMiddle = iWidth / 2;
+        const float fMaxAngle = fHorizFOV / 2;
+        const int iIndex = fMiddle + ((fMiddle * fAngle) / fMaxAngle);
+        // Now look through the buffer until you hit the floor
+        for (int i = 0; i < iFloor; i++) {
+            if (arObs[iIndex][i] < fDist) return true;
+        }
+    }
+    return false;
 }
 
 

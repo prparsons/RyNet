@@ -16,26 +16,38 @@ public:
 class DestinationEquation {
 public:
     DestinationEquation();
+    DestinationEquation(float fA, float fB, float fC, float fD, float fE, float fF);
+    DestinationEquation(float fXSin, float fXCos, float fC, float fYSin, float fYCos, float fF, bool);
 
     Destination GetLocation(float fT) const;
+    void GetDeriv(float& fDx, float& fDy, float fT) const;
     float GetRouteLength() const { return 0; }
 
     float fT;
 
 private:
+    bool bQuadratic;
     float fA, fB, fC; // x(t)
     float fD, fE, fF; // y(t)
+    float fXSin, fXCos; // x(t) = fXSin * sin(t) + fXCos * cos(t) + fC
+    float fYSin, fYCos; // y(t) = fYSin * sin(t) + fYCos * cos(t) + fF
 };
 
 class Obstruction {
 public:
-    Obstruction(int iWidth, int iHeight);
+    Obstruction(float* arDepthBuffer, int iWidth, int iHeight, float fHorizFOV);
     ~Obstruction();
 
-    u_int8_t IsObstructed(const DestinationEquation&, float fTStart); // returns confidence of obstruction 0 - 255
+    bool IsObstructed(const DestinationEquation&, float fTStart); // returns confidence of obstruction 0 - 255
+    void setFloor(int _iFloor) { iFloor = _iFloor; }
 
 private:
-    u_int8_t* uObstructed;
+    float* arObstructed;
+    float* arAngles;
+    float fHorizFOV;
+    int iWidth;
+    int iHeight;
+    int iFloor;
 };
 
 class Orientation {
@@ -121,6 +133,50 @@ private:
     cameraMulti* pCamera;
     Signal* psigImages;
     image imgRGB;
+    image imgDepth;
+    cameraFrame_depth *pDepthRaw;
+    Mutex mtImages;
+};
+
+class Navigator_PersonFinder:public Navigator {
+public:
+    Navigator_PersonFinder();
+    virtual ~Navigator_PersonFinder();
+    
+    virtual void newImageRGB(image imgRGB, bool bSignal) override;
+
+    virtual void _run(Signal* psigMain) override;
+
+protected:
+    virtual float _getConfidenceDest() override;
+
+private:
+    bool process();
+
+    bool bNewImgRGB;
+    cameraMulti* pCamera;
+    Signal* psigImages;
+    image imgRGB;
+    Mutex mtImages;
+};
+
+class Navigator_SimpleDepthObstruct:public Navigator {
+public:
+    Navigator_SimpleDepthObstruct();
+    virtual ~Navigator_SimpleDepthObstruct();
+    
+    virtual void newImageDepth(image imgDepth, bool bSignal) override;
+    virtual void newImageDepthRaw(cameraFrame_depth depthRaw, bool bSignal) override;
+
+    virtual void _run(Signal* psigMain) override;
+
+private:
+    bool processObstruct();
+
+    bool bNewImgDepth;
+    bool bNewImgDepthRaw;
+    cameraMulti* pCamera;
+    Signal* psigImages;
     image imgDepth;
     cameraFrame_depth *pDepthRaw;
     Mutex mtImages;
