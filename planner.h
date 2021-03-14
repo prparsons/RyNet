@@ -62,12 +62,17 @@ protected:
     void buildRouteTree(Destination dest, std::vector<Obstruction>& arObst);
     Vertex** branch(Vertex& vert);
 
-    Vertex* pSolution;
-    std::vector<Vertex*> arSolutionParentList;
-    Vertex* pCurrentSpot;
-    float fT;
+    bool processDestRunningAvg(Destination dest); // Returns true if change
+
+    Vertex* pCurrentRoute;
+    std::vector<Vertex*> arRouteList;
 
     std::vector<Destination> arDestAvg;
     std::vector<float> arSpeedAvg;
     std::vector<Orientation> arOrientAvg;
+    Destination destAvg;
+    float fDistBeforeChangeDest;
+    int iDestAvgCursor;
+    int iSpeedAvgCursor;
+    int iOrientationAvgCursor;
 };

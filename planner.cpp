@@ -14,6 +14,7 @@ public:
 
     float GetDistance() const;
     DestinationEquation GetRoute() const { return route; }
+    Vertex* GetParent() const { return pParent; }
 
 private:
     Vertex* pParent;
@@ -156,7 +157,6 @@ Vertex* VertexList::pop()
     return pReturn;
 }
 
-
 // ************
 // DrivePlanner
 
@@ -209,6 +209,11 @@ void Drive_TwinTrack::createNewPlan()
 
 Drive_TwinTrackAdv::Drive_TwinTrackAdv(std::vector<Navigator*>& arNav)
 : DrivePlanner(arNav)
+, pCurrentRoute(nullptr)
+, fDistBeforeChangeDest(1000)
+, iDestAvgCursor(0)
+, iSpeedAvgCursor(0)
+, iOrientationAvgCursor(0)
 {
 }
 
@@ -219,11 +224,11 @@ bool Drive_TwinTrackAdv::isPlanValid(Navigator& nav, Navigator::dirty)
         return false;
     }
     Destination destDesired = nav.getDest();
-    if (nav.getDest() != pDesFinal->GetLocation(1)) {
-        // Nav is wanting to go somewhere else
-        return false; // is this where my averaging stuff goes? YES
-        //if dest did change handle tranlation for dest since current location will be new origin
+    if (processDestRunningAvg(destDesired)) {
+        // Need to go somewhere else
+        return false;
     }
+    
     // Still going to the same place, so check to see if our route is obstructed
     std::vector<Obstruction> arObst;
     if (!nav.getObstructions(arObst)) {
@@ -251,22 +256,29 @@ void Drive_TwinTrackAdv::createNewPlan()
     /////////////////
     //see if nav wants to scale speed
 
-    // Get dest from averaging thing
     // NEED TO SAVE CURRENT DIRECTION!!!
-    Destination dest;
+    Destination dest = destAvg;
     float fDx;
     float fDy;
     DestinationEquation straightShot = createRoute(Destination(), fDx, fDy, dest);
     std::vector<Obstruction> arObst;
-    if (!arNav[0]->getObstructions(arObst)) { // not checking validity
+    bool bObstructionsExist = arNav[0]->getObstructions(arObst);
+    bool bRouteObstructed = false;
+    if (bObstructionsExist) {
+        bRouteObstructed = isRouteObstructed(straightShot, arObst);
+    }
+    if ((!bObstructionsExist) || (!bRouteObstructed)) {
         // There are no obstructions, we're good to go
+        // Clear the current route list
+        while (arRouteList.size() > 0) {
+            delete arRouteList[arRouteList.size() - 1];
+            arRouteList.pop_back();
+        }
+        arRouteList[0] = new Vertex(straightShot, dest);
+        arRouteList.shrink_to_fit();
         return;
     }
-    if (!isRouteObstructed(straightShot, arObst)) {
-        // Route is not obstructed, good to go
-        return;
-    }
-    
+    // There are obstructions, build a route
     buildRouteTree(dest, arObst);
 }
 
@@ -348,13 +360,38 @@ void Drive_TwinTrackAdv::buildRouteTree(Destination dest, std::vector<Obstructio
         delete pVert;
     }
 
-    if (pSolution != nullptr) delete pSolution;
-    while (arSolutionParentList.size() > 0) {
-        delete arSolutionParentList[arSolutionParentList.size() - 1];
-        arSolutionParentList.pop_back();
+   // Clear the current route list
+    while (arRouteList.size() > 0) {
+        delete arRouteList[arRouteList.size() - 1];
+        arRouteList.pop_back();
     }
-    arSolutionParentList = vertList;
-    pSolution = solutionList[iShortestIndex];
+    // Now take the solution, and add it and all its parents to arRouteList. Set each entry
+    //  in vertList to nullptr
+    pCurrentRoute = solutionList[iShortestIndex];
+    for (int i = 0; pCurrentRoute->GetParent() != nullptr; i++) {
+        arRouteList[i] = pCurrentRoute;
+        pCurrentRoute = pCurrentRoute->GetParent();
+        for (int j = 0; j < vertList.size(); j++) {
+            if (vertList[j] == pCurrentRoute) {
+                vertList[j] = nullptr;
+                break;
+            }
+        }
+    }
+    arRouteList.shrink_to_fit();
+    // Now delete anything left in vertList
+    for (int i = 0; i < vertList.size(); i++) {
+        if (vertList[i] != nullptr) {
+            delete vertList[i];
+        }
+    }
+    // List is backwards
+    for (int a = 0, z = arRouteList.size(); a < z; a++, z--) {
+        Vertex* pTemp = arRouteList[a];
+        arRouteList[a] = arRouteList[z];
+        arRouteList[z] = pTemp;
+    }
+    pCurrentRoute = arRouteList[0];
 }
 
 Vertex** Drive_TwinTrackAdv::branch(Vertex& vert)
@@ -414,4 +451,34 @@ Vertex** Drive_TwinTrackAdv::branch(Vertex& vert)
     }
 
     return lVertices;
+}
+
+bool Drive_TwinTrackAdv::processDestRunningAvg(Destination dest)
+{
+    arDestAvg[iDestAvgCursor] = dest;
+    float fX = 0;
+    float fY = 0;
+    float fZ = 0;
+    //SIMD candidate
+    for (int i = 0; i < arDestAvg.size(); i++) {
+        fX += arDestAvg[i].fX;
+        fY += arDestAvg[i].fY;
+        fZ += arDestAvg[i].fZ;
+    }
+    fX /= arDestAvg.size();
+    fY /= arDestAvg.size();
+    fZ /= arDestAvg.size();
+    if (++iDestAvgCursor == arDestAvg.size()) iDestAvgCursor = 0;
+
+    Destination destCurrent = arRouteList[arRouteList.size() - 1]->GetRoute().GetLocation(1.0);
+    float fDistance = sqrt(((fX - destCurrent.fX) * (fX - destCurrent.fX)) +
+                           ((fY - destCurrent.fY) * (fY - destCurrent.fY)) +
+                           ((fZ - destCurrent.fZ) * (fZ - destCurrent.fZ)));
+    if (fDistance > fDistBeforeChangeDest) {
+        destAvg.fX = fX;
+        destAvg.fY = fY;
+        destAvg.fZ = fZ;
+        return true;
+    }
+    return false;
 }
