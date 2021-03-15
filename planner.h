@@ -21,8 +21,6 @@ public:
 
 protected:
     std::vector<Navigator*>& arNav;
-    DestinationEquation* pDesFinal; // Destination (pointer to bottom of route list)
-    std::vector<DestinationEquation> arRoute; // List of routes to get to destination
 
     float fSpeed; // 0 <-> 1 stopped to max speed
     float fSteer; // -1 <-> 1 full left to full right
@@ -56,11 +54,13 @@ public:
     virtual void createNewPlan() override;
 
 protected:
+    void createRoute(Destination start, float fDx, float fDy, Destination dest, std::vector<DestinationEquation>& arRoute);
     DestinationEquation createRoute(Destination start, float fDx, float fDy, Destination dest);
-    bool isRouteObstructed(DestinationEquation, std::vector<Obstruction>&);
+    bool isRouteObstructed(DestinationEquation, std::vector<Obstruction>& arObs, float fOffsetX = 0, float fOffsetY = 0);
 
     void buildRouteTree(Destination dest, std::vector<Obstruction>& arObst);
     Vertex** branch(Vertex& vert);
+    Destination rotateTranslateDestination(Destination dest) const;
 
     bool processDestRunningAvg(Destination dest); // Returns true if change
 

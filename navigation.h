@@ -3,6 +3,10 @@
 #include <vector>
 #include "cameraMulti.h"
 
+#define PI 3.141592653590
+#define PI_2 1.570796326794
+#define PIx2 6.283185307180
+
 class Destination {
 public:
     Destination();
@@ -24,6 +28,8 @@ public:
     float GetRouteLength() const { return 0; }
 
     float fT;
+    float fT_min;
+    float fT_max;
 
 private:
     bool bQuadratic;
@@ -33,12 +39,13 @@ private:
     float fYSin, fYCos; // y(t) = fYSin * sin(t) + fYCos * cos(t) + fF
 };
 
+// Obstructions should always assume current position is at 0,0
 class Obstruction {
 public:
     Obstruction(float* arDepthBuffer, int iWidth, int iHeight, float fHorizFOV);
     ~Obstruction();
 
-    bool IsObstructed(const DestinationEquation&, float fTStart); // returns confidence of obstruction 0 - 255
+    bool IsObstructed(const DestinationEquation&, float fTStart, float fOffsetX = 0, float fOffsetY = 0); // returns confidence of obstruction 0 - 255
     void setFloor(int _iFloor) { iFloor = _iFloor; }
 
 private:

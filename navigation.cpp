@@ -66,7 +66,10 @@ bool Destination::operator!=(const Destination& other)
 // DestinationEquation
 
 DestinationEquation::DestinationEquation()
-: bQuadratic(false)
+: fT(0)
+, fT_min(0)
+, fT_max(1)
+, bQuadratic(false)
 , fA(0)
 , fB(0)
 , fC(0)
@@ -82,7 +85,10 @@ DestinationEquation::DestinationEquation()
 }
 
 DestinationEquation::DestinationEquation(float _fA, float _fB, float _fC, float _fD, float _fE, float _fF)
-: bQuadratic(true)
+: fT(0)
+, fT_min(0)
+, fT_max(1)
+, bQuadratic(true)
 , fA(_fA)
 , fB(_fB)
 , fC(_fC)
@@ -98,7 +104,10 @@ DestinationEquation::DestinationEquation(float _fA, float _fB, float _fC, float 
 }
 
 DestinationEquation::DestinationEquation(float _fXSin, float _fXCos, float _fC, float _fYSin, float _fYCos, float _fF, bool)
-: bQuadratic(false)
+: fT(0)
+, fT_min(0)
+, fT_max(PI_2)
+, bQuadratic(false)
 , fXSin(0)
 , fXCos(0)
 , fC(_fC)
@@ -160,10 +169,7 @@ Obstruction::Obstruction(float* arBuffer, int _iWidth, int _iHeight, float _fHor
         arAngles[i] = float(i - fMiddle) / fMiddle;
         arAngles[i] *= fMaxAngle;
     }
-}//angle = (fMaxAngle * (i - fMiddle)) / fMiddle
-//angle * fMiddle = fMaxANgle * (i - fMiddle)
-// (angle * fMiddle) / fMaxAngle = i - fMiddle
-// (angle * fMiddle) / fMaxAngle + fMiddle = i
+}
 
 Obstruction::~Obstruction()
 {
@@ -171,10 +177,13 @@ Obstruction::~Obstruction()
     delete[] arAngles;
 }
 
-bool Obstruction::IsObstructed(const DestinationEquation& destEq, float fTStart)
+bool Obstruction::IsObstructed(const DestinationEquation& destEq, float fTStart, float fOffsetX, float fOffsetY)
 {
     float (*arObs)[iWidth] = (float(*)[iWidth])arObstructed;
     Destination dest = destEq.GetLocation(0);
+    dest.fX += fOffsetX;
+    dest.fY += fOffsetY;
+
     const float fMaxAngle = fHorizFOV / 2;
     for (float fT = 0; fT <= 1.0; fT += .1) {
         dest = destEq.GetLocation(fT);

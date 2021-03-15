@@ -2,7 +2,7 @@
 
 #include <vector>
 
-// pi / 2
+
 #define Drive_TwinTrackAdv_BRANCH_DIST 1.570796326794
 
 class VertexList;
@@ -162,7 +162,6 @@ Vertex* VertexList::pop()
 
 DrivePlanner::DrivePlanner(std::vector<Navigator*>& _arNav)
 : arNav(_arNav)
-, pDesFinal(nullptr)
 , fSpeed(0)
 , fSteer(0)
 , fClimb(0)
@@ -219,7 +218,7 @@ Drive_TwinTrackAdv::Drive_TwinTrackAdv(std::vector<Navigator*>& arNav)
 
 bool Drive_TwinTrackAdv::isPlanValid(Navigator& nav, Navigator::dirty)
 {
-    if (pDesFinal == nullptr) {
+    if (pCurrentRoute == nullptr) {
         // We have no destination (or plan) yet, so need to create one
         return false;
     }
@@ -235,8 +234,9 @@ bool Drive_TwinTrackAdv::isPlanValid(Navigator& nav, Navigator::dirty)
         // There are no obstructions, so done?
         return true;
     }
-    for (int i = 0; i < arRoute.size(); i++) {
-        if (isRouteObstructed(arRoute[i], arObst)) {
+    Destination destCurrent = pCurrentRoute->GetRoute().GetLocation(pCurrentRoute->GetRoute().fT);
+    for (int i = 0; i < arRouteList.size(); i++) {
+        if (isRouteObstructed(arRouteList[i]->GetRoute(), arObst, -destCurrent.fX, -destCurrent.fY)) {
             return false;
         }
     }
@@ -256,10 +256,11 @@ void Drive_TwinTrackAdv::createNewPlan()
     /////////////////
     //see if nav wants to scale speed
 
-    // NEED TO SAVE CURRENT DIRECTION!!!
+    
     Destination dest = destAvg;
     float fDx;
     float fDy;
+    // For this, need to rotate dest
     DestinationEquation straightShot = createRoute(Destination(), fDx, fDy, dest);
     std::vector<Obstruction> arObst;
     bool bObstructionsExist = arNav[0]->getObstructions(arObst);
@@ -282,35 +283,48 @@ void Drive_TwinTrackAdv::createNewPlan()
     buildRouteTree(dest, arObst);
 }
 
-DestinationEquation Drive_TwinTrackAdv::createRoute(Destination start, float fDx, float fDy, Destination dest)
+void Drive_TwinTrackAdv::createRoute(Destination start, float fDx, float fDy, Destination dest, std::vector<DestinationEquation>& arRoute)
+{
+    std::cout << "Using unimplemented function createRoute()\n";
+}
+
+DestinationEquation Drive_TwinTrackAdv::createRoute(Destination start, float fDx, float fDy, Destination _dest)
 {
     // Cheating right here and not matching derivatives
     //x = bt + c
     //start = c
     // end = bt + c   end - c = b
-    DestinationEquation cheater(0, dest.fX - start.fX, start.fX, 0, dest.fY - start.fY, start.fY);
-    return cheater;
+    //DestinationEquation cheater(0, dest.fX - start.fX, start.fX, 0, dest.fY - start.fY, start.fY);
+    //return cheater;
+
+    Destination dest = rotateTranslateDestination(_dest);
+    DestinationEquation straightShot(0, dest.fX - start.fX, start.fX, 0, dest.fY - start.fY, start.fY);
+    return straightShot;
 }
 
-bool Drive_TwinTrackAdv::isRouteObstructed(DestinationEquation destEq, std::vector<Obstruction>& arObst)
+bool Drive_TwinTrackAdv::isRouteObstructed(DestinationEquation destEq, std::vector<Obstruction>& arObst, float fOffsetX, float fOffsetY)
 {
     for (int i = 0; i < arObst.size(); i++) {
-        if (arObst[i].IsObstructed(destEq, destEq.fT)) {
+        if (arObst[i].IsObstructed(destEq, destEq.fT, fOffsetX, fOffsetY)) {
             return true;
         }
     }
     return false;
 }
 
-void Drive_TwinTrackAdv::buildRouteTree(Destination dest, std::vector<Obstruction>& arObst)
+void Drive_TwinTrackAdv::buildRouteTree(Destination _dest, std::vector<Obstruction>& arObst)
 {
     std::vector<Vertex*> vertList;
     VertexList leafList;
     std::vector<Vertex*> solutionList;
-// NEED TO get CURRENT DIRECTION!!!
-    float fDx;
-    float fDy;
-    DestinationEquation start; // match tangents
+    // We rotate the destination about the origin so that we always start out at (0,0)
+    //  with derivatives (direction) of (0,1)
+    float fDx = 0;
+    float fDy = 1;
+    Destination dest = rotateTranslateDestination(_dest);
+    // For the parent vertex, leave the coeff all 0, set t = 1
+    DestinationEquation start;
+    start.fT = 1;
     Vertex vertParent(start, dest);
     Vertex** arChilds = branch(vertParent);
     //verify they all are valid, add to leafList
@@ -371,6 +385,9 @@ void Drive_TwinTrackAdv::buildRouteTree(Destination dest, std::vector<Obstructio
     for (int i = 0; pCurrentRoute->GetParent() != nullptr; i++) {
         arRouteList[i] = pCurrentRoute;
         pCurrentRoute = pCurrentRoute->GetParent();
+        if (pCurrentRoute == &vertParent) {
+            break; // I think this is where it should end, need to verify this
+        }
         for (int j = 0; j < vertList.size(); j++) {
             if (vertList[j] == pCurrentRoute) {
                 vertList[j] = nullptr;
@@ -451,6 +468,43 @@ Vertex** Drive_TwinTrackAdv::branch(Vertex& vert)
     }
 
     return lVertices;
+}
+
+Destination Drive_TwinTrackAdv::rotateTranslateDestination(Destination destFinal) const
+{
+    Destination destStart = pCurrentRoute->GetRoute().GetLocation(pCurrentRoute->GetRoute().fT);
+    // First, translate destination so that our start is (0,0)
+    destFinal.fX -= destStart.fX;
+    destFinal.fY -= destStart.fY;
+    // Now get derivative (direction) so we can rotate the destination about the start. Basically
+    //  easier if we just line things up so we're always going straight up.
+    float fDx;
+    float fDy;
+    pCurrentRoute->GetRoute().GetDeriv(fDx, fDy, pCurrentRoute->GetRoute().fT);
+    // First check along axes
+    float fAngle;
+    if (fDx == 0) {
+        fAngle = fDy > 0 ? 0 : 3.14;
+    } else if (fDy == 0) {
+        if (fDx > 0) {
+            fAngle = -3.14/2;
+        } else {
+            fAngle = 3.14/2;
+        }
+    } else {
+        fAngle = atan2(fDy, fDx); // NOT SURE THIS IS POINTED RIGHT
+    }
+    /*
+[x, y, 1][cos  sin  0]
+         [-sin cos  0]  =  [x*cos + y*-sin + 0*1, x*sin + y*cos + 0*1, ...]
+         [0    0    1]
+    */
+    const float fSin = sin(fAngle);
+    const float fCos = cos(fAngle);
+    Destination destRotated;
+    destRotated.fX = (destFinal.fX * fCos) - (destFinal.fY * fSin);
+    destRotated.fY = (destFinal.fX * fSin) + (destFinal.fY * fCos);
+    return destRotated;
 }
 
 bool Drive_TwinTrackAdv::processDestRunningAvg(Destination dest)
