@@ -1,8 +1,7 @@
 #pragma once
 
 #include "navigation.h"
-
-class Vertex;
+#include "data_types.h"
 
 class DrivePlanner {
 public:

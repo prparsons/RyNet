@@ -1,12 +1,11 @@
 #pragma once
 
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
-#include <opencv2/opencv.hpp>   // Include OpenCV API
 #include <thread>
 
 #include "locksignal.h"
+#include "data_types.h"
 
-typedef cv::Mat image;
 class cameraMulti;
 struct point {
     int iXY[2];
