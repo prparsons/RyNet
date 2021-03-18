@@ -8,6 +8,8 @@
 
 typedef cv::Mat image;
 
+class ServerLoop;
+
 class Destination {
 public:
     Destination();
@@ -38,6 +40,8 @@ private:
     float fD, fE, fF; // y(t)
     float fXSin, fXCos; // x(t) = fXSin * sin(t) + fXCos * cos(t) + fC
     float fYSin, fYCos; // y(t) = fYSin * sin(t) + fYCos * cos(t) + fF
+
+    friend class ServerLoop; // So the status window can write out things
 };
 
 // Obstructions should always assume current position is at 0,0

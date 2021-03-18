@@ -10,10 +10,11 @@ using namespace std;
 class ServerLoop {
 public:
     ServerLoop();
+    ~ServerLoop();
 
     void run(void);
-
-    void SetImage(image& im);
+    void SetImage(cv::Mat& im);
+    static ServerLoop& GetServerLoopSingleton();
 
     // Drive data
     void SetMaxDriveValues(float fMaxSteer, float fMaxSpeed, float fMaxClimb);
@@ -29,11 +30,15 @@ public:
     void SetObstructions(const std::vector<Obstruction>& arObstructions);
 
 private:
+    void writeSpeed(cv::Mat& image);
+    void writeEquation(cv::Mat& image);
+
     void updateGPU();
 
     Mutex mt;
     ThreadLock mtData;
-    Signal sigImage;
+    Signal* pSigImage;
+    cv::Mat image;
     // Raw drive
     float fSpeed;
     float fSteer; // -1 <-> 1 full left to full right

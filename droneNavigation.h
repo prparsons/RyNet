@@ -5,6 +5,7 @@
 #include "comms.h"
 #include "locksignal.h"
 #include "planner.h"
+#include "serverDroneStatus.h"
 
 
 template<class DriveType>
@@ -54,7 +55,8 @@ void DroneNavigation<DriveType>::run(void)
     for (int i = 0; i < arNav.size(); i++) {
         arNavThreads[i] = new std::thread(&Navigator::run, arNav[i], new Signal(signalMainMessage));
     }
-
+    // Start up the monitor thread
+    std::thread thrStatus(&ServerLoop::run, &ServerLoop::GetServerLoopSingleton());
     do {
         printf("MainLoop\n");
         for (int i = 0; i < arNav.size(); i++) {

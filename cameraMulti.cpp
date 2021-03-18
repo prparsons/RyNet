@@ -1,5 +1,7 @@
 #include "cameraMulti.h"
 
+#include "serverDroneStatus.h"
+
 using namespace cv;
 
 cameraFrame_depth::cameraFrame_depth(const rs2::depth_frame& _frame)
@@ -134,6 +136,9 @@ cameraMulti::cameraMulti(cameraType _type, cameraFeatures _features)
         if (features & cameraMulti_Depth) {
             pCameraRS->cfg.enable_stream(RS2_STREAM_DEPTH, 1280, 720);
         }
+        if (features & cameraMulti_RGB) {
+            pCameraRS->cfg.enable_stream(RS2_STREAM_COLOR, 1280, 720);
+        }
     }
 }
 
@@ -184,6 +189,7 @@ void cameraMulti::run_RS()
         }
         // Create camera frame
         cameraFrame frame;
+
         // Save the raw depth. If applying the decimation filter, before/after color map makes a difference in 
         //      how big the image is
         frame.pDepthRaw = new cameraFrame_depth(data.get_depth_frame());
@@ -205,6 +211,7 @@ void cameraMulti::run_RS()
         w = rgb.as<rs2::video_frame>().get_width();
         h = rgb.as<rs2::video_frame>().get_height();
         frame.pRGB = new Mat(Size(w, h), CV_8UC3, (void*)rgb.get_data(), Mat::AUTO_STEP);
+        ServerLoop::GetServerLoopSingleton().SetImage(*frame.pRGB);
 
         callbackFrame(&frame, pCallbackData);
     } while (!ss.shouldStop());

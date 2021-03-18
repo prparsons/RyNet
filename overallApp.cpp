@@ -36,10 +36,10 @@ int main( int argc, char** argv )
 			return 0;
 		}
 
-		// load the GoogleNet image recognition network with TensorRT
-		// you can use imageNet::RESNET_18 to load ResNet-18 model instead
-		//imageNet* net = imageNet::Create(imageNet::GOOGLENET);
+		// For Jetson Nano (just let it use gpu)
 		detectNet* net = detectNet::Create(detectNet::SSD_MOBILENET_V2);
+		// For Xavier (try to use one of the DLA engines so we can use the gpu for opencv stuff)
+		//detectNet* net = detectNet::Create(detectNet::SSD_MOBILENET_V2, 0.5f, 1, TYPE_FASTEST, DEVICE_DLA_0);
 
 		// check to make sure that the network model loaded properly
 		if( !net )
