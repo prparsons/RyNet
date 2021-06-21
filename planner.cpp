@@ -65,16 +65,20 @@ Drive_TwinTrackAdv::Drive_TwinTrackAdv(std::vector<Navigator*>& arNav)
 {
 }
 
-bool Drive_TwinTrackAdv::isPlanValid(Navigator& nav, Navigator::dirty)
+bool Drive_TwinTrackAdv::isPlanValid(Navigator& nav, Navigator::dirty flags)
 {
     if (pCurrentRoute == nullptr) {
         // We have no destination (or plan) yet, so need to create one
         return false;
     }
-    Destination destDesired = nav.getDest();
-    if (processDestRunningAvg(destDesired)) {
-        // Need to go somewhere else
-        return false;
+    
+    // Check destination
+    if ((flags && Navigator::DEST_X) || (flags && Navigator::DEST_Y) || (flags && Navigator::DEST_Z)) {
+        Destination destDesired = nav.getDest();
+        if (processDestRunningAvg(destDesired)) {
+            // Need to go somewhere else
+            return false;
+        }
     }
     
     // Still going to the same place, so check to see if our route is obstructed
@@ -89,13 +93,13 @@ bool Drive_TwinTrackAdv::isPlanValid(Navigator& nav, Navigator::dirty)
             return false;
         }
     }
-    // No obstructions, so done?
+    
     return true;
 }
 
 void Drive_TwinTrackAdv::createNewPlan()
 {
-    printf("Drive_TwinTrackAdv::_decide\n");
+    printf("Drive_TwinTrackAdv::createNewPlan\n");
     // Tell the nav it isn't dirty anymore
     float _fSteer = arNav[0]->getOrientation().fYaw;
     float _fSpeed = arNav[0]->getSpeed();
@@ -103,7 +107,14 @@ void Drive_TwinTrackAdv::createNewPlan()
     fSpeed = _fSpeed;
     fSteer = _fSteer;
     /////////////////
-    //see if nav wants to scale speed
+    // What we need to do here is have a priority system for the nav objects,
+    //      get desired speed, steer, destination from any that have them available (they shouldn't have to have everything)
+    //      use priority for conflicts
+    //      speed doesn't affect destination
+    //      if there's no destination, any steer is fine
+    //      if there is a destination, any higher priority steer should cancel it? (or save it for now?)
+    //      i think priority should be decided when they are being added, and each (speed, steer, dest)
+    //          should have it's own priority (fail if something not set)
 
     
     Destination dest = destAvg;
@@ -130,11 +141,6 @@ void Drive_TwinTrackAdv::createNewPlan()
     }
     // There are obstructions, build a route
     buildRouteTree(dest, arObst);
-}
-
-void Drive_TwinTrackAdv::createRoute(Destination start, float fDx, float fDy, Destination dest, std::vector<DestinationEquation>& arRoute)
-{
-    std::cout << "Using unimplemented function createRoute()\n";
 }
 
 DestinationEquation Drive_TwinTrackAdv::createRoute(Destination start, float fDx, float fDy, Destination _dest)

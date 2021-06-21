@@ -53,7 +53,6 @@ public:
     virtual void createNewPlan() override;
 
 protected:
-    void createRoute(Destination start, float fDx, float fDy, Destination dest, std::vector<DestinationEquation>& arRoute);
     DestinationEquation createRoute(Destination start, float fDx, float fDy, Destination dest);
     bool isRouteObstructed(DestinationEquation, std::vector<Obstruction>& arObs, float fOffsetX = 0, float fOffsetY = 0);
 
