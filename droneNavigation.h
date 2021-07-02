@@ -56,7 +56,8 @@ void DroneNavigation<DriveType>::run(void)
         arNavThreads[i] = new std::thread(&Navigator::run, arNav[i], new Signal(signalMainMessage));
     }
     // Start up the monitor thread
-    std::thread thrStatus(&ServerLoop::run, &ServerLoop::GetServerLoopSingleton());
+    ServerLoop& monitorStatus = ServerLoop::GetServerLoopSingleton();
+    std::thread thrStatus(&ServerLoop::run, &monitorStatus);
     do {
         printf("MainLoop\n");
         for (int i = 0; i < arNav.size(); i++) {
@@ -72,6 +73,8 @@ void DroneNavigation<DriveType>::run(void)
                 }
             }
         }
+        monitorStatus.SetSpeed(drive.getSpeed());
+        monitorStatus.SetSteer(drive.getSteer());
         signalMainMessage.wait(drive.getLoopTimeoutMS());
     } while (!ss.shouldStop());
     for (int i = 0; i< arNav.size(); i++) {
