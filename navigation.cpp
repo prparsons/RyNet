@@ -1,5 +1,7 @@
 #include "navigation.h"
 
+#include <jetson-inference/detectNet.h>
+#include <jetson-utils/loadImage.h>
 #include <thread>
 #include <unistd.h>
 
@@ -310,8 +312,33 @@ void Navigator_PersonFinder::newImageRGB(image _imgRGB, bool bSignal)
 {
     ThreadLock locker(mtImages);
     locker.lock();
+    if (bNewImgRGB) {
+        // cout << "New image when previous not used"; // Don't want to use unsynchronized frames, so we'll wait until the depth has finished
+        locker.unlock();
+        return;
+    }
     bNewImgRGB = true;
     imgRGB = _imgRGB; // copying is slow...need a single shareable read instance
+    locker.unlock();
+    if (bSignal) {
+        if (psigImages != nullptr) {
+            psigImages->signal();
+        }
+    }
+}
+
+void Navigator_PersonFinder::newImageDepthRaw(cameraFrame_depth _depthRaw, bool bSignal)
+{ 
+    ThreadLock locker(mtImages);
+    locker.lock();
+    if (bNewImgDepthRaw) {
+        // cout << "New image when previous not used"; // Don't want to use unsynchronized frames, so we'll wait until the rgb has finished
+        locker.unlock();
+        return;
+    }
+    bNewImgDepthRaw = true;
+    if (pDepthRaw) delete pDepthRaw;
+    pDepthRaw = new cameraFrame_depth(_depthRaw);
     locker.unlock();
     if (bSignal) {
         if (psigImages != nullptr) {
@@ -330,19 +357,29 @@ void Navigator_PersonFinder::_run(Signal* psigMain)
         sigImages.wait(1000);
         ThreadLock locker(mtImages);
         locker.lock();
-        if (!bNewImgRGB) {
+        if (!(bNewImgRGB && bNewImgDepthRaw)) {
             locker.unlock();
             continue; // Wait until new images of both
         }
-        bNewImgRGB = false;
-        locker.unlock();
            
-        // Very first thing check for obstructions. If there are, immediately signal that speed/steer have been affected
-        //if (processObstruct()) {
-        //    printf("Nav loop dirty obstruction\n");
-        //    flagDirty |= Navigator::SPEED | Navigator::STEER;
-        //    sigMain.signal();
-        //}
+        if (process()) {
+            flagDirty |= Navigator::DEST_X;
+            flagDirty |= Navigator::DEST_Y;
+            if (fSpeed == 0) {
+                fSpeed = 1.0;
+                flagDirty |= Navigator::SPEED;
+            }
+            sigMain.signal();
+        } else if (fSpeed != 0) {
+            fSpeed = 0;
+            flagDirty |= Navigator::SPEED;
+            sigMain.signal();
+        }
+        // Unlock and reset everything now that we're done with images
+        bNewImgRGB = false;
+        bNewImgDepthRaw = false;
+        locker.unlock();
+
     } while(!ss.shouldStop());
     delete psigMain;
     delete psigImages;
@@ -353,48 +390,76 @@ float Navigator_PersonFinder::_getConfidenceDest()
     return 1.0f;
 }
 
-/*		// these variables will store the image data pointer and dimensions
-		uchar3* imgPtr = NULL;   // shared CPU/GPU pointer to image
-		int imgWidth   = 0;      // width of the image (in pixels)
-		int imgHeight  = 0;      // height of the image (in pixels)
-			
-		// load the image from disk as uchar3 RGB (24 bits per pixel)
-		if( !loadImage(imgFilename, &imgPtr, &imgWidth, &imgHeight) )
-		{
-			printf("failed to load image '%s'\n", imgFilename);
-			return 0;
-		}
+bool Navigator_PersonFinder::process()
+{
+    // these variables will store the image data pointer and dimensions
+    uchar3* imgPtr = (uchar3*)imgRGB.data;   // shared CPU/GPU pointer to image
+    int imgWidth = imgRGB.cols;      // width of the image (in pixels)
+    int imgHeight = imgRGB.rows;      // height of the image (in pixels)
 
-		// For Jetson Nano (just let it use gpu)
-		detectNet* net = detectNet::Create(detectNet::SSD_MOBILENET_V2);
-		// For Xavier (try to use one of the DLA engines so we can use the gpu for opencv stuff)
-		//detectNet* net = detectNet::Create(detectNet::SSD_MOBILENET_V2, 0.5f, 1, TYPE_FASTEST, DEVICE_DLA_0);
+	// For Jetson Nano (just let it use gpu)
+	static detectNet* net = nullptr; // don't leave this static
+    
+    if (!net) net = detectNet::Create(detectNet::SSD_MOBILENET_V2);
+	// For Xavier (try to use one of the DLA engines so we can use the gpu for opencv stuff)
+	//detectNet* net = detectNet::Create(detectNet::SSD_MOBILENET_V2, 0.5f, 1, TYPE_FASTEST, DEVICE_DLA_0);
 
-		// check to make sure that the network model loaded properly
-		if( !net )
-		{
-			printf("failed to load image recognition network\n");
-			return 0;
-		}
-
-		detectNet::Detection* arDetections = nullptr;
-		int iDetections = net->Detect(imgPtr, imgWidth, imgHeight, &arDetections);
-		printf("Results    Class    Confidence    Left Top Right Bottom\n");
-		int i = 0;
-		for (; i < iDetections; i++) {
-			printf("Result[%d]: %s    %.4f    %.1f %.1f %.1f %.1f\n", i
-										, net->GetClassDesc(arDetections[i].ClassID)
-										, arDetections[i].Confidence
-										, arDetections[i].Left
-										, arDetections[i].Top
-										, arDetections[i].Right
-										, arDetections[i].Bottom); 
-		}
-
-		// Not sure if this is right for freeing the memory
-		cudaFree(imgPtr);
-		cudaFree(arDetections);
-
-		delete net;
+	// check to make sure that the network model loaded properly
+	if (!net) {
+		printf("failed to load image recognition network\n");
+		return 0;
 	}
-*/
+
+	detectNet::Detection* arDetections = nullptr;
+	int iDetections = net->Detect(imgPtr, imgWidth, imgHeight, &arDetections);
+
+    if (iDetections < 1) {
+        //printf("No People");
+        return false;
+    }
+
+    float fConvertX = pDepthRaw->getWidth() / float(imgWidth);
+    float fConvertY = pDepthRaw->getHeight() / float(imgHeight);
+    float fMinDistance = MAXFLOAT;
+    int iXDestination = 0;
+    for (int i = 0; i < iDetections; i++) {
+        if (arDetections[i].Confidence < 0.5) continue;
+        float fTop = arDetections[i].Top * fConvertY;
+        float fRight = arDetections[i].Right * fConvertX;
+        float fBottom = arDetections[i].Bottom * fConvertY;
+        float fLeft = arDetections[i].Left * fConvertX;
+
+        // Should we bother rounding?
+        for (int x = fLeft; x < fRight; x++) {
+            for (int y = fTop; y < fBottom; y++) {
+                point pt;
+                pt.iXY[0] = x;
+                pt.iXY[1] = y;
+                if ((*pDepthRaw)[pt] < fMinDistance) {
+                    fMinDistance = (*pDepthRaw)[pt];
+                    iXDestination = x;
+                }
+            }
+        }
+    }
+    if (fMinDistance == MAXFLOAT) {
+        //printf("not high enough confidence");
+        return false;
+    }
+
+    float fDistanceMeters = fMinDistance * pDepthRaw->getMetersPerUnit();
+    float fXDestination = iXDestination / fConvertX;
+    fXDestination /= imgWidth; //percentage
+    fXDestination -= 0.5; //0 at center of image
+    fXDestination *= (69 / 2); // FOV horizontal / 2
+    // Now we have angle and distance, need the 2 legs of the triangle now
+    float fX = fDistanceMeters * sin(fXDestination);
+    float fY = fDistanceMeters * cos(fXDestination);
+    dest.fX = fX;
+    dest.fY = fY;
+    
+	// Not sure if this is right for freeing the memory
+	cudaFree(arDetections);
+
+	return true;
+}

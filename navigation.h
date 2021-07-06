@@ -89,6 +89,7 @@ public:
     virtual ~Navigator_PersonFinder();
     
     virtual void newImageRGB(image imgRGB, bool bSignal) override;
+    virtual void newImageDepthRaw(cameraFrame_depth depthRaw, bool bSignal) override;
 
     virtual void _run(Signal* psigMain) override;
 
@@ -99,9 +100,11 @@ private:
     bool process();
 
     bool bNewImgRGB;
+    bool bNewImgDepthRaw;
     cameraMulti* pCamera;
     Signal* psigImages;
     image imgRGB;
+    cameraFrame_depth *pDepthRaw;
     Mutex mtImages;
 };
 
