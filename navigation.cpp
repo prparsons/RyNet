@@ -405,6 +405,7 @@ bool Navigator_PersonFinder::process()
 	// For Jetson Nano (just let it use gpu)
     
     if (!pNetwork) pNetwork = detectNet::Create(detectNet::SSD_MOBILENET_V2);
+    // SSD_INCEPTION_V2 ?
 	// For Xavier (try to use one of the DLA engines so we can use the gpu for opencv stuff)
 	//detectNet* net = detectNet::Create(detectNet::SSD_MOBILENET_V2, 0.5f, 1, TYPE_FASTEST, DEVICE_DLA_0);
 
@@ -428,6 +429,10 @@ bool Navigator_PersonFinder::process()
     int iXDestination = 0;
     for (int i = 0; i < iDetections; i++) {
         if (arDetections[i].Confidence < 0.5) continue;
+        if (arDetections[i].ClassID != 1) continue; // Should be a person (looking for people)
+
+        //somehow display in status monitor
+
         float fTop = arDetections[i].Top * fConvertY;
         float fRight = arDetections[i].Right * fConvertX;
         float fBottom = arDetections[i].Bottom * fConvertY;
