@@ -299,13 +299,18 @@ float Navigator_SimpleObstruct2D::_getConfidenceRaw()
 Navigator_PersonFinder::Navigator_PersonFinder()
 : Navigator(&activ_null)
 , bNewImgRGB(false)
+, psigImages(nullptr)
+, pDepthRaw(nullptr)
+, pNetwork(nullptr)
 {
 
 }
 
 Navigator_PersonFinder::~Navigator_PersonFinder()
 {
-
+    if (pNetwork != nullptr) delete pNetwork;
+    if (psigImages != nullptr) delete psigImages;
+    if (pDepthRaw != nullptr) delete pDepthRaw; // do we need to lock this (what thread is the update called from...need to make sure camer is stopped?)
 }
     
 void Navigator_PersonFinder::newImageRGB(image _imgRGB, bool bSignal)
@@ -398,20 +403,19 @@ bool Navigator_PersonFinder::process()
     int imgHeight = imgRGB.rows;      // height of the image (in pixels)
 
 	// For Jetson Nano (just let it use gpu)
-	static detectNet* net = nullptr; // don't leave this static
     
-    if (!net) net = detectNet::Create(detectNet::SSD_MOBILENET_V2);
+    if (!pNetwork) pNetwork = detectNet::Create(detectNet::SSD_MOBILENET_V2);
 	// For Xavier (try to use one of the DLA engines so we can use the gpu for opencv stuff)
 	//detectNet* net = detectNet::Create(detectNet::SSD_MOBILENET_V2, 0.5f, 1, TYPE_FASTEST, DEVICE_DLA_0);
 
 	// check to make sure that the network model loaded properly
-	if (!net) {
+	if (!pNetwork) {
 		printf("failed to load image recognition network\n");
 		return 0;
 	}
 
 	detectNet::Detection* arDetections = nullptr;
-	int iDetections = net->Detect(imgPtr, imgWidth, imgHeight, &arDetections);
+	int iDetections = pNetwork->Detect(imgPtr, imgWidth, imgHeight, &arDetections);
 
     if (iDetections < 1) {
         //printf("No People");

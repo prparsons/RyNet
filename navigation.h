@@ -83,6 +83,8 @@ private:
     Mutex mtImages;
 };
 
+class detectNet;
+
 class Navigator_PersonFinder:public Navigator {
 public:
     Navigator_PersonFinder();
@@ -106,6 +108,7 @@ private:
     image imgRGB;
     cameraFrame_depth *pDepthRaw;
     Mutex mtImages;
+    detectNet* pNetwork;
 };
 
 class Navigator_SimpleDepthObstruct:public Navigator {
