@@ -52,6 +52,8 @@ public:
     virtual bool isPlanValid(Navigator& nav, Navigator::dirty isDirty) override;
     virtual void createNewPlan() override;
 
+    virtual void newImages(cameraFrame_depth& depthRaw, image& imgRGB);
+
 protected:
     DestinationEquation createRoute(Destination start, float fDx, float fDy, Destination dest);
     bool isRouteObstructed(DestinationEquation, std::vector<Obstruction>& arObs, float fOffsetX = 0, float fOffsetY = 0);

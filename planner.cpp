@@ -55,6 +55,28 @@ void Drive_TwinTrack::createNewPlan()
 // ******************
 // Drive_TwinTrackAdv
 
+void twinTrackAdv_CameraCallback(cameraFrame* pFrame, void* pDrivePlanner)
+{
+    if (pFrame == nullptr || pDrivePlanner == nullptr) {
+        printf("@updateDepthCamera:arguments were null\n");
+        return;
+    }
+    Drive_TwinTrackAdv& system = *((Drive_TwinTrackAdv*)pDrivePlanner);
+
+    if (!pFrame->hasRGB()) {
+        printf("twinTrackAdv_CameraCallback:frame has no rgb\n");
+        return;
+    }
+    if (!pFrame->hasDepth()) {
+        printf("twinTrackAdv_CameraCallback:frame has no depth\n");
+        return;
+    }
+
+    image imageRGB = pFrame->getImageRGB();
+    cameraFrame_depth depthFrame = pFrame->getImageDepthRaw();
+    system.newImages(depthFrame, imageRGB);
+}
+
 Drive_TwinTrackAdv::Drive_TwinTrackAdv(std::vector<Navigator*>& arNav)
 : DrivePlanner(arNav)
 , pCurrentRoute(nullptr)
@@ -141,6 +163,14 @@ void Drive_TwinTrackAdv::createNewPlan()
     }
     // There are obstructions, build a route
     buildRouteTree(dest, arObst);
+}
+
+void Drive_TwinTrackAdv::newImages(cameraFrame_depth& depthRaw, image& imgDepth)
+{
+    for (int i = 0; i < arNav.size(); i++) {
+        arNav[i]->newImageRGB(imgDepth, false);
+        arNav[i]->newImageDepthRaw(depthRaw, true);
+    }
 }
 
 DestinationEquation Drive_TwinTrackAdv::createRoute(Destination start, float fDx, float fDy, Destination _dest)
