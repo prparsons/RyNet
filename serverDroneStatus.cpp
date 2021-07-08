@@ -43,6 +43,7 @@ void ServerLoop::run(void)
 
         // need to use mutex...copy image here? is copying slow?
         if (image.size == 0) continue;
+        writeDetections(image);
         writeSpeed(image);
         writeEquation(image);
 
@@ -171,6 +172,29 @@ void ServerLoop::SetEquation(DestinationEquation eq)
 void ServerLoop::SetObstructions(const std::vector<Obstruction>& arObstructions)
 {
 
+}
+
+void ServerLoop::AddDetection(DetectionBox bounds)
+{
+    mtData.lock();
+    arObjects.push_back(bounds);
+    mtData.unlock();
+}
+
+void ServerLoop::ClearDetection()
+{
+    mtData.lock();
+    arObjects.clear();
+    mtData.unlock();
+}
+
+void ServerLoop::writeDetections(cv::Mat& image)
+{
+    cv::Scalar rgbRect(0, 255, 0);
+    for (int i = 0; i < arObjects.size(); i++) {
+        cv::Rect rect(arObjects[i].fLeft, arObjects[i].fTop, arObjects[i].fRight - arObjects[i].fLeft, arObjects[i].fBottom - arObjects[i].fTop);
+        cv::rectangle(image, rect, rgbRect);
+    }
 }
 
 void ServerLoop::writeSpeed(cv::Mat& image)

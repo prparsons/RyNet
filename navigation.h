@@ -116,19 +116,16 @@ public:
     Navigator_SimpleDepthObstruct();
     virtual ~Navigator_SimpleDepthObstruct();
     
-    virtual void newImageDepth(image imgDepth, bool bSignal) override;
     virtual void newImageDepthRaw(cameraFrame_depth depthRaw, bool bSignal) override;
 
     virtual void _run(Signal* psigMain) override;
 
 private:
-    bool processObstruct();
+    bool process();
 
-    bool bNewImgDepth;
     bool bNewImgDepthRaw;
     cameraMulti* pCamera;
     Signal* psigImages;
-    image imgDepth;
     cameraFrame_depth *pDepthRaw;
     Mutex mtImages;
 };

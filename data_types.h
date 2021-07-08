@@ -10,6 +10,19 @@ typedef cv::Mat image;
 
 class ServerLoop;
 
+class DetectionBox {
+public:
+    DetectionBox(){}
+    DetectionBox(const DetectionBox& other);
+    DetectionBox& operator=(const DetectionBox& other);
+
+    float fTop;
+    float fRight;
+    float fBottom;
+    float fLeft;
+    float fDistance;
+};
+
 class Destination {
 public:
     Destination();

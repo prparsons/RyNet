@@ -5,6 +5,9 @@
 #include <thread>
 #include <unistd.h>
 
+#include "data_types.h"
+#include "serverDroneStatus.h"
+
 #define MIN_RANGE 0.6
 //#define FRAME_WIDTH 848
 //#define FRAME_HEIGHT 480
@@ -428,10 +431,12 @@ bool Navigator_PersonFinder::process()
     float fMinDistance = MAXFLOAT;
     int iXDestination = 0;
     for (int i = 0; i < iDetections; i++) {
-        if (arDetections[i].Confidence < 0.5) continue;
+        //if (arDetections[i].Confidence < 0.5) continue; // This isn't necessary since the argument is passed to detectNet
         if (arDetections[i].ClassID != 1) continue; // Should be a person (looking for people)
 
-        //somehow display in status monitor
+        DetectionBox bounds;
+        bounds.fLeft = arDetections[i].Left / float(pDepthRaw->getWidth());
+        ServerLoop::GetServerLoopSingleton().AddDetection(bounds);
 
         float fTop = arDetections[i].Top * fConvertY;
         float fRight = arDetections[i].Right * fConvertX;
@@ -471,4 +476,121 @@ bool Navigator_PersonFinder::process()
 	cudaFree(arDetections);
 
 	return true;
+}
+
+Navigator_SimpleDepthObstruct::Navigator_SimpleDepthObstruct()
+: Navigator(&activ_null)
+, bNewImgDepthRaw(false)
+, pCamera(nullptr)
+, pDepthRaw(nullptr)
+{
+    
+}
+
+Navigator_SimpleDepthObstruct::~Navigator_SimpleDepthObstruct()
+{
+    if (psigImages != nullptr) delete psigImages;
+    if (pDepthRaw != nullptr) delete pDepthRaw; // do we need to lock this (what thread is the update called from...need to make sure camer is stopped?)
+}
+
+void Navigator_SimpleDepthObstruct::newImageDepthRaw(cameraFrame_depth _depthRaw, bool bSignal)
+{
+    ThreadLock locker(mtImages);
+    locker.lock();
+    bNewImgDepthRaw = true;
+    if (pDepthRaw) delete pDepthRaw;
+    pDepthRaw = new cameraFrame_depth(_depthRaw);
+    locker.unlock();
+    if (bSignal) {
+        if (psigImages != nullptr) {
+            psigImages->signal();
+        }
+    }
+}
+
+void Navigator_SimpleDepthObstruct::_run(Signal* psigMain)
+{
+    Signal& sigMain = *psigMain;
+    Signal sigImages;
+    psigImages = new Signal(sigImages);
+
+    do {
+        sigImages.wait(1000);
+        ThreadLock locker(mtImages);
+        locker.lock();
+        if (!bNewImgDepthRaw) {
+            locker.unlock();
+            continue; // Wait until new images of both
+        }
+           
+        if (process()) {
+            flagDirty |= Navigator::SPEED;
+            sigMain.signal();
+        }
+        
+        // Unlock and reset everything now that we're done with images
+        bNewImgDepthRaw = false;
+        locker.unlock();
+
+    } while(!ss.shouldStop());
+    delete psigMain;
+    delete psigImages;
+}
+
+bool Navigator_SimpleDepthObstruct::process()
+{
+    ThreadLock locker(mtImages);
+    locker.lock();
+    if (pDepthRaw == nullptr) {
+        printf("Not any raw data\n");
+        return false;
+    }
+    cameraFrame_depth depthRaw(*pDepthRaw);
+    locker.unlock();
+    
+    float arRegions[4][4];
+    // Use decimation filter to downsample
+    depthRaw.applyDecimationFilter();
+    // Dividing the frame in 16 sections (4x4)
+    const int iRegionWidth = depthRaw.getWidth() / 4;
+    const int iRegionHeight = depthRaw.getHeight() / 4;
+
+    // For each region find the minimum value in that region. Ignore zeroes,
+    //  since that's what RS uses for invalid values
+        
+    // With the decimation filter enabled threading slows things down
+    //#pragma omp parallel for
+    for (int iRegionX = 0; iRegionX < 4; iRegionX++) {
+        for (int iRegionY = 0; iRegionY < 4; iRegionY++) {
+            const int iStartX = iRegionX * iRegionWidth;
+            const int iEndX = iRegionX == 3 ? depthRaw.getWidth() : iStartX + iRegionWidth;
+            float fMin = MAXFLOAT;
+            point pt;
+            pt.iXY[0] = iStartX;
+            for (int& x = pt.iXY[0]; x < iEndX; x++) {
+                const int iStartY = iRegionY * iRegionHeight;
+                const int iEndY = iRegionY == 3 ? depthRaw.getHeight() : iStartY + iRegionHeight;
+                pt.iXY[1] = iStartY;
+                for (int& y = pt.iXY[1]; y < iEndY; y++) {
+                    float fValue = depthRaw[pt];
+                    if (fValue < fMin) {
+                        fMin = fValue;
+                    }
+                }
+            }
+            arRegions[iRegionX][iRegionY] = fMin;
+        }
+    }
+
+    bool bReturn = false;
+    for (int i = 1; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            if (arRegions[i][j] < 10) {
+                //create obstruction
+                bReturn = true;
+            }
+        }
+    }
+
+    return bReturn;
 }

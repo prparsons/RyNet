@@ -28,8 +28,11 @@ public:
 
     // Navigator
     void SetObstructions(const std::vector<Obstruction>& arObstructions);
+    void AddDetection(DetectionBox bounds);
+    void ClearDetection();
 
 private:
+    void writeDetections(cv::Mat& image);
     void writeSpeed(cv::Mat& image);
     void writeEquation(cv::Mat& image);
 
@@ -51,6 +54,7 @@ private:
     DestinationEquation equation;
     // Navigator
     std::vector<Obstruction> arObstructions;
+    std::vector<DetectionBox> arObjects;
     //people
     // Machine stats
     int iGPU_Temp;
