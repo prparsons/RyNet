@@ -48,6 +48,7 @@ private:
 class Drive_TwinTrackAdv: public DrivePlanner {
 public:
     Drive_TwinTrackAdv(std::vector<Navigator*>& arNav);
+    virtual ~Drive_TwinTrackAdv();
 
     virtual bool isPlanValid(Navigator& nav, Navigator::dirty isDirty) override;
     virtual void createNewPlan() override;
@@ -71,6 +72,10 @@ protected:
     std::vector<float> arSpeedAvg;
     std::vector<Orientation> arOrientAvg;
     Destination destAvg;
+
+    cameraMulti* pCamera;
+    std::thread* pthrCamera;
+
     float fDistBeforeChangeDest;
     int iDestAvgCursor;
     int iSpeedAvgCursor;

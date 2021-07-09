@@ -85,6 +85,38 @@ Drive_TwinTrackAdv::Drive_TwinTrackAdv(std::vector<Navigator*>& arNav)
 , iSpeedAvgCursor(0)
 , iOrientationAvgCursor(0)
 {
+    cameraMulti::cameraFeatures features = cameraMulti::cameraFeatures(cameraMulti::cameraMulti_RGB | cameraMulti::cameraMulti_IR | cameraMulti::cameraMulti_Align);
+    pCamera = cameraMulti::OpenCamera(cameraMulti::cameraMulti_RS, features);
+    if (pCamera == nullptr) {
+        printf("Error opening camera\n");
+        return;
+    }
+
+    try {     
+        pthrCamera = new std::thread(&cameraMulti::run, pCamera, (void*)&twinTrackAdv_CameraCallback, (void*)this);
+    } catch (rs2::error e) {
+        std::cout << "Camera Error. Type: " << e.get_type() << std::endl;
+        std::cout << "Camera Error. Function: " << e.get_failed_function() << std::endl;
+        std::cout << "Camera Error. Args: " << e.get_failed_args() << std::endl;
+
+        static int iRetryCount = 0;
+        // Try 3 times to restart the camera
+        if (iRetryCount++ < 3) {
+            std::cout << "Camera Error. Restart attempt: " << iRetryCount << std::endl;
+            //figure out if thread is running...if so stop it
+            delete pCamera;
+            pCamera = cameraMulti::OpenCamera(cameraMulti::cameraMulti_RS, features);
+            if (pCamera == nullptr) {
+                std::cout << "Camera Error. Unable to create new camera.\n";
+            }
+        }
+    }
+}
+
+Drive_TwinTrackAdv::~Drive_TwinTrackAdv()
+{
+    pCamera->ss.stop();
+    pthrCamera->join();
 }
 
 bool Drive_TwinTrackAdv::isPlanValid(Navigator& nav, Navigator::dirty flags)

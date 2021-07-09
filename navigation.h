@@ -103,7 +103,6 @@ private:
 
     bool bNewImgRGB;
     bool bNewImgDepthRaw;
-    cameraMulti* pCamera;
     Signal* psigImages;
     image imgRGB;
     cameraFrame_depth *pDepthRaw;
@@ -124,7 +123,6 @@ private:
     bool process();
 
     bool bNewImgDepthRaw;
-    cameraMulti* pCamera;
     Signal* psigImages;
     cameraFrame_depth *pDepthRaw;
     Mutex mtImages;

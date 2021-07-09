@@ -481,7 +481,6 @@ bool Navigator_PersonFinder::process()
 Navigator_SimpleDepthObstruct::Navigator_SimpleDepthObstruct()
 : Navigator(&activ_null)
 , bNewImgDepthRaw(false)
-, pCamera(nullptr)
 , pDepthRaw(nullptr)
 {
     

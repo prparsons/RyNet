@@ -77,7 +77,8 @@ public:
         cameraMulti_Depth = 0x04,
         cameraMulti_REdge = 0x08,
 
-        cameraMulti_DownsampleDepth = 0x10
+        cameraMulti_DownsampleDepth = 0x10,
+        cameraMulti_Align = 0x20
     };
 
     static cameraMulti* OpenCamera(cameraType type, cameraFeatures features);
