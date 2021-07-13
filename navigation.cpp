@@ -9,8 +9,6 @@
 #include "serverDroneStatus.h"
 
 #define MIN_RANGE 0.6
-//#define FRAME_WIDTH 848
-//#define FRAME_HEIGHT 480
 
 void updateDepthCamera(cameraFrame* pFrame, void* pNavigator)
 {
@@ -466,7 +464,7 @@ bool Navigator_PersonFinder::process()
     fXDestination /= imgWidth; //percentage
     fXDestination -= 0.5; //0 at center of image
     fXDestination *= (69 / 2); // FOV horizontal / 2
-    //CONVERT DEGREES TO RADIANS!!!!
+    fXDestination *= (PI / 180); // Convert to radians
     // Now we have angle and distance, need the 2 legs of the triangle now
     float fX = fDistanceMeters * sin(fXDestination);
     float fY = fDistanceMeters * cos(fXDestination);

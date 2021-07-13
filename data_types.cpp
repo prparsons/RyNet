@@ -131,13 +131,13 @@ Obstruction::Obstruction(DetectionBox box, float fTotalWidth, float fHorizFOV)
     float fDegreePerPixel = (fHorizFOV / 2) / fTotalWidth;
     float fLeft = box.fLeft - (fTotalWidth / 2);
     fLeft *= fDegreePerPixel;
-    // convert degres to radians!!!!!!!!!!!!!!!!!!
-    // Point should be floats!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    fLeft *= (PI / 180); // Convert to radians
     ptLine[0].fX = box.fDistance * sin(fLeft);
     ptLine[0].fY = box.fDistance * cos(fLeft);
 
     float fRight = box.fRight - (fTotalWidth / 2);
     fRight *= fDegreePerPixel;
+    fRight *= (PI / 180); // Convert to radians
     ptLine[1].fX = box.fDistance * sin(fRight);
     ptLine[1].fY = box.fDistance * cos(fRight);
 }
