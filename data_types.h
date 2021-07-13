@@ -57,22 +57,28 @@ private:
     friend class ServerLoop; // So the status window can write out things
 };
 
+class Point {
+public:
+    Point():fX(0),fY(0){}
+    Point(float _fX, float _fY):fX(_fX), fY(_fY){}
+    Point(const Point& other){ *this = other; }
+
+    Point& operator=(const Point& other) { fX = other.fX; fY = other.fY; }
+
+    float fX;
+    float fY;
+};
+
 // Obstructions should always assume current position is at 0,0
 class Obstruction {
 public:
-    Obstruction(float* arDepthBuffer, int iWidth, int iHeight, float fHorizFOV);
+    Obstruction(DetectionBox box, float fTotalWidth, float fHorizFOV); // Box is image coordinates, constructor will convert to robot space coordinates
     ~Obstruction();
 
     bool IsObstructed(const DestinationEquation&, float fTStart, float fOffsetX = 0, float fOffsetY = 0); // returns confidence of obstruction 0 - 255
-    void setFloor(int _iFloor) { iFloor = _iFloor; }
 
 private:
-    float* arObstructed;
-    float* arAngles;
-    float fHorizFOV;
-    int iWidth;
-    int iHeight;
-    int iFloor;
+    Point ptLine[2];
 };
 
 class Orientation {

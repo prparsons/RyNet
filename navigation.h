@@ -117,6 +117,8 @@ public:
     
     virtual void newImageDepthRaw(cameraFrame_depth depthRaw, bool bSignal) override;
 
+    virtual bool getObstructions(std::vector<Obstruction>&) override;
+
     virtual void _run(Signal* psigMain) override;
 
 private:
@@ -126,4 +128,5 @@ private:
     Signal* psigImages;
     cameraFrame_depth *pDepthRaw;
     Mutex mtImages;
+    std::vector<Obstruction> arObs;
 };

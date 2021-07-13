@@ -1,4 +1,7 @@
 #pragma once
+// Intel RealSense D435i
+//  Depth FOV: 87° × 58°
+//  RGB FOV:   69° × 42° 
 
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
 #include <thread>

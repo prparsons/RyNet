@@ -126,52 +126,74 @@ void DestinationEquation::GetDeriv(float& fDx, float& fDy, float fT) const
 // ***********
 // Obstruction
 
-Obstruction::Obstruction(float* arBuffer, int _iWidth, int _iHeight, float _fHorizFOV)
-: arObstructed(new float[_iWidth * _iHeight])
-, arAngles(new float[_iWidth])
-, fHorizFOV(_fHorizFOV)
-, iWidth(_iWidth)
-, iHeight(_iHeight)
-, iFloor(iHeight)
+Obstruction::Obstruction(DetectionBox box, float fTotalWidth, float fHorizFOV)
 {
-    const int iSize = iWidth * iHeight;
-    for (int i = 0; i < iSize; i++) {
-        arObstructed[i] = arBuffer[i];
-    }
-    const float fMiddle = iWidth / 2;
-    const float fMaxAngle = fHorizFOV / 2;
-    for (int i = 0; i < iWidth; i++) {
-        arAngles[i] = float(i - fMiddle) / fMiddle;
-        arAngles[i] *= fMaxAngle;
-    }
+    float fDegreePerPixel = (fHorizFOV / 2) / fTotalWidth;
+    float fLeft = box.fLeft - (fTotalWidth / 2);
+    fLeft *= fDegreePerPixel;
+    // convert degres to radians!!!!!!!!!!!!!!!!!!
+    // Point should be floats!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ptLine[0].fX = box.fDistance * sin(fLeft);
+    ptLine[0].fY = box.fDistance * cos(fLeft);
+
+    float fRight = box.fRight - (fTotalWidth / 2);
+    fRight *= fDegreePerPixel;
+    ptLine[1].fX = box.fDistance * sin(fRight);
+    ptLine[1].fY = box.fDistance * cos(fRight);
 }
 
 Obstruction::~Obstruction()
 {
-    delete[] arObstructed;
-    delete[] arAngles;
+
 }
 
 bool Obstruction::IsObstructed(const DestinationEquation& destEq, float fTStart, float fOffsetX, float fOffsetY)
 {
-    float (*arObs)[iWidth] = (float(*)[iWidth])arObstructed;
-    Destination dest = destEq.GetLocation(0);
-    dest.fX += fOffsetX;
-    dest.fY += fOffsetY;
+    if (ptLine[0].fX == ptLine[1].fX) {
+        // Should make this parametric, cheating for now since this shouldn't be possible anyways
+        return false;
+    }
+    Destination destPrev = destEq.GetLocation(fTStart);
 
-    const float fMaxAngle = fHorizFOV / 2;
-    for (float fT = 0; fT <= 1.0; fT += .1) {
-        dest = destEq.GetLocation(fT);
-        float fAngle = atan2(dest.fX, dest.fY);
-        if (fAngle > fMaxAngle) return true;
-        float fDist = dest.fX / sin(fAngle);
-        // figure out index for fAngle
-        const float fMiddle = iWidth / 2;
-        const float fMaxAngle = fHorizFOV / 2;
-        const int iIndex = fMiddle + ((fMiddle * fAngle) / fMaxAngle);
-        // Now look through the buffer until you hit the floor
-        for (int i = 0; i < iFloor; i++) {
-            if (arObs[iIndex][i] < fDist) return true;
+    // y = mx + b  for the obstruction
+    float fObsM = (ptLine[1].fY - ptLine[0].fY) / (ptLine[1].fX - ptLine[0].fX);
+    float fObsB = ptLine[0].fY - (fObsM * ptLine[0].fX);
+
+    for (float fT = fTStart + .1; fT <= 1.0; fT += .1) {
+        Destination dest = destEq.GetLocation(fT);
+        if (dest.fX == destPrev.fX) {
+            // Straight line
+            if (dest.fX < ptLine[0].fX || dest.fX > ptLine[1].fX) {
+                // Obstruction not in this line of travel
+                continue;
+            }
+            float fIntersection = (fObsM * dest.fX) + fObsB;
+            if (destPrev.fY < fIntersection && fIntersection < dest.fY) {
+                // Intersection is within the segment of travel
+                return true;
+            }
+            continue;
+        }
+        // y = mx + b for that segment of travel
+        float fM = (dest.fY - destPrev.fY) / (dest.fX - destPrev.fX);
+        float fB = destPrev.fY - (fM * destPrev.fX);
+        if (fObsM == fM) {
+            if (fB == fObsB) return true; // They are the same line
+            continue; // Parallel lines
+        }
+        float fXintersect = (fB - fObsB) / (fObsM - fM);
+        if (ptLine[0].fX < fXintersect && fXintersect < ptLine[1].fX) {
+            float fLeft, fRight;
+            if (dest.fX < destPrev.fX) {
+                fLeft = dest.fX;
+                fRight = destPrev.fX;
+            } else {
+                fRight = dest.fX;
+                fLeft = destPrev.fX;
+            }
+            if (fLeft < fXintersect && fXintersect < fRight) {
+                return true;
+            }
         }
     }
     return false;

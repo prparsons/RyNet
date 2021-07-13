@@ -466,6 +466,7 @@ bool Navigator_PersonFinder::process()
     fXDestination /= imgWidth; //percentage
     fXDestination -= 0.5; //0 at center of image
     fXDestination *= (69 / 2); // FOV horizontal / 2
+    //CONVERT DEGREES TO RADIANS!!!!
     // Now we have angle and distance, need the 2 legs of the triangle now
     float fX = fDistanceMeters * sin(fXDestination);
     float fY = fDistanceMeters * cos(fXDestination);
@@ -505,6 +506,13 @@ void Navigator_SimpleDepthObstruct::newImageDepthRaw(cameraFrame_depth _depthRaw
             psigImages->signal();
         }
     }
+}
+
+bool Navigator_SimpleDepthObstruct::getObstructions(std::vector<Obstruction>& _arObs)
+{
+    if (arObs.size() == 0) return false;
+    _arObs = arObs;
+    return true;
 }
 
 void Navigator_SimpleDepthObstruct::_run(Signal* psigMain)
@@ -547,6 +555,7 @@ bool Navigator_SimpleDepthObstruct::process()
     cameraFrame_depth depthRaw(*pDepthRaw);
     locker.unlock();
     
+    arObs.clear();
     float arRegions[4][4];
     // Use decimation filter to downsample
     depthRaw.applyDecimationFilter();
@@ -582,10 +591,21 @@ bool Navigator_SimpleDepthObstruct::process()
     }
 
     bool bReturn = false;
-    for (int i = 1; i < 3; i++) {
+    // Looking at the full width, ignoring bottom row (floor/ground)
+    //  0,0     1,0     2,0     3,0
+    //  0,1     1,1     2,1     3,1
+    //  0,2     1,2     2,2     3,2
+    //  x       x       x       x
+    for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 3; j++) {
-            if (arRegions[i][j] < 10) {
+            if (arRegions[i][j] < 10) { // Only consider things < 10 meters
                 //create obstruction
+                //Obstruction(DetectionBox box, float fTotalWidth, float fHorizFOV)
+                DetectionBox box;
+                box.fLeft = i * iRegionWidth;
+                box.fRight = box.fLeft + iRegionWidth;
+                box.fDistance = arRegions[i][j];
+                arObs.push_back(Obstruction(box, depthRaw.getWidth(), 87));
                 bReturn = true;
             }
         }
