@@ -9,7 +9,7 @@
 #include "locksignal.h"
 #include "data_types.h"
 
-class cameraMulti;
+class CameraController;
 struct point {
     int iXY[2];
 };
@@ -36,7 +36,7 @@ class cameraFrame {
 public:
     cameraFrame();
     cameraFrame(const cameraFrame& other);
-    cameraFrame& operator=(const cameraFrame& other);
+    //cameraFrame& operator=(const cameraFrame& other);
     ~cameraFrame();
 
     image getImageRGB();
@@ -58,7 +58,9 @@ private:
     cv::Mat* pREdge;
     cameraFrame_depth* pDepthRaw;
     int* piCount;
-    friend class cameraMulti;
+    Mutex* pM;
+    ThreadLock* pLock;
+    friend class CameraController;
 };
 
 class camera_RS {
@@ -67,44 +69,39 @@ public:
     rs2::config cfg;
 };
 
-class cameraMulti {
+//rename CameraController
+class CameraController {
 public:
-    ~cameraMulti();
-    enum cameraType {
-        cameraMulti_CV,
-        cameraMulti_RS };
+    ~CameraController();
 
     enum cameraFeatures {
-        cameraMulti_RGB = 0x01,
-        cameraMulti_IR = 0x02,
-        cameraMulti_Depth = 0x04,
-        cameraMulti_REdge = 0x08,
+        CameraController_RGB = 0x01,
+        CameraController_IR = 0x02,
+        CameraController_Depth = 0x04,
 
-        cameraMulti_DownsampleDepth = 0x10,
-        cameraMulti_Align = 0x20
+        CameraController_DownsampleDepth = 0x08
     };
 
-    static cameraMulti* OpenCamera(cameraType type, cameraFeatures features);
-    static bool isCameraTypeAvail(cameraType type);
+    static CameraController* OpenCamera(cameraFeatures features);
 
-    int getAvailFeatures() const;
+    cameraFrame* getCurrentFrame();
 
-    void runCameraLoop();
-    cameraFrame* waitForCamera();
-    void run(void* pCallbackFrame, void* pCallbackData);
-    StopSignal ss;
+    void run();
 
 protected:
-    cameraMulti(cameraType, cameraFeatures);
-    cameraMulti(const cameraMulti&);
-
+    CameraController(cameraFeatures);
     void run_RS();
 
 private:
-    void (*callbackFrame)(cameraFrame*, void*);
-    void* pCallbackData;
+    cameraFrame* pFrameCurrent;
+    Mutex m;
 
     camera_RS* pCameraRS;
-    cameraType type;
     cameraFeatures features;
+
+    std::thread* pthrCamera[3];
+    StopSignal ss;
+    Signal sigRGB;
+    Signal sigDepth;
+    Signal sigThermal;
 };

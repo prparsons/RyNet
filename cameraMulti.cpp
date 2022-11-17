@@ -1,6 +1,6 @@
-#include "cameraMulti.h"
+#include "CameraController.h"
 
-#include "serverDroneStatus.h"
+#include "dataLogger.h"
 
 using namespace cv;
 
@@ -34,28 +34,30 @@ cameraFrame::cameraFrame()
 , pREdge(nullptr)
 , pDepthRaw(nullptr)
 , piCount(new int(1))
+, pM(new Mutex)
+, pLock(new ThreadLock(*pM))
 {
 
 }
 
 cameraFrame::cameraFrame(const cameraFrame& other)
 {
-    (*this) = other;
-}
-
-cameraFrame& cameraFrame::operator=(const cameraFrame& other)
-{
+    other.pLock->lock();
     pRGB = other.pRGB;
     pDepth = other.pDepth;
     pIR = other.pIR;
     pREdge = other.pREdge;
     piCount = other.piCount;
     pDepthRaw = other.pDepthRaw;
+    pM = other.pM;
+    pLock = new ThreadLock(*pM);
     (*piCount)++;
+    other.pLock->unlock();
 }
 
 cameraFrame::~cameraFrame()
 {
+    pLock->lock();
     if (--(*piCount) == 0) {
         delete pRGB;
         delete pDepth;
@@ -63,7 +65,10 @@ cameraFrame::~cameraFrame()
         delete pIR;
         delete pREdge;
         delete piCount;
+        delete pM;
     }
+    pLock->unlock();
+    delete pLock;
 }
 
 bool cameraFrame::hasRGB() const
@@ -112,63 +117,78 @@ image cameraFrame::getImageREdge()
 }
 
 // ***********
-// cameraMulti
+// CameraController
 
-cameraMulti* cameraMulti::OpenCamera(cameraType type, cameraFeatures features)
+CameraController* CameraController::OpenCamera(cameraType type, cameraFeatures features)
 {
-    cameraMulti* pReturn = new cameraMulti(type, features);
+    CameraController* pReturn = new CameraController(type, features);
     if (pReturn->pCameraRS == nullptr) {
         delete pReturn;
-        printf("cameraMulti didn't have valid pCameraRS - deleted\n");
+        printf("CameraController didn't have valid pCameraRS - deleted\n");
         return nullptr;
     }
     return pReturn;
 }
 
-cameraMulti::cameraMulti(cameraType _type, cameraFeatures _features)
-: pCameraRS(nullptr)
-, type(_type)
+cameraFrame* CameraController::getCurrentFrame()
+{
+    m.lock();
+    if (pFrameCurrent == nullptr) {
+        m.unlock();
+        return nullptr;
+    }
+    cameraFrame* pFrameReturn = new cameraFrame(*pFrameCurrent);
+    m.unlock();
+    return pFrameCurrent;
+}
+
+CameraController::CameraController(cameraFeatures _features)
+: pFrameCurrent(nullptr)
+, pCameraRS(nullptr)
 , features(_features)
 {
-    printf("cameraMulti::cameraMulti\n");
-    if (type == cameraMulti_RS) {
+    printf("CameraController::CameraController\n");
+    
+    if (features & CameraController_Depth) {
         pCameraRS = new camera_RS;
-        if (features & cameraMulti_Depth) {
-            pCameraRS->cfg.enable_stream(RS2_STREAM_DEPTH, 1280, 720);
-        }
-        if (features & cameraMulti_RGB) {
-            pCameraRS->cfg.enable_stream(RS2_STREAM_COLOR, 1280, 720);
-        }
+        pCameraRS->cfg.enable_stream(RS2_STREAM_DEPTH, 1280, 720);
     }
+
+    pthrCamera[0] = nullptr;
+    pthrCamera[1] = nullptr;
+    pthrCamera[2] = nullptr;
 }
 
-cameraMulti::~cameraMulti()
+CameraController::~CameraController()
 {
     if (pCameraRS != nullptr) delete pCameraRS;
-}
-
-void cameraMulti::runCameraLoop()
-{
-    if (type == cameraMulti_RS) {
-        run_RS();
+    if (pFrameCurrent != nullptr) delete pFrameCurrent;
+    if (pthrCamera[0] != nullptr) {
+        printf("~CameraController stopping realsense thread");
+        pthrCamera[0]->join();
+        delete pthrCamera[0];
     }
 }
 
-void cameraMulti::run(void* pCallbackFrame, void* _pCallbackData)
+void CameraController::run()
 {
-    callbackFrame = (void(*)(cameraFrame*, void*))pCallbackFrame;
-    pCallbackData = _pCallbackData;
-    runCameraLoop();
+    if (features & CameraController_Depth) {
+        if (pthrCamera[0] == nullptr) {
+            pthrCamera[0] = new std::thread(&CameraController::run_RS, this);
+        } else {
+            printf("CameraController::run realsense already started");
+        }
+    }
 }
 
-void cameraMulti::run_RS()
+void CameraController::run_RS()
 {
-    printf("cameraMulti::run_RS\n");
+    printf("CameraController::run_RS\n");
     // Declare depth colorizer for pretty visualization of depth data
     rs2::colorizer color_map(2); // 2 should give us a white to black color map
     rs2::pipeline_profile pipelineInfo = pCameraRS->pipe.start();
     if (!pipelineInfo) {
-        printf("cameraMulti error\n");
+        printf("CameraController error\n");
         return;
     }
     do {
@@ -184,16 +204,18 @@ void cameraMulti::run_RS()
             try {
                 data = pCameraRS->pipe.wait_for_frames();
             } catch(rs2::error) {
+                printf("cam fail retry\n");
                 return;
             }
         }
+        printf("newCameraFrame\n");
         // Create camera frame
         cameraFrame frame;
 
         // Save the raw depth. If applying the decimation filter, before/after color map makes a difference in 
         //      how big the image is
         frame.pDepthRaw = new cameraFrame_depth(data.get_depth_frame());
-        if (features & cameraMulti_DownsampleDepth) {
+        if (features & CameraController_DownsampleDepth) {
             frame.pDepthRaw->applyDecimationFilter();
         }
         rs2::frame depth = ((rs2::frame*)frame.pDepthRaw)->apply_filter(color_map);
@@ -203,7 +225,6 @@ void cameraMulti::run_RS()
         int h = depth.as<rs2::video_frame>().get_height();
 
         // Create OpenCV matrix of size (w,h) from the colorized depth data
-        //Mat image(Size(w, h), CV_8UC3, (void*)depth.get_data(), Mat::AUTO_STEP);
         frame.pDepth = new Mat(Size(w, h), CV_8UC3, (void*)depth.get_data(), Mat::AUTO_STEP);
 
         // Now handle the rgb
@@ -211,8 +232,15 @@ void cameraMulti::run_RS()
         w = rgb.as<rs2::video_frame>().get_width();
         h = rgb.as<rs2::video_frame>().get_height();
         frame.pRGB = new Mat(Size(w, h), CV_8UC3, (void*)rgb.get_data(), Mat::AUTO_STEP);
-        ServerLoop::GetServerLoopSingleton().SetImage(*frame.pRGB);
+        
+        // printf("status monitor new frame\n");
+        m.lock();
+        if (pFrameCurrent != nullptr) delete pFrameCurrent;
+        pFrameCurrent = new cameraFrame(frame);
+        m.unlock();
 
-        callbackFrame(&frame, pCallbackData);
+        sigDepth.signal();
+
+        printf("finished new camera frame\n");
     } while (!ss.shouldStop());
 }

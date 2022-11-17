@@ -30,11 +30,14 @@ int main( int argc, char** argv )
     bool bContinueFlight = true;
     //std::thread server((ServerLoop()));
 
-    DroneNavigation<Drive_TwinTrack> navSystem;
-	Navigator_SimpleObstruct2D* pNav = new Navigator_SimpleObstruct2D;
-	navSystem.addNav(pNav);
+    DroneNavigation<Drive_TwinTrackAdv> navSystem;
+	Navigator_PersonFinder* pNavPerson = new Navigator_PersonFinder();
+    Navigator_SimpleDepthObstruct* pNavDepth = new Navigator_SimpleDepthObstruct();
+	navSystem.addNav(pNavPerson);
+    navSystem.addNav(pNavDepth);
+
 	try {
-		std::thread client(&DroneNavigation<Drive_TwinTrack>::run, &navSystem);
+		std::thread client(&DroneNavigation<Drive_TwinTrackAdv>::run, &navSystem);
 		if (client.joinable()) {
 			std::cout << "Joinable\n";
 		} else {
