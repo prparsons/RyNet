@@ -1,6 +1,7 @@
 #include "navigation.h"
 
 #include <jetson-inference/detectNet.h>
+#include <jetson-inference/segNet.h>
 #include <jetson-utils/loadImage.h>
 #include <thread>
 #include <unistd.h>
@@ -11,35 +12,91 @@
 ObjectDetection::ObjectDetection(DataLogger& _logger)
 : logger(_logger)
 {
-
+	// For Jetson Nano (just let it use gpu)
+    pNetwork = detectNet::Create(detectNet::SSD_MOBILENET_V2);
+    // SSD_INCEPTION_V2 ?
+	// For Xavier (try to use one of the DLA engines so we can use the gpu for opencv stuff)
+	//detectNet* net = detectNet::Create(detectNet::SSD_MOBILENET_V2, 0.5f, 1, TYPE_FASTEST, DEVICE_DLA_0);
 }
 
 void ObjectDetection::ProcessImage()
 {
-    
+    // these variables will store the image data pointer and dimensions
+    uchar3* imgPtr;// = (uchar3*)imgRGB.data;   // shared CPU/GPU pointer to image
+    int imgWidth = imgRGB.cols;      // width of the image (in pixels)
+    int imgHeight = imgRGB.rows;      // height of the image (in pixels)
+
+	// For Jetson Nano (just let it use gpu)
+
+	detectNet::Detection* arDetections = nullptr;
+	int iDetections = pNetwork->Detect(imgPtr, imgWidth, imgHeight, &arDetections);
+
+    if (iDetections < 1) {
+        //printf("no things");
+        return false;
+    }
+
+    for (int i = 0; i < iDetections; i++) {
+        //if (arDetections[i].Confidence < 0.5) continue; // This isn't necessary since the argument is passed to detectNet
+        if (arDetections[i].ClassID != 1) continue; // Should be a person (looking for people)
+
+
+        float fTop = arDetections[i].Top;
+        float fRight = arDetections[i].Right;
+        float fBottom = arDetections[i].Bottom;
+        float fLeft = arDetections[i].Left;
+    }
+
+	// Not sure if this is right for freeing the memory
+	cudaFree(arDetections);
 }
 
 // ** TerrainSegmentation
 
 TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
 : logger(_logger)
+{
+    pNetwork = segNet::Create(segNet::FCN_RESNET18_DEEPSCENE_576x320);
+}
+
+void TerrainSegmentation::ProcessImage()
+{
+    uchar3* imgPtr;// = (uchar3*)imgRGB.data;   // shared CPU/GPU pointer to image
+    int imgWidth = imgRGB.cols;      // width of the image (in pixels)
+    int imgHeight = imgRGB.rows;      // height of the image (in pixels)
+
+    if(!net->Process(imgPtr, imgWidth, imgHeight)) {
+        printf("TerrainSegmentation::ProcessImage fail");
+        return;
+    }
+    
+    uchar3* imgMask;
+    if(!net->Mask(imgMask, imgWidth, imgHeight, segNet::FILTER_POINT)) {
+        printf("TerrainSegmentation::ProcessImage mask");
+        return;
+    }
+}
+
+bool TerrainSegmentation::ScanMask(uchar3* imgMask, int iWidth, int iHeight)
+{
+    int size = iWidth * iHeight;
+    for (int i = 0; i < size; i++) {
+        if (uint32_t(imgMask[i]) == HABITAT) {
+            // figure out angle
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+Navigator::Navigator(DataLogger& _logger)
+: logger(_logger)
 , pThreadNav(nullptr)
 , pThreadDet(nullptr)
 , pThreadSeg(nullptr)
 , detector(logger)
 , segmenter(logger)
-{
-
-
-}
-
-void TerrainSegmentation::ProcessImage()
-{
-
-}
-
-Navigator::Navigator(DataLogger& _logger)
-: logger(_logger)
 {
 
 }
