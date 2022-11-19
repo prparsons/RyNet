@@ -4,7 +4,7 @@
 #include "data_types.h"
 #include "dataLogger.h"
 
-class FlightController {Navigator
+class FlightController {
 public:
     FlightController(DataLogger& logger);
 

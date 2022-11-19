@@ -15,7 +15,7 @@ public:
 
 class DetectionBox {
 public:
-    DetectionBox():fTop(0), fRight(0), fBottom(0), bLeft(0){}
+    DetectionBox():fTop(0), fRight(0), fBottom(0), fLeft(0){}
 
     float fTop;
     float fRight;

@@ -31,24 +31,25 @@ int main( int argc, char** argv )
     //std::thread server((ServerLoop()));
 
     DataLogger logger("logAlpha");
-	FlightController controller;
+	FlightController controller(logger);
 	CameraController* pCamera = CameraController::OpenCamera(CameraController::CameraController_RGB);
 	Navigator nav(controller, logger, *pCamera);
 
 	try {
 		//std::thread client(&DroneNavigation<Drive_TwinTrackAdv>::run, &navSystem);
-		if (client.joinable()) {
+		std::thread thrNav(&Navigator::runNavigator, &nav);
+		if (thrNav.joinable()) {
 			std::cout << "Joinable\n";
 		} else {
 			std::cout << "Not joinable\n";
 		}
 		// std::system_error if the thread could not be started.
 		do {
-			client.join();
+			thrNav.join();
 			break;
 		} while (bContinueFlight);
 	} catch (std::exception e) {
-		cout << "Exception: " << e.what();
+		std::cout << "Exception: " << e.what();
 	}
 
 	return 0;
