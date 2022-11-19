@@ -1,0 +1,657 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.0//EN" "http://www.w3.org/TR/2001/PR-SVG-20010719/DTD/svg10.dtd">
+<svg width="139cm" height="46cm" viewBox="19 19 2763 918" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <g>
+    <rect style="fill: #ffffff" x="20" y="40" width="271.8" height="28"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="20" y="40" width="271.8" height="28"/>
+    <text font-size="16" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:700" x="155.9" y="59">CameraController</text>
+    <rect style="fill: #ffffff" x="20" y="68" width="271.8" height="52"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="20" y="68" width="271.8" height="52"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="23" y="82">-sgDepth: signal</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="23" y="98">-sgRGB: signal</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="23" y="114">-sgThermal: signal</text>
+    <rect style="fill: #ffffff" x="20" y="120" width="271.8" height="148"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="20" y="120" width="271.8" height="148"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="23" y="134">+addDataLogger(logger:DataLogger</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="23" y="150">+getSignalDepth(): signal</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="23" y="166">+getSignalRGB(): signal</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="23" y="182">+getImageDepth(): image</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="23" y="198">+getImageRGB(): image</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="23" y="214">+getImageThermal(): image</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="23" y="230">-threadDepth(): void</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="23" y="246">-threadRGB(): void</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="23" y="262">-threadThermal(): void</text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="1060" y="20" width="325.7" height="28"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1060" y="20" width="325.7" height="28"/>
+    <text font-size="16" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:700" x="1222.85" y="39">FlightController</text>
+    <rect style="fill: #ffffff" x="1060" y="48" width="325.7" height="8"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1060" y="48" width="325.7" height="8"/>
+    <rect style="fill: #ffffff" x="1060" y="56" width="325.7" height="179"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1060" y="56" width="325.7" height="179"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="1063" y="70">+setDirection(fHeadingOffsetDeg:float)</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="1063" y="86">+setDestination(fHeadingOffsetDeg:float,</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="1063" y="102">                fDistance:float)</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="1063" y="118">+restoreRouteNaive()</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="1063" y="134">+restoreRouteClean(visitedPoints:coord[])</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="1063" y="150">-saveRoute()</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="1063" y="166">-threadDepth()</text>
+    <text font-size="11.2" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1063" y="180.5">gets depth</text>
+    <text font-size="11.2" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1063" y="194.5">images, sends</text>
+    <text font-size="11.2" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1063" y="208.5">height </text>
+    <text font-size="11.2" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1063" y="222.5">messages</text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="1480" y="40" width="271.8" height="28"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1480" y="40" width="271.8" height="28"/>
+    <text font-size="16" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:700" x="1615.9" y="59">Navigator</text>
+    <rect style="fill: #ffffff" x="1480" y="68" width="271.8" height="36"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1480" y="68" width="271.8" height="36"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="1483" y="82">-terrain: TerrainSegmentation</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="1483" y="98">-object: ObjectSegmentation</text>
+    <rect style="fill: #ffffff" x="1480" y="104" width="271.8" height="257"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1480" y="104" width="271.8" height="257"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="1483" y="118">+addDataLogger(logger:DataLogger</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="1483" y="134">-threadNavigator(): void</text>
+    <text font-size="11.2" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1483" y="148.5">while sgRGB </text>
+    <text font-size="11.2" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1483" y="162.5">check altitude</text>
+    <text font-size="11.2" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1483" y="176.5">run object</text>
+    <text font-size="11.2" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1483" y="190.5">run terrain</text>
+    <text font-size="11.2" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1483" y="204.5">join object </text>
+    <text font-size="11.2" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1483" y="218.5">change dest?</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="1483" y="241">-threadObject(): void</text>
+    <text font-size="11.2" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1483" y="255.5">simple thread, called by</text>
+    <text font-size="11.2" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1483" y="269.5">threadNavigator...all it does</text>
+    <text font-size="11.2" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1483" y="283.5">is run the object</text>
+    <text font-size="11.2" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1483" y="297.5">detection...threadNavigator</text>
+    <text font-size="11.2" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1483" y="311.5">will join it</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="1483" y="334">-threadTerrain(): void</text>
+    <text font-size="11.2" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1483" y="348.5">same idea as threadObject</text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="60" y="700" width="271.8" height="28"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="60" y="700" width="271.8" height="28"/>
+    <text font-size="16" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:700" x="195.9" y="719">DataLogger</text>
+    <rect style="fill: #ffffff" x="60" y="728" width="271.8" height="84"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="60" y="728" width="271.8" height="84"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="63" y="742">-lock: mutex</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="63" y="758">-listText_type: string[]</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="63" y="774">-listText_data: string[]</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="63" y="790">-listImage_type: string[]</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="63" y="806">-listImage_data: image[]</text>
+    <rect style="fill: #ffffff" x="60" y="812" width="271.8" height="84"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="60" y="812" width="271.8" height="84"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="63" y="826">+logText(type:string,data:string)</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="63" y="842">+logImage(type:string,data:image</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="63" y="858">-threadLogger()</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="63" y="874">-writeTextList()</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="63" y="890">+writeImageList()</text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="20" y="440" width="294.9" height="28"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="20" y="440" width="294.9" height="28"/>
+    <text font-size="16" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:700" x="167.45" y="459">TerrainSegmentation</text>
+    <rect style="fill: #ffffff" x="20" y="468" width="294.9" height="8"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="20" y="468" width="294.9" height="8"/>
+    <rect style="fill: #ffffff" x="20" y="476" width="294.9" height="36"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="20" y="476" width="294.9" height="36"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="23" y="490">+addDataLogger(logger:DataLogger</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="23" y="506">+processImage(imageRGB:image</text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="20" y="580" width="287.2" height="28"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="20" y="580" width="287.2" height="28"/>
+    <text font-size="16" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:700" x="163.6" y="599">ObjectDetection</text>
+    <rect style="fill: #ffffff" x="20" y="608" width="287.2" height="8"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="20" y="608" width="287.2" height="8"/>
+    <rect style="fill: #ffffff" x="20" y="616" width="287.2" height="36"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="20" y="616" width="287.2" height="36"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="23" y="630">+addDataLogger(logger:DataLogger</text>
+    <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:monospace;font-style:normal;font-weight:normal" x="23" y="646">+processImage(imageRGB:image): image</text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="380" y="20" width="130.15" height="36" rx="10" ry="10"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="380" y="20" width="130.15" height="36" rx="10" ry="10"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:700" x="445.075" y="41.9">
+      <tspan x="445.075" y="41.9">Camera Thread</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="400" y="100" width="88.85" height="36" rx="20" ry="20"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="400" y="100" width="88.85" height="36" rx="20" ry="20"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="444.425" y="121.9">
+      <tspan x="444.425" y="121.9">wait frame</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="520" y="260" width="81.55" height="36" rx="20" ry="20"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="520" y="260" width="81.55" height="36" rx="20" ry="20"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="560.775" y="281.9">
+      <tspan x="560.775" y="281.9">log frame</tspan>
+    </text>
+  </g>
+  <g>
+    <polygon style="fill: #ffffff" points="420,280 440,260 460,280 440,300 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="420,280 440,260 460,280 440,300 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="320" y="280">
+    <tspan x="320" y="280">if log interval</tspan>
+  </text>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="445.075,56 445.075,78 444.425,78 444.425,95.5279 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="439.425,87.7639 444.425,97.7639 449.425,87.7639 "/>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="460,280 490,280 490,278 515.528,278 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="507.764,283 517.764,278 507.764,273 "/>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="400" y="180" width="80" height="36" rx="20" ry="20"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="400" y="180" width="80" height="36" rx="20" ry="20"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="440" y="201.9">
+      <tspan x="440" y="201.9">signal</tspan>
+    </text>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="444.425,136 444.425,158 440,158 440,175.528 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="435,167.764 440,177.764 445,167.764 "/>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="440,216 440,226 440,250 440,255.528 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="435,247.764 440,257.764 445,247.764 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="480" y="260">
+    <tspan x="480" y="260">yes</tspan>
+  </text>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="440,300 440,340 660,340 660,118 493.322,118 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="501.086,113 491.086,118 501.086,123 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="460" y="320">
+    <tspan x="460" y="320">no</tspan>
+  </text>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="601.55,278 630.775,278 630.775,280 655.528,280 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="647.764,285 657.764,280 647.764,275 "/>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="1560" y="580" width="114.85" height="36" rx="10" ry="10"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1560" y="580" width="114.85" height="36" rx="10" ry="10"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:700" x="1617.43" y="601.9">
+      <tspan x="1617.43" y="601.9">threadObject</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="1560" y="660" width="119.7" height="36" rx="20" ry="20"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1560" y="660" width="119.7" height="36" rx="20" ry="20"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1619.85" y="681.9">
+      <tspan x="1619.85" y="681.9">evaluate image</tspan>
+    </text>
+  </g>
+  <g>
+    <polygon style="fill: #ffffff" points="1600,760 1620,740 1640,760 1620,780 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1600,760 1620,740 1640,760 1620,780 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1540" y="780">
+    <tspan x="1540" y="780">found elk?</tspan>
+  </text>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1617.43,616 1617.43,638 1619.85,638 1619.85,655.528 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1614.85,647.764 1619.85,657.764 1624.85,647.764 "/>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1619.85,696 1619.85,718 1620,718 1620,735.528 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1615,727.764 1620,737.764 1625,727.764 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1660" y="740">
+    <tspan x="1660" y="740">no</tspan>
+  </text>
+  <g>
+    <rect style="fill: #ffffff" x="1720" y="740" width="144.85" height="36" rx="20" ry="20"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1720" y="740" width="144.85" height="36" rx="20" ry="20"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1792.43" y="761.9">
+      <tspan x="1792.43" y="761.9">set bFoundElk false</tspan>
+    </text>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1640,760 1680,760 1680,758 1715.53,758 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1707.76,763 1717.76,758 1707.76,753 "/>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="1580" y="840" width="80" height="36" rx="20" ry="20"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1580" y="840" width="80" height="36" rx="20" ry="20"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1620" y="861.9">
+      <tspan x="1620" y="861.9">log find</tspan>
+    </text>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1620,780 1620,790 1620,830 1620,835.528 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1615,827.764 1620,837.764 1625,827.764 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1580" y="820">
+    <tspan x="1580" y="820">yes</tspan>
+  </text>
+  <g>
+    <rect style="fill: #ffffff" x="1720" y="840" width="150.9" height="52" rx="20" ry="20"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1720" y="840" width="150.9" height="52" rx="20" ry="20"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1795.45" y="861.9">
+      <tspan x="1795.45" y="861.9">set bFoundElk true</tspan>
+      <tspan x="1795.45" y="877.9">save coord/direction</tspan>
+    </text>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1660,858 1690,858 1690,866 1715.53,866 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1707.76,871 1717.76,866 1707.76,861 "/>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="1900" y="100" width="120.2" height="36" rx="10" ry="10"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1900" y="100" width="120.2" height="36" rx="10" ry="10"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:700" x="1960.1" y="121.9">
+      <tspan x="1960.1" y="121.9">threadTerrain</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="1900" y="200" width="119.7" height="36" rx="20" ry="20"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1900" y="200" width="119.7" height="36" rx="20" ry="20"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1959.85" y="221.9">
+      <tspan x="1959.85" y="221.9">evaluate image</tspan>
+    </text>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1960.1,136 1960.1,168 1959.85,168 1959.85,195.528 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1954.85,187.764 1959.85,197.764 1964.85,187.764 "/>
+  </g>
+  <g>
+    <polygon style="fill: #ffffff" points="1940,320 1960,300 1980,320 1960,340 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1940,320 1960,300 1980,320 1960,340 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="1840" y="320">
+    <tspan x="1840" y="320">found habitat?</tspan>
+  </text>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1959.85,236 1959.85,268 1960,268 1960,295.528 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1955,287.764 1960,297.764 1965,287.764 "/>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="2060" y="300" width="172.85" height="36" rx="20" ry="20"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="2060" y="300" width="172.85" height="36" rx="20" ry="20"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="2146.43" y="321.9">
+      <tspan x="2146.43" y="321.9">set bFoundHabitat false</tspan>
+    </text>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1980,320 2020,320 2020,318 2055.53,318 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2047.76,323 2057.76,318 2047.76,313 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="2000" y="300">
+    <tspan x="2000" y="300">no</tspan>
+  </text>
+  <g>
+    <rect style="fill: #ffffff" x="1920" y="400" width="80" height="36" rx="20" ry="20"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1920" y="400" width="80" height="36" rx="20" ry="20"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1960" y="421.9">
+      <tspan x="1960" y="421.9">log find</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="1860" y="500" width="181.3" height="52" rx="20" ry="20"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1860" y="500" width="181.3" height="52" rx="20" ry="20"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1950.65" y="521.9">
+      <tspan x="1950.65" y="521.9">scan for habitat direction</tspan>
+      <tspan x="1950.65" y="537.9">save direction</tspan>
+    </text>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1960,340 1960,350 1960,390 1960,395.528 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1955,387.764 1960,397.764 1965,387.764 "/>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1960,436 1960,468 1950.65,468 1950.65,495.528 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1945.65,487.764 1950.65,497.764 1955.65,487.764 "/>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="2060" y="440" width="168.65" height="36" rx="20" ry="20"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="2060" y="440" width="168.65" height="36" rx="20" ry="20"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="2144.32" y="461.9">
+      <tspan x="2144.32" y="461.9">set bFoundHabitat true</tspan>
+    </text>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2041.3,526 2144.32,526 2144.32,480.472 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2149.32,488.236 2144.32,478.236 2139.32,488.236 "/>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="1100" y="300" width="111.7" height="36" rx="10" ry="10"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1100" y="300" width="111.7" height="36" rx="10" ry="10"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:700" x="1155.85" y="321.9">
+      <tspan x="1155.85" y="321.9">threadDepth</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="1100" y="380" width="88.75" height="36" rx="20" ry="20"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1100" y="380" width="88.75" height="36" rx="20" ry="20"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1144.38" y="401.9">
+      <tspan x="1144.38" y="401.9">wait signal</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="1080" y="460" width="140.8" height="52" rx="20" ry="20"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1080" y="460" width="140.8" height="52" rx="20" ry="20"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1150.4" y="481.9">
+      <tspan x="1150.4" y="481.9">scan frame top</tspan>
+      <tspan x="1150.4" y="497.9">send obst distance</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="1080" y="560" width="145.3" height="52" rx="20" ry="20"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1080" y="560" width="145.3" height="52" rx="20" ry="20"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1152.65" y="581.9">
+      <tspan x="1152.65" y="581.9">scan frame bottom</tspan>
+      <tspan x="1152.65" y="597.9">send ground height</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="1300" y="560" width="107.05" height="52" rx="20" ry="20"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="1300" y="560" width="107.05" height="52" rx="20" ry="20"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="1353.52" y="581.9">
+      <tspan x="1353.52" y="581.9">log scan lines</tspan>
+      <tspan x="1353.52" y="597.9">of each type</tspan>
+    </text>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1155.85,336 1155.85,358 1144.38,358 1144.38,375.528 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1139.38,367.764 1144.38,377.764 1149.38,367.764 "/>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1144.38,416 1144.38,438 1150.4,438 1150.4,455.528 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1145.4,447.764 1150.4,457.764 1155.4,447.764 "/>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1150.4,512 1150.4,536 1152.65,536 1152.65,555.528 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1147.65,547.764 1152.65,557.764 1157.65,547.764 "/>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1225.3,586 1235.3,586 1290,586 1295.53,586 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1287.76,591 1297.76,586 1287.76,581 "/>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1353.52,560 1353.52,398 1193.22,398 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="1200.99,393 1190.99,398 1200.99,403 "/>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="600" y="420" width="118.25" height="36" rx="10" ry="10"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="600" y="420" width="118.25" height="36" rx="10" ry="10"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:700" x="659.125" y="441.9">
+      <tspan x="659.125" y="441.9">threadLogger</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="600" y="500" width="96.9" height="36" rx="20" ry="20"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="600" y="500" width="96.9" height="36" rx="20" ry="20"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="648.45" y="521.9">
+      <tspan x="648.45" y="521.9">wait .05 sec</tspan>
+    </text>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="659.125,456 659.125,478 648.45,478 648.45,495.528 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="643.45,487.764 648.45,497.764 653.45,487.764 "/>
+  </g>
+  <g>
+    <polygon style="fill: #ffffff" points="640,600 660,580 680,600 660,620 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="640,600 660,580 680,600 660,620 "/>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="648.45,536 648.45,558 660,558 660,575.528 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="655,567.764 660,577.764 665,567.764 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="520" y="600">
+    <tspan x="520" y="600">text list empty?</tspan>
+  </text>
+  <g>
+    <rect style="fill: #ffffff" x="740" y="580" width="102.8" height="36" rx="20" ry="20"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="740" y="580" width="102.8" height="36" rx="20" ry="20"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="791.4" y="601.9">
+      <tspan x="791.4" y="601.9">writeTextList</tspan>
+    </text>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="680,600 710,600 710,598 735.528,598 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="727.764,603 737.764,598 727.764,593 "/>
+  </g>
+  <g>
+    <polygon style="fill: #ffffff" points="640,700 660,680 680,700 660,720 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="640,700 660,680 680,700 660,720 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="520" y="700">
+    <tspan x="520" y="700">image list empty?</tspan>
+  </text>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="660,620 660,630 660,670 660,675.528 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="655,667.764 660,677.764 665,667.764 "/>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="740" y="680" width="114.65" height="36" rx="20" ry="20"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="740" y="680" width="114.65" height="36" rx="20" ry="20"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="797.325" y="701.9">
+      <tspan x="797.325" y="701.9">writeImageList</tspan>
+    </text>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="680,700 710,700 710,698 735.528,698 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="727.764,703 737.764,698 727.764,693 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="700" y="580">
+    <tspan x="700" y="580">no</tspan>
+  </text>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="700" y="680">
+    <tspan x="700" y="680">no</tspan>
+  </text>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="620" y="640">
+    <tspan x="620" y="640">yes</tspan>
+  </text>
+  <g>
+    <polygon style="fill: #ffffff" points="640,800 660,780 680,800 660,820 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="640,800 660,780 680,800 660,820 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="520" y="800">
+    <tspan x="520" y="800">is stop signaled?</tspan>
+  </text>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="660,820 660,830 660,890 660,895.528 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="655,887.764 660,897.764 665,887.764 "/>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="620" y="900" width="80" height="36" rx="20" ry="20"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="620" y="900" width="80" height="36" rx="20" ry="20"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="660" y="921.9">
+      <tspan x="660" y="921.9">return</tspan>
+    </text>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="660,720 660,730 660,770 660,775.528 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="655,767.764 660,777.764 665,767.764 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="620" y="860">
+    <tspan x="620" y="860">yes</tspan>
+  </text>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="680,800 880,800 880,438 722.722,438 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="730.486,433 720.486,438 730.486,443 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="700" y="780">
+    <tspan x="700" y="780">no</tspan>
+  </text>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="791.4,616 791.4,640 664.472,640 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="672.236,635 662.236,640 672.236,645 "/>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="797.326,716 797.326,740 664.472,740 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="672.236,735 662.236,740 672.236,745 "/>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="2340" y="40" width="139.1" height="36" rx="10" ry="10"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="2340" y="40" width="139.1" height="36" rx="10" ry="10"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:700" x="2409.55" y="61.9">
+      <tspan x="2409.55" y="61.9">threadNavigator</tspan>
+    </text>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="2340" y="140" width="147.15" height="36" rx="20" ry="20"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="2340" y="140" width="147.15" height="36" rx="20" ry="20"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="2413.57" y="161.9">
+      <tspan x="2413.57" y="161.9">while no stop signal</tspan>
+    </text>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2409.55,76 2409.55,108 2413.57,108 2413.57,135.528 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2408.57,127.764 2413.57,137.764 2418.57,127.764 "/>
+  </g>
+  <g>
+    <polygon style="fill: #ffffff" points="2380,440 2400,420 2420,440 2400,460 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2380,440 2400,420 2420,440 2400,460 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="2280" y="440">
+    <tspan x="2280" y="440">grid searching?</tspan>
+  </text>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2413.57,176 2413.57,198 2397.22,198 2397.22,215.528 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2392.22,207.764 2397.22,217.764 2402.22,207.764 "/>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="2340" y="220" width="114.45" height="36" rx="20" ry="20"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="2340" y="220" width="114.45" height="36" rx="20" ry="20"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="2397.22" y="241.9">
+      <tspan x="2397.22" y="241.9">wait rgb frame</tspan>
+    </text>
+  </g>
+  <g>
+    <polygon style="fill: #ffffff" points="2500,440 2520,420 2540,440 2520,460 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2500,440 2520,420 2540,440 2520,460 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="2440" y="460">
+    <tspan x="2440" y="460">yes</tspan>
+  </text>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2397.22,256 2397.22,288 2403.3,288 2403.3,315.528 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2398.3,307.764 2403.3,317.764 2408.3,307.764 "/>
+  </g>
+  <g>
+    <rect style="fill: #ffffff" x="2320" y="320" width="166.6" height="52" rx="20" ry="20"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="2320" y="320" width="166.6" height="52" rx="20" ry="20"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="2403.3" y="341.9">
+      <tspan x="2403.3" y="341.9">terrain.processImage()</tspan>
+      <tspan x="2403.3" y="357.9">object.processImage()</tspan>
+    </text>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2520,460 2520,490 2506.53,490 2506.53,515.528 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2501.53,507.764 2506.53,517.764 2511.53,507.764 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="2380" y="480">
+    <tspan x="2380" y="480">no</tspan>
+  </text>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="2480" y="480">
+    <tspan x="2480" y="480">yes</tspan>
+  </text>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2540,440 2600,440 2600,158 2491.63,158 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2499.4,153 2489.4,158 2499.4,163 "/>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2420,440 2430,440 2490,440 2495.53,440 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2487.76,445 2497.76,440 2487.76,435 "/>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2403.3,372 2403.3,396 2400,396 2400,415.528 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2395,407.764 2400,417.764 2405,407.764 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="2460" y="400">
+    <tspan x="2460" y="400">good terrain visible</tspan>
+  </text>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="2580" y="460">
+    <tspan x="2580" y="460">no</tspan>
+  </text>
+  <g>
+    <rect style="fill: #ffffff" x="2420" y="520" width="173.05" height="52" rx="20" ry="20"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="2420" y="520" width="173.05" height="52" rx="20" ry="20"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="2506.53" y="541.9">
+      <tspan x="2506.53" y="541.9">controller.setDirection()</tspan>
+      <tspan x="2506.53" y="557.9">log changes</tspan>
+    </text>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2593.06,546 2640,546 2640,158 2491.63,158 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2499.4,153 2489.4,158 2499.4,163 "/>
+  </g>
+  <g>
+    <polygon style="fill: #ffffff" points="2480,660 2500,640 2520,660 2500,680 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2480,660 2500,640 2520,660 2500,680 "/>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2400,460 2400,660 2475.53,660 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2467.76,665 2477.76,660 2467.76,655 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="2440" y="620">
+    <tspan x="2440" y="620">good terrain still in</tspan>
+    <tspan x="2440" y="636">current direction?</tspan>
+  </text>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2520,660 2660,660 2660,158 2491.63,158 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2499.4,153 2489.4,158 2499.4,163 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="2540" y="680">
+    <tspan x="2540" y="680">yes</tspan>
+  </text>
+  <g>
+    <polygon style="fill: #ffffff" points="2480,760 2500,740 2520,760 2500,780 "/>
+    <polygon style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2480,760 2500,740 2520,760 2500,780 "/>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2500,680 2500,690 2500,730 2500,735.528 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2495,727.764 2500,737.764 2505,727.764 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="2460" y="700">
+    <tspan x="2460" y="700">no</tspan>
+  </text>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="2360" y="760">
+    <tspan x="2360" y="760">good terrain</tspan>
+    <tspan x="2360" y="776">different direction?</tspan>
+  </text>
+  <g>
+    <rect style="fill: #ffffff" x="2580" y="740" width="144.25" height="52" rx="20" ry="20"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="2580" y="740" width="144.25" height="52" rx="20" ry="20"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="2652.13" y="761.9">
+      <tspan x="2652.13" y="761.9">resume grid search</tspan>
+      <tspan x="2652.13" y="777.9">log changes</tspan>
+    </text>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2520,760 2550,760 2550,766 2575.53,766 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2567.76,771 2577.76,766 2567.76,761 "/>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2724.25,766 2754.25,766 2754.25,158 2491.62,158 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2499.39,153 2489.39,158 2499.39,163 "/>
+  </g>
+  <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="2540" y="780">
+    <tspan x="2540" y="780">no</tspan>
+  </text>
+  <g>
+    <rect style="fill: #ffffff" x="2420" y="840" width="173.05" height="52" rx="20" ry="20"/>
+    <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="2420" y="840" width="173.05" height="52" rx="20" ry="20"/>
+    <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="2506.53" y="861.9">
+      <tspan x="2506.53" y="861.9">controller.setDirection()</tspan>
+      <tspan x="2506.53" y="877.9">log changes</tspan>
+    </text>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2500,780 2500,810 2506.53,810 2506.53,835.528 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2501.53,827.764 2506.53,837.764 2511.53,827.764 "/>
+  </g>
+  <g>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2593.06,866 2780,866 2780,158 2491.63,158 "/>
+    <polyline style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" points="2499.4,153 2489.4,158 2499.4,163 "/>
+  </g>
+</svg>
