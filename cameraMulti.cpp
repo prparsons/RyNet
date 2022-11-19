@@ -119,9 +119,9 @@ image cameraFrame::getImageREdge()
 // ***********
 // CameraController
 
-CameraController* CameraController::OpenCamera(cameraType type, cameraFeatures features)
+CameraController* CameraController::OpenCamera(cameraFeatures features)
 {
-    CameraController* pReturn = new CameraController(type, features);
+    CameraController* pReturn = new CameraController(features);
     if (pReturn->pCameraRS == nullptr) {
         delete pReturn;
         printf("CameraController didn't have valid pCameraRS - deleted\n");

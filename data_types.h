@@ -7,7 +7,7 @@
 #define PI_2 1.570796326794
 #define PIx2 6.283185307180
 
-typedef image cv::Mat;
+typedef cv::Mat image;
 
 class DetectionBox {
 public:
