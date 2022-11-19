@@ -5,8 +5,6 @@
 #include "locksignal.h"
 #include "data_types.h"
 
-using namespace std;
-
 class DataLogger {
 public:
     DataLogger(const char* scLogFile);
@@ -22,7 +20,9 @@ private:
     void WriteDetections(cv::Mat& image);
     void WriteSpeed(cv::Mat& image);
 
+    bool bWriteImg;
     Mutex mt;
+    Signal sigNewData;
     cv::Mat image;
-    vector<string> listStrings;
+    std::vector<std::string> listStrings;
 };

@@ -2,15 +2,15 @@
 
 #include <time.h>
 #include <stdio.h>
+#include <fstream>
+
+using namespace std;
 
 //https://learnopencv.com/getting-started-opencv-cuda-module/
 DataLogger gStatus;
 
 DataLogger::DataLogger()
-: mtData(mt)
-, pSigImage(nullptr)
 {
-    printf("DataLogger\n");
 }
 
 DataLogger::~DataLogger()
@@ -22,27 +22,81 @@ void DataLogger::run(void)
 {
     printf("DataLogger Thread\n");
 
-    const cv::String window_name = "RyNet Status";
-    cv::namedWindow(window_name, cv::WINDOW_AUTOSIZE);
+    pSigImage = new Signal(sigNewData); // Deleted in destructor
+    time_t timeNow;
+    struct tm* pTimeStruct;
 
-    float fFrameTimeAvg = .033;
-    clock_t tFrame = clock();
-    Signal sigImage;
-    pSigImage = new Signal(sigImage); // Deleted in destructor
+    fstream fileLog;
+    vector<string> listStringsT;
+    char scfileNameText[128];
+    timeNow = time(nullptr);
+    pTimeStruct = localtime(timeNow);
+    snprintf(scFileNameText, 
+            127, 
+            "log_%d_%d_%d_%d_%d.txt", 
+            pTimeStruct->tm_year + 1900, 
+            pTimeStruct->tm_mon + 1,
+            pTimeStruct->tm_mday,
+            pTimeStruct->tm_hour,
+            pTimeStruct->tm_min);
+    delete pTimeStruct;
+
+    cv::Mat imageWrite;
+    bool bWriteImgLocal = false;
 
     while (cv::waitKey(1) < 0 && cv::getWindowProperty(window_name, cv::WND_PROP_AUTOSIZE) >= 0)
     {
         // Wait on signal
-        sigImage.wait();
+        pSigImage->wait();
         printf("statusLoop\n");
 
         // check text list, if not empty write
+        mt.lock();
+        listStringsT.assign(listStrings);
+        mt.unlock();
+        if (listStringsT.size() > 0) {
+            fileLog.open(scFileNameText, ios::out);
+            if (!fileLog) {
+                printf("Failed to open log files\n");
+            } else {
+                do {
+                    string str = listStringsT.back;
+                    fileLog << str << endl;
+                    listStringsT.pop_back();
+                } while (listStringsT.size() > 0);
+                fileLog.close();
+            }
+        }
 
         // check image list, if not empty, write (it's not a list......should there be a bNewImage flag?)
+        mt.lock();
+        if (bWriteImg) {
+            bWriteImg = false;
+            bWriteImgLocal = true;
+            imageWrite = image; // memcpy?
+        }
+        mt.unlock();
 
-        // Update the window with new data
-        imshow(window_name, image);
+        if (bWriteImgLocal) {
+            bWriteImgLocal = false;
+            timeNow = time(nullptr);
+            pTimeStruct = localtime(timeNow);
+            char scFileName[128];
+            snprintf(scFileName, 
+                    127, 
+                    "img_%d_%d_%d_%d_%d_%d.jpg", 
+                    pTimeStruct->tm_year + 1900, 
+                    pTimeStruct->tm_mon + 1,
+                    pTimeStruct->tm_mday,
+                    pTimeStruct->tm_hour,
+                    pTimeStruct->tm_min,
+                    pTimeStruct->tm_sec);
+            cv::imwrite(scFileName, imageWrite);
+            delete pTimeStruct;
+        }
     }
+
+    delete pSigImage;
 }
 /*
 // License: Apache 2.0. See LICENSE file in root directory.
@@ -117,7 +171,7 @@ void DataLogger::LogString(const char* scData)
 {
     printf("DataLogger::LogString\n");
     mt.lock();
-    std::string strData(scData)
+    string strData(scData)
     listStrings.push_back(strData);
     mt.unlock();
     if (pSigImage != nullptr) pSigImage->signal(); // see above not right comment
