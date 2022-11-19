@@ -4,19 +4,19 @@
 #include <mutex>
 #include <condition_variable>
 
-typedef std::mutex Mutex;
+typedef std::mutex ThreadMutex;
 
 class ThreadLock {
 public:
-    ThreadLock(Mutex& m);
+    ThreadLock(ThreadMutex& m);
     ThreadLock(const ThreadLock& other);
     
     void lock() { uniquelock.lock(); }
     void unlock() { uniquelock.unlock(); }
     
 private:
-    Mutex& m;
-    std::unique_lock<Mutex> uniquelock;
+    ThreadMutex& m;
+    std::unique_lock<ThreadMutex> uniquelock;
 };
 
 class StopSignal {
@@ -35,9 +35,9 @@ public:
 
 private:
     bool* pbStop;
-    Mutex* pm;
+    ThreadMutex* pm;
     int* piCount;
-    std::unique_lock<Mutex> ul;
+    std::unique_lock<ThreadMutex> ul;
 };
 
 class Signal {
@@ -54,13 +54,13 @@ public:
 private:
     bool* pbReady;
     //Throws std::system_error when errors occur
-    Mutex* pMutex;
-    Mutex& mutex;
+    ThreadMutex* pThreadMutex;
+    ThreadMutex& mutex;
     std::condition_variable* pCond;
-    std::unique_lock<Mutex> uniquelock;
+    std::unique_lock<ThreadMutex> uniquelock;
 };
 
-inline ThreadLock::ThreadLock(Mutex& _m)
+inline ThreadLock::ThreadLock(ThreadMutex& _m)
 : m(_m)
 , uniquelock(m, std::defer_lock)
 {
@@ -74,7 +74,7 @@ inline ThreadLock::ThreadLock(const ThreadLock& other)
 
 inline StopSignal::StopSignal()
 : pbStop(new bool(false))
-, pm(new Mutex)
+, pm(new ThreadMutex)
 , piCount(new int(1))
 , ul(*pm, std::defer_lock)
 {
@@ -107,13 +107,13 @@ inline StopSignal::~StopSignal()
 
 inline bool StopSignal::shouldStop()
 {
-    std::lock_guard<Mutex> lk(*pm);
+    std::lock_guard<ThreadMutex> lk(*pm);
     return (*pbStop);
 }
 
 inline void StopSignal::stop()
 {
-    std::lock_guard<Mutex> lk(*pm);
+    std::lock_guard<ThreadMutex> lk(*pm);
     (*pbStop) = true;
 }
 
@@ -129,14 +129,14 @@ inline void StopSignal::unlockForCopy()
 
 inline void StopSignal::reset()
 {
-    std::lock_guard<Mutex> lk(*pm);
+    std::lock_guard<ThreadMutex> lk(*pm);
     (*pbStop) = false;
 }
 
 inline Signal::Signal()
 : pbReady(new bool(false))
-, pMutex(new Mutex)
-, mutex(*pMutex)
+, pThreadMutex(new ThreadMutex)
+, mutex(*pThreadMutex)
 , uniquelock(mutex, std::defer_lock)
 , pCond(new std::condition_variable)
 {
@@ -153,9 +153,9 @@ inline Signal::Signal(const Signal& sig)
 
 inline Signal::~Signal()
 {
-    if (pMutex != nullptr) {
+    if (pThreadMutex != nullptr) {
         delete pbReady;
-        delete pMutex;
+        delete pThreadMutex;
         delete pCond;
     }
 }

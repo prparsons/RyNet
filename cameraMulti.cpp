@@ -34,7 +34,7 @@ cameraFrame::cameraFrame()
 , pREdge(nullptr)
 , pDepthRaw(nullptr)
 , piCount(new int(1))
-, pM(new Mutex)
+, pM(new ThreadMutex())
 , pLock(new ThreadLock(*pM))
 {
 

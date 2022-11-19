@@ -21,7 +21,7 @@ private:
     void WriteSpeed(cv::Mat& image);
 
     bool bWriteImg;
-    Mutex mt;
+    ThreadMutex mt;
     Signal sigNewData;
     StopSignal ss;
     cv::Mat image;

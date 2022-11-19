@@ -58,7 +58,7 @@ private:
     cv::Mat* pREdge;
     cameraFrame_depth* pDepthRaw;
     int* piCount;
-    Mutex* pM;
+    ThreadMutex* pM;
     ThreadLock* pLock;
     friend class CameraController;
 };
@@ -95,7 +95,7 @@ protected:
 
 private:
     cameraFrame* pFrameCurrent;
-    Mutex m;
+    ThreadMutex m;
 
     camera_RS* pCameraRS;
     cameraFeatures features;

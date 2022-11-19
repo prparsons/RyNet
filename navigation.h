@@ -23,7 +23,7 @@ private:
 
     DataLogger& logger;
     detectNet* pNetwork;
-    Mutex mt;
+    ThreadMutex mt;
     Signal sigNewImage;
     StopSignal ss;
     image imgRecent;
@@ -53,7 +53,7 @@ private:
     segNet* pNetwork;
     float fBestDirection;
     float fImageFOV;
-    Mutex mt;
+    ThreadMutex mt;
     Signal sigNewImage;
     StopSignal ss;
     image imgRecent;

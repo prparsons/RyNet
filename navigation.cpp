@@ -30,7 +30,7 @@ void ObjectDetection::SetNewImage(image& img)
 bool ObjectDetection::ProcessImage(image& img)
 {
     // these variables will store the image data pointer and dimensions
-    uchar3* imgPtr;// = (uchar3*)imgRGB.data;   // shared CPU/GPU pointer to image
+    uchar3* imgPtr = (uchar3*)imgRGB.data;   // shared CPU/GPU pointer to image
     int imgWidth = imgRGB.cols;      // width of the image (in pixels)
     int imgHeight = imgRGB.rows;      // height of the image (in pixels)
 
@@ -245,7 +245,7 @@ private:
     Signal* psigImages;
     image imgRGB;
     cameraFrame_depth *pDepthRaw;
-    Mutex mtImages;
+    ThreadMutex mtImages;
     detectNet* pNetwork;
 };
 
