@@ -15,7 +15,10 @@ typedef cv::Mat image;
 
 class DetectionBox {
 public:
-    DetectionBox():fTop(0), fRight(0), fBottom(0), fLeft(0){}
+    DetectionBox();
+    DetectionBox(const DetectionBox& other);
+
+    DetectionBox& operator=(const DetectionBox& other);
 
     float fTop;
     float fRight;

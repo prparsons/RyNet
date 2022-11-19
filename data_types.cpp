@@ -2,6 +2,15 @@
 
 #include <cmath>
 
+DetectionBox::DetectionBox()
+: fTop(0)
+, fRight(0)
+, fBottom(0)
+, fLeft(0)
+{
+
+}
+
 DetectionBox::DetectionBox(const DetectionBox& other)
 {
     *this = other;
@@ -13,7 +22,6 @@ DetectionBox& DetectionBox::operator=(const DetectionBox& other)
     fRight = other.fRight;
     fBottom = other.fBottom;
     fLeft = other.fLeft;
-    fDistance = other.fDistance;
 }
 
 // ***********
