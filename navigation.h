@@ -4,6 +4,7 @@
 #include "cameraMulti.h"
 #include "data_types.h"
 #include "dataLogger.h"
+#include "planner.h"
 
 // Place holders with the jetson inference networks...once that's working...
 class detectNet;
@@ -50,19 +51,22 @@ private:
     DataLogger& logger;
     segNet* pNetwork;
     float fBestDirection;
+    float fImageFOV;
     Mutex mt;
     Signal sigNewImage;
     StopSignal ss;
     image imgRecent;
+    uchar3* pImgMask; // only access from thread
 };
 
 class Navigator {
 public:
-    Navigator(DataLogger& logger, CameraController& camera);
+    Navigator(FlightController& control, DataLogger& logger, CameraController& camera);
 
     void runNavigator();
 
 private:
+    FlightController& control;
     DataLogger& logger;
     CameraController& camera;
     std::thread* pThreadNav;

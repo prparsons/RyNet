@@ -45,16 +45,19 @@ bool ObjectDetection::ProcessImage(image& img)
     }
 
     bool bRet = false;
+    char sc[128];
     for (int i = 0; i < iDetections; i++) {
         //if (arDetections[i].Confidence < 0.5) continue; // This isn't necessary since the argument is passed to detectNet
         if (arDetections[i].ClassID != 1) continue; // Should be a person (looking for people)
 
         bRet = true;
-        /*
-        *parDetections->fTop = arDetections[i].Top;
-        *parDetections->fRight = arDetections[i].Right;
-        *parDetections->fBottom = arDetections[i].Bottom;
-        *parDetections->fLeft = arDetections[i].Left;*/
+        snprintf(127, "Detection Class[%d] LTRB:%d %d %d %d", 
+                    arDetections[i].ClassID, 
+                    arDetections[i].Left, 
+                    arDetections[i].Top, 
+                    arDetections[i].Right, 
+                    arDetections[i].Bottom);
+        logger.LogString(sc);
     }
 
 	// Not sure if this is right for freeing the memory
@@ -75,7 +78,6 @@ void ObjectDetection::run()
         
         if (detector.ProcessImage(imgProcess)) {
             logger.LogImage(imgProcess);
-            //log strings of detection box
         }
     }
     delete pSigRGB;
@@ -100,13 +102,11 @@ bool TerrainSegmentation::ProcessImage(image& img)
         return false;
     }
     
-    uchar3* imgMask;
-    if(!net->Mask(imgMask, imgWidth, imgHeight, segNet::FILTER_POINT)) {
-        printf("TerrainSegmentation::ProcessImage mask");
+    if(!net->Mask(pImgMask, imgWidth, imgHeight, segNet::FILTER_POINT)) {
         return false;
     }
 
-    return ScanMask(imgMask, imgWidth, imgHeight);
+    return ScanMask(pImgMask, imgWidth, imgHeight);
 }
 
 float TerrainSegmentation::GetHabitatDirection()
@@ -134,8 +134,9 @@ void TerrainSegmentation::run()
         mt.unlock();
         
         if (segmenter.ProcessImage(imgProcess)) {
-            // log the mask
-            //log strings of ...something?
+            logger.LogImage(pImgMask);
+            logger.LogImage(imgProcess);
+            logger.LogString("Good Habitat Found");
         }
     }
     delete pSigRGB;
@@ -144,18 +145,28 @@ void TerrainSegmentation::run()
 bool TerrainSegmentation::ScanMask(uchar3* imgMask, int iWidth, int iHeight)
 {
     int size = iWidth * iHeight;
+    float fAngleAvgSum = 0;
+    int iAngleAvgCount = 0;
     for (int i = 0; i < size; i++) {
         if (uint32_t(imgMask[i]) == HABITAT) {
-            // figure out angle
-            return true;
+            int x = i / iWidth;
+            fAngleAvgSum += (abs(x - (iWidth * .5)) / (iWidth * .5)) * (fImageFOV * .5);
+            iAngleAvgCount++;
         }
     }
 
-    return false;
+    if (iAngleAvgCount == 0) {
+        fBestDirection = -1;
+        return false;
+    }
+
+    fBestDirection = fAngleAvgSum / iAngleAvgCount;
+    return true;
 }
 
-Navigator::Navigator(DataLogger& _logger, CameraController& _camera)
-: logger(_logger)
+Navigator::Navigator(FlightController& _control, DataLogger& _logger, CameraController& _camera)
+: control(_control)
+, logger(_logger)
 , camera(_camera)
 , pThreadNav(nullptr)
 , pThreadDet(nullptr)
@@ -172,6 +183,8 @@ void Navigator::runNavigator()
     Signal* pSigRGB = camera.GetSignalRGB();
 
     bool bGridSearching = false;
+    float fMargin = 0;
+    float fCurrentDirection = 0;
 
     while (!ssMain.shouldStop()) {
         pSigRGB->wait();
@@ -179,31 +192,31 @@ void Navigator::runNavigator()
         pFrame = camera.GetCurrentFrame();
         if (!pFrame->hasRGB()) continue;
         
-        detector.ProcessImage(pFrame->getImageRGB());
-        segmenter.ProcessImage(pFrame->getImageRGB());
+        detector.SetNewImage(pFrame->getImageRGB());
+        segmenter.SetNewImage(pFrame->getImageRGB());
 
         if (bGridSearching) {
-            //good terrain visible?
-            //{
-                //controller.setdirection
-                //log changes
-            //}
+            if (segmenter.GetHabitatDirection() >= 0.0) { // good terrain visible?
+                control.SetDirection(segmenter.GetHabitatDirection());
+                fCurrentDirection = segmenter.GetHabitatDirection();
+                char sc[64];
+                sprintf(sc, "Grid Search -> Good Habitat %1.3f", fCurrentDirection);
+                logger.LogString(sc);
+            }
         } else {
-            // good terrain in current direction?
-            //{
-                //continue
-            //} else {
-                //good terrain in different direction?
-                //{
-                    //controller.setdirection
-                    //log changes
-                //} else {
-                    //resume grid search
-                    //log changes
-                //}
-            //}
+            float fDiff = abs(segmenter.GetHabitatDirection() - fCurrentDirection);
+            if (fDiff < fMargin) continue; // good terrain in current direction?
+            if (segmenter.GetHabitatDirection() >= 0.0) { // good terrain in different direction?
+                control.SetDirection(segmenter.GetHabitatDirection());
+                fCurrentDirection = segmenter.GetHabitatDirection();
+                char sc[64];
+                sprintf(sc, "Grid Search Change -> %1.3f", fCurrentDirection);
+                logger.LogString(sc);
+            } else {
+                control.RestoreRouteNaive();
+                logger.LogString("Good Habitat -> Grid Search")
+            }
         }
-
     }
     if (pFrame != nullptr) delete pFrame;
     delete pSigRGB;
