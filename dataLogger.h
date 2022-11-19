@@ -7,7 +7,7 @@
 
 class DataLogger {
 public:
-    DataLogger(const char* scLogFile);
+    DataLogger();
     ~DataLogger();
 
     void run(void);

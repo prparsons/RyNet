@@ -7,7 +7,6 @@
 using namespace std;
 
 //https://learnopencv.com/getting-started-opencv-cuda-module/
-DataLogger gStatus;
 
 DataLogger::DataLogger()
 {
@@ -22,7 +21,7 @@ void DataLogger::run(void)
 {
     printf("DataLogger Thread\n");
 
-    pSigImage = new Signal(sigNewData); // Deleted in destructor
+    Signal* pSigImage = new Signal(sigNewData); // Deleted in destructor
     time_t timeNow;
     struct tm* pTimeStruct;
 
@@ -52,7 +51,7 @@ void DataLogger::run(void)
 
         // check text list, if not empty write
         mt.lock();
-        listStringsT.assign(listStrings);
+        listStringsT.assign(listStrings.begin(), listStrings.end());
         mt.unlock();
         if (listStringsT.size() > 0) {
             fileLog.open(scFileNameText, ios::out);
@@ -60,7 +59,7 @@ void DataLogger::run(void)
                 printf("Failed to open log files\n");
             } else {
                 do {
-                    string str = listStringsT.back;
+                    string str = listStringsT.back();
                     fileLog << str << endl;
                     listStringsT.pop_back();
                 } while (listStringsT.size() > 0);
@@ -80,7 +79,7 @@ void DataLogger::run(void)
         if (bWriteImgLocal) {
             bWriteImgLocal = false;
             timeNow = time(nullptr);
-            pTimeStruct = localtime(timeNow);
+            pTimeStruct = localtime(&timeNow);
             char scFileName[128];
             snprintf(scFileName, 
                     127, 
@@ -171,13 +170,8 @@ void DataLogger::LogString(const char* scData)
 {
     printf("DataLogger::LogString\n");
     mt.lock();
-    string strData(scData)
+    string strData(scData);
     listStrings.push_back(strData);
     mt.unlock();
     if (pSigImage != nullptr) pSigImage->signal(); // see above not right comment
-}
-
-DataLogger& DataLogger::GetDataLogger()
-{
-    return gStatus;
 }

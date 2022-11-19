@@ -30,7 +30,7 @@ int main( int argc, char** argv )
     bool bContinueFlight = true;
     //std::thread server((ServerLoop()));
 
-    DataLogger logger("logAlpha");
+    DataLogger logger;
 	FlightController controller(logger);
 	CameraController* pCamera = CameraController::OpenCamera(CameraController::CameraController_RGB);
 	Navigator nav(controller, logger, *pCamera);
