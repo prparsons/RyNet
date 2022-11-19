@@ -14,7 +14,6 @@ DataLogger::DataLogger()
 
 DataLogger::~DataLogger()
 {
-    if (pSigImage != nullptr) delete pSigImage;
 }
 
 void DataLogger::run(void)
@@ -27,9 +26,9 @@ void DataLogger::run(void)
 
     fstream fileLog;
     vector<string> listStringsT;
-    char scfileNameText[128];
+    char scFileNameText[128];
     timeNow = time(nullptr);
-    pTimeStruct = localtime(timeNow);
+    pTimeStruct = localtime(&timeNow);
     snprintf(scFileNameText, 
             127, 
             "log_%d_%d_%d_%d_%d.txt", 
@@ -163,7 +162,7 @@ void DataLogger::LogImage(cv::Mat& im)
     mt.lock();
     image = im.clone();
     mt.unlock();
-    if (pSigImage != nullptr) pSigImage->signal(); // this isn't right yet...something copy
+    sigNewData.signal();
 }
 
 void DataLogger::LogString(const char* scData)
@@ -173,5 +172,5 @@ void DataLogger::LogString(const char* scData)
     string strData(scData);
     listStrings.push_back(strData);
     mt.unlock();
-    if (pSigImage != nullptr) pSigImage->signal(); // see above not right comment
+    sigNewData.signal();
 }
