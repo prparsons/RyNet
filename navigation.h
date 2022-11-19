@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cuda.h>
 #include <vector>
 #include "cameraMulti.h"
 #include "data_types.h"

@@ -42,8 +42,7 @@ void DataLogger::run(void)
     cv::Mat imageWrite;
     bool bWriteImgLocal = false;
 
-    while (cv::waitKey(1) < 0 && cv::getWindowProperty(window_name, cv::WND_PROP_AUTOSIZE) >= 0)
-    {
+    while (!ss.shouldStop()) {
         // Wait on signal
         pSigImage->wait();
         printf("statusLoop\n");

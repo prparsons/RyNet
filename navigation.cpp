@@ -52,11 +52,11 @@ bool ObjectDetection::ProcessImage(image& img)
 
         bRet = true;
         snprintf(127, "Detection Class[%d] LTRB:%d %d %d %d", 
-                    arDetections[i].ClassID, 
-                    arDetections[i].Left, 
-                    arDetections[i].Top, 
-                    arDetections[i].Right, 
-                    arDetections[i].Bottom);
+                    int(arDetections[i].ClassID), 
+                    int(arDetections[i].Left), 
+                    int(arDetections[i].Top), 
+                    int(arDetections[i].Right), 
+                    int(arDetections[i].Bottom));
         logger.LogString(sc);
     }
 
@@ -76,7 +76,7 @@ void ObjectDetection::run()
         imgProcess = imgRecent;
         mt.unlock();
         
-        if (detector.ProcessImage(imgProcess)) {
+        if (ProcessImage(imgProcess)) {
             logger.LogImage(imgProcess);
         }
     }
@@ -91,18 +91,18 @@ TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
     pNetwork = segNet::Create(segNet::FCN_RESNET18_DEEPSCENE_576x320);
 }
 
-bool TerrainSegmentation::ProcessImage(image& img)
+bool TerrainSegmentation::ProcessImage(image& imgRGB)
 {
-    uchar3* imgPtr;// = (uchar3*)imgRGB.data;   // shared CPU/GPU pointer to image
+    uchar3* imgPtr = (uchar3*)imgRGB.data;   // shared CPU/GPU pointer to image
     int imgWidth = imgRGB.cols;      // width of the image (in pixels)
     int imgHeight = imgRGB.rows;      // height of the image (in pixels)
 
-    if(!net->Process(imgPtr, imgWidth, imgHeight)) {
+    if(!pNetwork->Process(imgPtr, imgWidth, imgHeight)) {
         printf("TerrainSegmentation::ProcessImage fail");
         return false;
     }
     
-    if(!net->Mask(pImgMask, imgWidth, imgHeight, segNet::FILTER_POINT)) {
+    if(!pNetwork->Mask(pImgMask, imgWidth, imgHeight, segNet::FILTER_POINT)) {
         return false;
     }
 
@@ -133,7 +133,7 @@ void TerrainSegmentation::run()
         imgProcess = imgRecent;
         mt.unlock();
         
-        if (segmenter.ProcessImage(imgProcess)) {
+        if (ProcessImage(imgProcess)) {
             logger.LogImage(pImgMask);
             logger.LogImage(imgProcess);
             logger.LogString("Good Habitat Found");
@@ -192,8 +192,9 @@ void Navigator::runNavigator()
         pFrame = camera.GetCurrentFrame();
         if (!pFrame->hasRGB()) continue;
         
-        detector.SetNewImage(pFrame->getImageRGB());
-        segmenter.SetNewImage(pFrame->getImageRGB());
+        image imgNew = pFrame->getImageRGB();
+        detector.SetNewImage(imgNew);
+        segmenter.SetNewImage(imgNew);
 
         if (bGridSearching) {
             if (segmenter.GetHabitatDirection() >= 0.0) { // good terrain visible?
@@ -214,7 +215,7 @@ void Navigator::runNavigator()
                 logger.LogString(sc);
             } else {
                 control.RestoreRouteNaive();
-                logger.LogString("Good Habitat -> Grid Search")
+                logger.LogString("Good Habitat -> Grid Search");
             }
         }
     }

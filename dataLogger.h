@@ -23,6 +23,7 @@ private:
     bool bWriteImg;
     Mutex mt;
     Signal sigNewData;
+    StopSignal ss;
     cv::Mat image;
     std::vector<std::string> listStrings;
 };
