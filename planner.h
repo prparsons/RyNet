@@ -1,6 +1,5 @@
 #pragma once
 
-#include "navigation.h"
 #include "data_types.h"
 #include "dataLogger.h"
 

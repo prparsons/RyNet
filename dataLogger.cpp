@@ -155,13 +155,18 @@ catch (const std::exception& e)
 
 */
 
-void DataLogger::LogImage(cv::Mat& im)
+void DataLogger::LogImage(image& im)
 {
     printf("DataLogger::LogImage\n");
     mt.lock();
     image = im.clone();
     mt.unlock();
     sigNewData.signal();
+}
+
+void DataLogger::LogImage(uchar3* pImg)
+{
+
 }
 
 void DataLogger::LogString(const char* scData)

@@ -24,7 +24,7 @@ void ObjectDetection::SetNewImage(image& img)
     sigNewImage.signal();
 }
 
-bool ObjectDetection::ProcessImage(image& img)
+bool ObjectDetection::ProcessImage(image& imgRGB)
 {
     // these variables will store the image data pointer and dimensions
     uchar3* imgPtr = (uchar3*)imgRGB.data;   // shared CPU/GPU pointer to image
@@ -48,12 +48,12 @@ bool ObjectDetection::ProcessImage(image& img)
         if (arDetections[i].ClassID != 1) continue; // Should be a person (looking for people)
 
         bRet = true;
-        snprintf(127, "Detection Class[%d] LTRB:%d %d %d %d", 
-                    int(arDetections[i].ClassID), 
-                    int(arDetections[i].Left), 
-                    int(arDetections[i].Top), 
-                    int(arDetections[i].Right), 
-                    int(arDetections[i].Bottom));
+        snprintf(sc, 127, "Detection Class[%d] LTRB:%d %d %d %d", 
+                int(arDetections[i].ClassID), 
+                int(arDetections[i].Left), 
+                int(arDetections[i].Top), 
+                int(arDetections[i].Right), 
+                int(arDetections[i].Bottom));
         logger.LogString(sc);
     }
 
