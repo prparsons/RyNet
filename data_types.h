@@ -2,6 +2,10 @@
 
 #include <opencv2/opencv.hpp>   // Include OpenCV API
 #include <ctime>
+#include <jetson-inference/detectNet.h>
+#include <jetson-inference/segNet.h>
+#include <jetson-utils/loadImage.h>
+#include <vector>
 
 #define PI 3.141592653590
 #define PI_2 1.570796326794

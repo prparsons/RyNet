@@ -1,9 +1,5 @@
 #pragma once
 
-#include <jetson-inference/detectNet.h>
-#include <jetson-inference/segNet.h>
-#include <jetson-utils/loadImage.h>
-#include <vector>
 #include "cameraMulti.h"
 #include "data_types.h"
 #include "dataLogger.h"
