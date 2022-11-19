@@ -16,10 +16,18 @@ ObjectDetection::ObjectDetection(DataLogger& _logger)
     pNetwork = detectNet::Create(detectNet::SSD_MOBILENET_V2);
     // SSD_INCEPTION_V2 ?
 	// For Xavier (try to use one of the DLA engines so we can use the gpu for opencv stuff)
-	//detectNet* net = detectNet::Create(detectNet::SSD_MOBILENET_V2, 0.5f, 1, TYPE_FASTEST, DEVICE_DLA_0);
+	//detectNet* net = detectNet::Create(detectNet::SSD_MOBILENET_V2, 0.5f, 1, TYPE_FASTEST, DEVICE_DLA_0);DEVICE_DLA_1 DEVICE_GPU
 }
 
-void ObjectDetection::ProcessImage()
+void ObjectDetection::SetNewImage(image& img)
+{
+    mt.lock();
+    imgRecent = img;
+    mt.unlock();
+    sigNewImage.signal();
+}
+
+bool ObjectDetection::ProcessImage(image& img)
 {
     // these variables will store the image data pointer and dimensions
     uchar3* imgPtr;// = (uchar3*)imgRGB.data;   // shared CPU/GPU pointer to image
@@ -36,19 +44,41 @@ void ObjectDetection::ProcessImage()
         return false;
     }
 
+    bool bRet = false;
     for (int i = 0; i < iDetections; i++) {
         //if (arDetections[i].Confidence < 0.5) continue; // This isn't necessary since the argument is passed to detectNet
         if (arDetections[i].ClassID != 1) continue; // Should be a person (looking for people)
 
-
-        float fTop = arDetections[i].Top;
-        float fRight = arDetections[i].Right;
-        float fBottom = arDetections[i].Bottom;
-        float fLeft = arDetections[i].Left;
+        bRet = true;
+        /*
+        *parDetections->fTop = arDetections[i].Top;
+        *parDetections->fRight = arDetections[i].Right;
+        *parDetections->fBottom = arDetections[i].Bottom;
+        *parDetections->fLeft = arDetections[i].Left;*/
     }
 
 	// Not sure if this is right for freeing the memory
 	cudaFree(arDetections);
+    return bRet;
+}
+
+void ObjectDetection::run()
+{
+    Signal* pSigRGB = new Signal(sigNewImage);
+    image imgProcess;
+
+    while (!ss.shouldStop()) {
+        pSigRGB->wait();
+        mt.lock();
+        imgProcess = imgRecent;
+        mt.unlock();
+        
+        if (detector.ProcessImage(imgProcess)) {
+            logger.LogImage(imgProcess);
+            //log strings of detection box
+        }
+    }
+    delete pSigRGB;
 }
 
 // ** TerrainSegmentation
@@ -59,7 +89,7 @@ TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
     pNetwork = segNet::Create(segNet::FCN_RESNET18_DEEPSCENE_576x320);
 }
 
-void TerrainSegmentation::ProcessImage()
+bool TerrainSegmentation::ProcessImage(image& img)
 {
     uchar3* imgPtr;// = (uchar3*)imgRGB.data;   // shared CPU/GPU pointer to image
     int imgWidth = imgRGB.cols;      // width of the image (in pixels)
@@ -67,14 +97,48 @@ void TerrainSegmentation::ProcessImage()
 
     if(!net->Process(imgPtr, imgWidth, imgHeight)) {
         printf("TerrainSegmentation::ProcessImage fail");
-        return;
+        return false;
     }
     
     uchar3* imgMask;
     if(!net->Mask(imgMask, imgWidth, imgHeight, segNet::FILTER_POINT)) {
         printf("TerrainSegmentation::ProcessImage mask");
-        return;
+        return false;
     }
+
+    return ScanMask(imgMask, imgWidth, imgHeight);
+}
+
+float TerrainSegmentation::GetHabitatDirection()
+{
+    return 1.0;
+}
+
+void TerrainSegmentation::SetNewImage(image& img)
+{
+    mt.lock();
+    imgRecent = img;
+    mt.unlock();
+    sigNewImage.signal();
+}
+
+void TerrainSegmentation::run()
+{
+    Signal* pSigRGB = new Signal(sigNewImage);
+    image imgProcess;
+
+    while (!ss.shouldStop()) {
+        pSigRGB->wait();
+        mt.lock();
+        imgProcess = imgRecent;
+        mt.unlock();
+        
+        if (segmenter.ProcessImage(imgProcess)) {
+            // log the mask
+            //log strings of ...something?
+        }
+    }
+    delete pSigRGB;
 }
 
 bool TerrainSegmentation::ScanMask(uchar3* imgMask, int iWidth, int iHeight)
@@ -86,12 +150,13 @@ bool TerrainSegmentation::ScanMask(uchar3* imgMask, int iWidth, int iHeight)
             return true;
         }
     }
-    
+
     return false;
 }
 
-Navigator::Navigator(DataLogger& _logger)
+Navigator::Navigator(DataLogger& _logger, CameraController& _camera)
 : logger(_logger)
+, camera(_camera)
 , pThreadNav(nullptr)
 , pThreadDet(nullptr)
 , pThreadSeg(nullptr)
@@ -103,17 +168,45 @@ Navigator::Navigator(DataLogger& _logger)
 
 void Navigator::runNavigator()
 {
+    cameraFrame* pFrame = nullptr;
+    Signal* pSigRGB = camera.GetSignalRGB();
 
-}
+    bool bGridSearching = false;
 
-void Navigator::runObjectDetect()
-{
+    while (!ssMain.shouldStop()) {
+        pSigRGB->wait();
+        if (pFrame) delete pFrame;
+        pFrame = camera.GetCurrentFrame();
+        if (!pFrame->hasRGB()) continue;
+        
+        detector.ProcessImage(pFrame->getImageRGB());
+        segmenter.ProcessImage(pFrame->getImageRGB());
 
-}
+        if (bGridSearching) {
+            //good terrain visible?
+            //{
+                //controller.setdirection
+                //log changes
+            //}
+        } else {
+            // good terrain in current direction?
+            //{
+                //continue
+            //} else {
+                //good terrain in different direction?
+                //{
+                    //controller.setdirection
+                    //log changes
+                //} else {
+                    //resume grid search
+                    //log changes
+                //}
+            //}
+        }
 
-void Navigator::runTerrainSegment()
-{
-
+    }
+    if (pFrame != nullptr) delete pFrame;
+    delete pSigRGB;
 }
 
 #ifdef dontdefine

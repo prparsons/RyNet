@@ -12,16 +12,28 @@ class segNet;
 class ObjectDetection {
 public:
     ObjectDetection(DataLogger& logger);
-    void ProcessImage();
+
+    void SetNewImage(image& img);
+    void run();
+
+private:
+    bool ProcessImage(image& img);
 
     DataLogger& logger;
     detectNet* pNetwork;
+    Mutex mt;
+    Signal sigNewImage;
+    StopSignal ss;
+    image imgRecent;
 };
 
 class TerrainSegmentation {
 public:
     TerrainSegmentation(DataLogger& logger);
-    void ProcessImage();
+
+    float GetHabitatDirection();
+    void SetNewImage(image& img);
+    void run();
 
     enum Classes {
         SKY = 0,
@@ -32,25 +44,31 @@ public:
     };
 
 private:
+    bool ProcessImage(image& img);
     bool ScanMask(uchar3* imgMask, int iWidth, int iHeight);
 
     DataLogger& logger;
     segNet* pNetwork;
+    float fBestDirection;
+    Mutex mt;
+    Signal sigNewImage;
+    StopSignal ss;
+    image imgRecent;
 };
 
 class Navigator {
 public:
-    Navigator(DataLogger& logger);
+    Navigator(DataLogger& logger, CameraController& camera);
 
     void runNavigator();
-    void runObjectDetect();
-    void runTerrainSegment();
 
 private:
     DataLogger& logger;
+    CameraController& camera;
     std::thread* pThreadNav;
     std::thread* pThreadDet;
     std::thread* pThreadSeg;
+    StopSignal ssMain;
     ObjectDetection detector;
     TerrainSegmentation segmenter;
 };
