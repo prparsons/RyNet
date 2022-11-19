@@ -7,11 +7,7 @@
 #define PI_2 1.570796326794
 #define PIx2 6.283185307180
 
-class image:public cv::Mat {
-public:
-    time_t tStamp;
-};
-
+typedef image cv::Mat;
 
 class DetectionBox {
 public:
