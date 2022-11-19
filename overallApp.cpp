@@ -5,8 +5,8 @@
 
 #include <thread>
 
-#include "droneNavigation.h"
-#include "serverDroneStatus.h"
+#include "navigation.h"
+#include "dataLogger.h"
 
 int main( int argc, char** argv )
 {
@@ -30,14 +30,13 @@ int main( int argc, char** argv )
     bool bContinueFlight = true;
     //std::thread server((ServerLoop()));
 
-    DroneNavigation<Drive_TwinTrackAdv> navSystem;
-	Navigator_PersonFinder* pNavPerson = new Navigator_PersonFinder();
-    Navigator_SimpleDepthObstruct* pNavDepth = new Navigator_SimpleDepthObstruct();
-	navSystem.addNav(pNavPerson);
-    navSystem.addNav(pNavDepth);
+    DataLogger logger("logAlpha");
+	FlightController controller;
+	CameraController* pCamera = CameraController::OpenCamera(CameraController::CameraController_RGB);
+	Navigator nav(controller, logger, *pCamera);
 
 	try {
-		std::thread client(&DroneNavigation<Drive_TwinTrackAdv>::run, &navSystem);
+		//std::thread client(&DroneNavigation<Drive_TwinTrackAdv>::run, &navSystem);
 		if (client.joinable()) {
 			std::cout << "Joinable\n";
 		} else {
@@ -45,7 +44,6 @@ int main( int argc, char** argv )
 		}
 		// std::system_error if the thread could not be started.
 		do {
-			//server.join();
 			client.join();
 			break;
 		} while (bContinueFlight);

@@ -84,7 +84,8 @@ public:
 
     static CameraController* OpenCamera(cameraFeatures features);
 
-    cameraFrame* getCurrentFrame();
+    cameraFrame* GetCurrentFrame();
+    Signal* GetSignalRGB();
 
     void run();
 

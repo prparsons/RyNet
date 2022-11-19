@@ -130,7 +130,7 @@ CameraController* CameraController::OpenCamera(cameraType type, cameraFeatures f
     return pReturn;
 }
 
-cameraFrame* CameraController::getCurrentFrame()
+cameraFrame* CameraController::GetCurrentFrame()
 {
     m.lock();
     if (pFrameCurrent == nullptr) {
@@ -140,6 +140,11 @@ cameraFrame* CameraController::getCurrentFrame()
     cameraFrame* pFrameReturn = new cameraFrame(*pFrameCurrent);
     m.unlock();
     return pFrameCurrent;
+}
+
+Signal* CameraController::GetSignalRGB()
+{
+    return new Signal(sigRGB);
 }
 
 CameraController::CameraController(cameraFeatures _features)

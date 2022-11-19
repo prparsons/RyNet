@@ -2,9 +2,9 @@
 
 #include "navigation.h"
 #include "data_types.h"
-#include "datalogger.h"
+#include "dataLogger.h"
 
-class FlightController {
+class FlightController {Navigator
 public:
     FlightController(DataLogger& logger);
 

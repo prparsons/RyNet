@@ -15,15 +15,12 @@ public:
 
 class DetectionBox {
 public:
-    DetectionBox(){}
-    DetectionBox(const DetectionBox& other);
-    DetectionBox& operator=(const DetectionBox& other);
+    DetectionBox():fTop(0), fRight(0), fBottom(0), bLeft(0){}
 
     float fTop;
     float fRight;
     float fBottom;
     float fLeft;
-    float fDistance;
 };
 
 class Destination {
