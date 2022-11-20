@@ -184,7 +184,7 @@ catch (const std::exception& e)
 
 */
 
-void DataLogger::LogImage(image& im)
+void DataLogger::LogImage(cv::Mat& im)
 {
     printf("DataLogger::LogImage cv::Mat\n");
     mt.lock();
