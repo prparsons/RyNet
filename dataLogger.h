@@ -14,7 +14,7 @@ public:
     static DataLogger& GetDataLogger();
 
     void LogImage(image& im);
-    void LogImage(uchar3* pImg);
+    void LogMask(uchar3* pImg, int width, int height);
     void LogString(const char* scData);
 
 private:
@@ -22,9 +22,11 @@ private:
     void WriteSpeed(cv::Mat& image);
 
     bool bWriteImg;
+    bool bWriteMask;
     ThreadMutex mt;
     Signal sigNewData;
     StopSignal ss;
     cv::Mat image;
+    cv::Mat mask;
     std::vector<std::string> listStrings;
 };

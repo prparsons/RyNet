@@ -37,6 +37,8 @@ int main( int argc, char** argv )
 
 	try {
 		//std::thread client(&DroneNavigation<Drive_TwinTrackAdv>::run, &navSystem);
+		std::thread thrLogger(&DataLogger::run, &logger);
+		std::thread thrCamera(&CameraController::run, pCamera);
 		std::thread thrNav(&Navigator::runNavigator, &nav);
 		if (thrNav.joinable()) {
 			std::cout << "Joinable\n";
@@ -46,6 +48,8 @@ int main( int argc, char** argv )
 		// std::system_error if the thread could not be started.
 		do {
 			thrNav.join();
+			thrCamera.join();
+			thrLogger.join();
 			break;
 		} while (bContinueFlight);
 	} catch (std::exception e) {

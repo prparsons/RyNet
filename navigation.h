@@ -40,7 +40,7 @@ public:
         TREES,
         WATER,
         TERRAIN,
-        HABITAT
+        HABITAT = 8 //sunrgb, door is 8
     };
 
 private:
@@ -55,7 +55,7 @@ private:
     Signal sigNewImage;
     StopSignal ss;
     image imgRecent;
-    uchar3* pImgMask; // only access from thread
+    uchar3* u3Mask; // only access from thread
 };
 
 class Navigator {

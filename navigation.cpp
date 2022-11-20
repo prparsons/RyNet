@@ -27,14 +27,14 @@ void ObjectDetection::SetNewImage(image& img)
 bool ObjectDetection::ProcessImage(image& imgRGB)
 {
     // these variables will store the image data pointer and dimensions
-    uchar3* imgPtr = (uchar3*)imgRGB.data;   // shared CPU/GPU pointer to image
+    uchar3* u3Img = (uchar3*)imgRGB.data;   // shared CPU/GPU pointer to image
     int imgWidth = imgRGB.cols;      // width of the image (in pixels)
     int imgHeight = imgRGB.rows;      // height of the image (in pixels)
 
 	// For Jetson Nano (just let it use gpu)
 
 	detectNet::Detection* arDetections = nullptr;
-	int iDetections = pNetwork->Detect(imgPtr, imgWidth, imgHeight, &arDetections);
+	int iDetections = pNetwork->Detect(u3Img, imgWidth, imgHeight, &arDetections);
 
     if (iDetections < 1) {
         //printf("no things");
@@ -85,25 +85,25 @@ void ObjectDetection::run()
 TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
 : logger(_logger)
 {
-    pNetwork = segNet::Create(segNet::FCN_RESNET18_DEEPSCENE_576x320);
+    pNetwork = segNet::Create(segNet::FCN_RESNET18_SUNRGB_640x512);//segNet::FCN_RESNET18_DEEPSCENE_576x320);FCN_ALEXNET_AERIAL_FPV_720p
 }
 
 bool TerrainSegmentation::ProcessImage(image& imgRGB)
 {
-    uchar3* imgPtr = (uchar3*)imgRGB.data;   // shared CPU/GPU pointer to image
+    uchar3* u3Img = (uchar3*)imgRGB.data;   // shared CPU/GPU pointer to image
     int imgWidth = imgRGB.cols;      // width of the image (in pixels)
     int imgHeight = imgRGB.rows;      // height of the image (in pixels)
 
-    if(!pNetwork->Process(imgPtr, imgWidth, imgHeight)) {
+    if(!pNetwork->Process(u3Img, imgWidth, imgHeight)) {
         printf("TerrainSegmentation::ProcessImage fail");
         return false;
     }
     
-    if(!pNetwork->Mask(pImgMask, imgWidth, imgHeight, segNet::FILTER_POINT)) {
+    if(!pNetwork->Mask(u3Mask, imgWidth, imgHeight, segNet::FILTER_POINT)) {
         return false;
     }
 
-    return ScanMask(pImgMask, imgWidth, imgHeight);
+    return ScanMask(u3Mask, imgWidth, imgHeight);
 }
 
 float TerrainSegmentation::GetHabitatDirection()
@@ -145,7 +145,7 @@ bool TerrainSegmentation::ScanMask(uchar3* imgMask, int iWidth, int iHeight)
     float fAngleAvgSum = 0;
     int iAngleAvgCount = 0;
     for (int i = 0; i < size; i++) {
-        if (uint32_t(imgMask[i]) == HABITAT) {
+        if (uint32_t(imgMask[i]) == HABITAT) { // This still isn't right...i'm testing category number
             int x = i / iWidth;
             fAngleAvgSum += (abs(x - (iWidth * .5)) / (iWidth * .5)) * (fImageFOV * .5);
             iAngleAvgCount++;
@@ -157,6 +157,8 @@ bool TerrainSegmentation::ScanMask(uchar3* imgMask, int iWidth, int iHeight)
         return false;
     }
 
+    // We've found the desired category
+    logger.LogMask(imgMask, iWidth, iHeight);
     fBestDirection = fAngleAvgSum / iAngleAvgCount;
     return true;
 }
@@ -182,6 +184,9 @@ void Navigator::runNavigator()
     bool bGridSearching = false;
     float fMargin = 0;
     float fCurrentDirection = 0;
+
+    std::thread thrObject(&ObjectDetection::run, &detector);
+    std::thread thrSegment(&TerrainSegmentation::run, &segmenter);
 
     while (!ssMain.shouldStop()) {
         pSigRGB->wait();
@@ -218,6 +223,9 @@ void Navigator::runNavigator()
     }
     if (pFrame != nullptr) delete pFrame;
     delete pSigRGB;
+
+    thrObject.join();
+    thrSegment.join();
 }
 
 #ifdef dontdefine

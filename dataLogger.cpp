@@ -9,11 +9,15 @@ using namespace std;
 //https://learnopencv.com/getting-started-opencv-cuda-module/
 
 DataLogger::DataLogger()
+: u3Mask(nullptr)
+, bWriteImg(false)
+, bWriteMask(false)
 {
 }
 
 DataLogger::~DataLogger()
 {
+    if (u3Mask) delete u3Mask;
 }
 
 void DataLogger::run(void)
@@ -65,15 +69,14 @@ void DataLogger::run(void)
             }
         }
 
-        // check image list, if not empty, write (it's not a list......should there be a bNewImage flag?)
+        // Check if there's an image we should write
         mt.lock();
         if (bWriteImg) {
             bWriteImg = false;
             bWriteImgLocal = true;
-            imageWrite = image; // memcpy?
+            imageWrite = image;
         }
         mt.unlock();
-
         if (bWriteImgLocal) {
             bWriteImgLocal = false;
             timeNow = time(nullptr);
@@ -82,6 +85,32 @@ void DataLogger::run(void)
             snprintf(scFileName, 
                     127, 
                     "img_%d_%d_%d_%d_%d_%d.jpg", 
+                    pTimeStruct->tm_year + 1900, 
+                    pTimeStruct->tm_mon + 1,
+                    pTimeStruct->tm_mday,
+                    pTimeStruct->tm_hour,
+                    pTimeStruct->tm_min,
+                    pTimeStruct->tm_sec);
+            cv::imwrite(scFileName, imageWrite);
+            delete pTimeStruct;
+        }
+
+        // Check if there's a mask we should write
+        mt.lock();
+        if (bWriteMask) {
+            bWriteMask = false;
+            bWriteImgLocal = true;
+            imageWrite = mask;
+        }
+        mt.unlock();
+        if (bWriteImgLocal) {
+            bWriteImgLocal = false;
+            timeNow = time(nullptr);
+            pTimeStruct = localtime(&timeNow);
+            char scFileName[128];
+            snprintf(scFileName, 
+                    127, 
+                    "mask_%d_%d_%d_%d_%d_%d.jpg", 
                     pTimeStruct->tm_year + 1900, 
                     pTimeStruct->tm_mon + 1,
                     pTimeStruct->tm_mday,
@@ -157,16 +186,22 @@ catch (const std::exception& e)
 
 void DataLogger::LogImage(image& im)
 {
-    printf("DataLogger::LogImage\n");
+    printf("DataLogger::LogImage cv::Mat\n");
     mt.lock();
     image = im.clone();
+    bWriteImg = true;
     mt.unlock();
     sigNewData.signal();
 }
 
-void DataLogger::LogImage(uchar3* pImg)
+void DataLogger::LogMask(uchar3* pImg, int width, int height)
 {
-
+    printf("DataLogger::LogImage uchar3\n");
+    mt.lock();
+    mask = cv::Mat(height, width, cv::CV_8UC3, (void*)pImg);
+    bWriteMask = true;
+    mt.unlock();
+    sigNewData.signal();
 }
 
 void DataLogger::LogString(const char* scData)
