@@ -144,8 +144,10 @@ bool TerrainSegmentation::ScanMask(uchar3* imgMask, int iWidth, int iHeight)
     int size = iWidth * iHeight;
     float fAngleAvgSum = 0;
     int iAngleAvgCount = 0;
+    uint32_t pixel;
     for (int i = 0; i < size; i++) {
-        if (uint32_t(imgMask[i]) == HABITAT) {
+        pixel = *((uint32_t*)(&imgMask[i])) >> 8;
+        if (pixel == HABITAT) {
             int x = i / iWidth;
             fAngleAvgSum += (abs(x - (iWidth * .5)) / (iWidth * .5)) * (fImageFOV * .5);
             iAngleAvgCount++;

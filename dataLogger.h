@@ -13,7 +13,7 @@ public:
     void run(void);
     static DataLogger& GetDataLogger();
 
-    void LogImage(image& im);
+    void LogImage(cv::Mat& im);
     void LogImage(uchar3* pImg);
     void LogString(const char* scData);
 
