@@ -14,7 +14,7 @@ public:
     static DataLogger& GetDataLogger();
 
     void LogImage(cv::Mat& im);
-    void LogImage(uchar3* pImg);
+    void LogMask(uchar3* pImg, int width, int height);
     void LogString(const char* scData);
 
 private:

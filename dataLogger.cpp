@@ -9,15 +9,13 @@ using namespace std;
 //https://learnopencv.com/getting-started-opencv-cuda-module/
 
 DataLogger::DataLogger()
-: u3Mask(nullptr)
-, bWriteImg(false)
+: bWriteImg(false)
 , bWriteMask(false)
 {
 }
 
 DataLogger::~DataLogger()
 {
-    if (u3Mask) delete u3Mask;
 }
 
 void DataLogger::run(void)
@@ -198,7 +196,7 @@ void DataLogger::LogMask(uchar3* pImg, int width, int height)
 {
     printf("DataLogger::LogImage uchar3\n");
     mt.lock();
-    mask = cv::Mat(height, width, cv::CV_8UC3, (void*)pImg);
+   // mask = cv::Mat(height, width, cv::CV_8UC3, (void*)pImg);
     bWriteMask = true;
     mt.unlock();
     sigNewData.signal();

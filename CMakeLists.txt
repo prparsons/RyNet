@@ -23,6 +23,9 @@ find_package(Qt4)
 include(${QT_USE_FILE})
 add_definitions(${QT_DEFINITIONS})
 
+#was getting a missing lnvbuf_util linker error
+link_directories(/usr/lib/aarch64-linux-gnu/tegra) 
+
 # compiler flags
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")

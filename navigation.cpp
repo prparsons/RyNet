@@ -131,7 +131,6 @@ void TerrainSegmentation::run()
         mt.unlock();
         
         if (ProcessImage(imgProcess)) {
-            logger.LogImage(pImgMask);
             logger.LogImage(imgProcess);
             logger.LogString("Good Habitat Found");
         }
