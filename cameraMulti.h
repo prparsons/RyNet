@@ -39,23 +39,12 @@ public:
     //cameraFrame& operator=(const cameraFrame& other);
     ~cameraFrame();
 
-    image getImageRGB();
-    image getImageDepth();
-    cameraFrame_depth getImageDepthRaw();
-    image getImageIR();
-    image getImageREdge();
-
-    bool hasRGB() const;
-    bool hasDepth() const;
-    bool hasIR() const;
-    bool hasREdge() const;
+    image getImage();
+    cameraFrame_depth* getDepthRaw();
 
 private:
     // whatever needed for each type
-    cv::Mat* pRGB;
-    cv::Mat* pDepth;
-    cv::Mat* pIR;
-    cv::Mat* pREdge;
+    cv::Mat* pImg;
     cameraFrame_depth* pDepthRaw;
     int* piCount;
     ThreadMutex* pM;
@@ -84,7 +73,10 @@ public:
 
     static CameraController* OpenCamera(cameraFeatures features);
 
-    cameraFrame* GetCurrentFrame();
+    // Must delete returned pointers
+    cameraFrame* GetFrameDepth();
+    cameraFrame* GetFrameRGB();
+    Signal* GetSignalDepth();
     Signal* GetSignalRGB();
 
     void run();
@@ -95,14 +87,16 @@ protected:
     void run_CV();
 
 private:
-    cameraFrame* pFrameCurrent;
+    cameraFrame* pFrameCurrentDepth;
+    cameraFrame* pFrameCurrentRGB;
     ThreadMutex m;
 
     camera_RS* pCameraRS;
     cameraFeatures features;
 
     std::thread* pthrCamera[3];
-    StopSignal ss;
+    StopSignal ssRS;
+    StopSignal ssCV;
     Signal sigRGB;
     Signal sigDepth;
     Signal sigThermal;

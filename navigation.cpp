@@ -198,10 +198,9 @@ void Navigator::runNavigator()
     while (!ssMain.shouldStop()) {
         pSigRGB->wait();
         if (pFrame) delete pFrame;
-        pFrame = camera.GetCurrentFrame();
-        if (!pFrame->hasRGB()) continue;
+        pFrame = camera.GetFrameRGB();
         
-        image imgNew = pFrame->getImageRGB();
+        image imgNew = pFrame->getImage();
         detector.SetNewImage(imgNew);
         segmenter.SetNewImage(imgNew);
 

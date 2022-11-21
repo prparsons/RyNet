@@ -31,10 +31,7 @@ void cameraFrame_depth::applyDecimationFilter()
 // cameraFrame
 
 cameraFrame::cameraFrame()
-: pRGB(nullptr)
-, pDepth(nullptr)
-, pIR(nullptr)
-, pREdge(nullptr)
+: pImg(nullptr)
 , pDepthRaw(nullptr)
 , piCount(new int(1))
 , pM(new ThreadMutex())
@@ -47,10 +44,7 @@ cameraFrame::cameraFrame(const cameraFrame& other)
 {
     printf("cameraFrame::cameraFrame(other)");
     other.pLock->lock();
-    pRGB = other.pRGB;
-    pDepth = other.pDepth;
-    pIR = other.pIR;
-    pREdge = other.pREdge;
+    pImg = other.pImg;
     piCount = other.piCount;
     pDepthRaw = other.pDepthRaw;
     pM = other.pM;
@@ -64,11 +58,8 @@ cameraFrame::~cameraFrame()
     printf("cameraFrame::~cameraFrame");
     pLock->lock();
     if (--(*piCount) == 0) {
-        delete pRGB;
-        delete pDepth;
+        delete pImg;
         delete pDepthRaw;
-        delete pIR;
-        delete pREdge;
         delete piCount;
         delete pM;
     }
@@ -76,49 +67,14 @@ cameraFrame::~cameraFrame()
     delete pLock;
 }
 
-bool cameraFrame::hasRGB() const
+image cameraFrame::getImage()
 {
-    return pRGB != nullptr;
+    return *pImg;
 }
 
-bool cameraFrame::hasIR() const
+cameraFrame_depth* cameraFrame::getDepthRaw()
 {
-    return pIR != nullptr;
-}
-
-bool cameraFrame::hasDepth() const
-{
-    return pDepth != nullptr;
-}
-
-bool cameraFrame::hasREdge() const
-{
-    return pREdge != nullptr;
-}
-
-image cameraFrame::getImageRGB()
-{
-    return *pRGB;
-}
-
-image cameraFrame::getImageDepth()
-{
-    return *pDepth;
-}
-
-cameraFrame_depth cameraFrame::getImageDepthRaw()
-{
-    return *pDepthRaw;
-}
-
-image cameraFrame::getImageIR()
-{
-    return *pIR;
-}
-
-image cameraFrame::getImageREdge()
-{
-    return *pREdge;
+    return pDepthRaw;
 }
 
 // ***********
@@ -135,16 +91,33 @@ CameraController* CameraController::OpenCamera(cameraFeatures features)
     return pReturn;
 }
 
-cameraFrame* CameraController::GetCurrentFrame()
+cameraFrame* CameraController::GetFrameDepth()
 {
     m.lock();
-    if (pFrameCurrent == nullptr) {
+    if (pFrameCurrentDepth == nullptr) {
         m.unlock();
         return nullptr;
     }
-    cameraFrame* pFrameReturn = new cameraFrame(*pFrameCurrent);
+    cameraFrame* pFrameReturn = new cameraFrame(*pFrameCurrentDepth);
     m.unlock();
-    return pFrameCurrent;
+    return pFrameReturn;
+}
+
+cameraFrame* CameraController::GetFrameRGB()
+{
+    m.lock();
+    if (pFrameCurrentRGB == nullptr) {
+        m.unlock();
+        return nullptr;
+    }
+    cameraFrame* pFrameReturn = new cameraFrame(*pFrameCurrentRGB);
+    m.unlock();
+    return pFrameReturn;
+}
+
+Signal* CameraController::GetSignalDepth()
+{
+    return new Signal(sigDepth);
 }
 
 Signal* CameraController::GetSignalRGB()
@@ -153,7 +126,8 @@ Signal* CameraController::GetSignalRGB()
 }
 
 CameraController::CameraController(cameraFeatures _features)
-: pFrameCurrent(nullptr)
+: pFrameCurrentDepth(nullptr)
+, pFrameCurrentRGB(nullptr)
 , pCameraRS(nullptr)
 , features(_features)
 {
@@ -163,7 +137,9 @@ CameraController::CameraController(cameraFeatures _features)
         pCameraRS = new camera_RS;
         pCameraRS->cfg.enable_stream(RS2_STREAM_DEPTH, 1280, 720);
     }
-
+    if (features & CameraController_RGB) {
+        // Set up anything here? resolution, framerate, exposure, white balance?
+    }
     pthrCamera[0] = nullptr;
     pthrCamera[1] = nullptr;
     pthrCamera[2] = nullptr;
@@ -171,8 +147,9 @@ CameraController::CameraController(cameraFeatures _features)
 
 CameraController::~CameraController()
 {
+    if (pFrameCurrentDepth != nullptr) delete pFrameCurrentDepth;
+    if (pFrameCurrentRGB != nullptr) delete pFrameCurrentRGB;
     if (pCameraRS != nullptr) delete pCameraRS;
-    if (pFrameCurrent != nullptr) delete pFrameCurrent;
     if (pthrCamera[0] != nullptr) {
         printf("~CameraController stopping realsense thread");
         pthrCamera[0]->join();
@@ -187,6 +164,13 @@ void CameraController::run()
             pthrCamera[0] = new std::thread(&CameraController::run_RS, this);
         } else {
             printf("CameraController::run realsense already started");
+        }
+    }
+    if (features & CameraController_RGB) {
+        if (pthrCamera[1] == nullptr) {
+            pthrCamera[1] = new std::thread(&CameraController::run_CV, this);
+        } else {
+            printf("CameraController::run cv already started");
         }
     }
 }
@@ -220,39 +204,33 @@ void CameraController::run_RS()
         }
         printf("newCameraFrame\n");
         // Create camera frame
-        cameraFrame frame;
+        cameraFrame* pNewFrameDepth = new cameraFrame();
 
         // Save the raw depth. If applying the decimation filter, before/after color map makes a difference in 
         //      how big the image is
-        frame.pDepthRaw = new cameraFrame_depth(data.get_depth_frame());
+        pNewFrameDepth->pDepthRaw = new cameraFrame_depth(data.get_depth_frame());
         if (features & CameraController_DownsampleDepth) {
-            frame.pDepthRaw->applyDecimationFilter();
+            pNewFrameDepth->pDepthRaw->applyDecimationFilter();
         }
-        rs2::frame depth = ((rs2::frame*)frame.pDepthRaw)->apply_filter(color_map);
+        rs2::frame depth = ((rs2::frame*)pNewFrameDepth->pDepthRaw)->apply_filter(color_map);
 
         // Query depth frame size (width and height)
         int w = depth.as<rs2::video_frame>().get_width();
         int h = depth.as<rs2::video_frame>().get_height();
 
         // Create OpenCV matrix of size (w,h) from the colorized depth data
-        frame.pDepth = new Mat(Size(w, h), CV_8UC3, (void*)depth.get_data(), Mat::AUTO_STEP);
-
-        // Now handle the rgb
-        rs2::frame rgb = data.get_color_frame();
-        w = rgb.as<rs2::video_frame>().get_width();
-        h = rgb.as<rs2::video_frame>().get_height();
-        frame.pRGB = new Mat(Size(w, h), CV_8UC3, (void*)rgb.get_data(), Mat::AUTO_STEP);
+        pNewFrameDepth->pImg = new Mat(Size(w, h), CV_8UC3, (void*)depth.get_data(), Mat::AUTO_STEP);
         
         // printf("status monitor new frame\n");
         m.lock();
-        if (pFrameCurrent != nullptr) delete pFrameCurrent;
-        pFrameCurrent = new cameraFrame(frame);
+        if (pFrameCurrentDepth != nullptr) delete pFrameCurrentDepth;
+        pFrameCurrentDepth = pNewFrameDepth;
         m.unlock();
 
         sigDepth.signal();
 
         printf("finished new camera frame\n");
-    } while (!ss.shouldStop());
+    } while (!ssRS.shouldStop());
 }
 
 void CameraController::run_CV()
@@ -269,12 +247,20 @@ void CameraController::run_CV()
         return;
     }
 
-    while (!ss.shouldStop()) { // We need a separate stop signal for each thread
+    while (!ssCV.shouldStop()) { // We need a separate stop signal for each thread
         cap.read(frame);
         if (frame.empty()) {
-            printf("CameraController::run_CVempty frame");
+            printf("CameraController::run_CV empty frame");
         }
         // Do something with frame
+        cameraFrame* pNewFrameRGB = new cameraFrame();
+        pNewFrameRGB->pImg = new Mat(frame);
+        m.lock(); // Need own mutex lock/whatever?
+        if (pFrameCurrentRGB != nullptr) delete pFrameCurrentRGB;
+        pFrameCurrentRGB = pNewFrameRGB;
+        m.unlock();
+
+        sigRGB.signal();
     }
     // According to opencv: the camera will be deinitialized automatically in VideoCapture destructor
 }
