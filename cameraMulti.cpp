@@ -37,11 +37,12 @@ cameraFrame::cameraFrame()
 , pM(new ThreadMutex())
 , pLock(new ThreadLock(*pM))
 {
-
+    printf("cameraFrame::cameraFrame");
 }
 
 cameraFrame::cameraFrame(const cameraFrame& other)
 {
+    printf("cameraFrame::cameraFrame(other)");
     other.pLock->lock();
     pRGB = other.pRGB;
     pDepth = other.pDepth;
@@ -57,6 +58,7 @@ cameraFrame::cameraFrame(const cameraFrame& other)
 
 cameraFrame::~cameraFrame()
 {
+    printf("cameraFrame::~cameraFrame");
     pLock->lock();
     if (--(*piCount) == 0) {
         delete pRGB;

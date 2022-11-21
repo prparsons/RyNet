@@ -10,7 +10,7 @@ ObjectDetection::ObjectDetection(DataLogger& _logger)
 : logger(_logger)
 {
 	// For Jetson Nano (just let it use gpu)
-    pNetwork = detectNet::Create(detectNet::SSD_MOBILENET_V2);
+    pNetwork = nullptr;//detectNet::Create(detectNet::SSD_MOBILENET_V2);
     // SSD_INCEPTION_V2 ?
 	// For Xavier (try to use one of the DLA engines so we can use the gpu for opencv stuff)
 	//detectNet* net = detectNet::Create(detectNet::SSD_MOBILENET_V2, 0.5f, 1, TYPE_FASTEST, DEVICE_DLA_0);DEVICE_DLA_1 DEVICE_GPU
@@ -26,6 +26,7 @@ void ObjectDetection::SetNewImage(image& img)
 
 bool ObjectDetection::ProcessImage(image& imgRGB)
 {
+    printf("ObjectDetection::ProcessImage");
     // these variables will store the image data pointer and dimensions
     uchar3* u3Img = (uchar3*)imgRGB.data;   // shared CPU/GPU pointer to image
     int imgWidth = imgRGB.cols;      // width of the image (in pixels)
@@ -64,6 +65,7 @@ bool ObjectDetection::ProcessImage(image& imgRGB)
 
 void ObjectDetection::run()
 {
+    printf("ObjectDetection::run");
     Signal* pSigRGB = new Signal(sigNewImage);
     image imgProcess;
 
@@ -73,9 +75,9 @@ void ObjectDetection::run()
         imgProcess = imgRecent;
         mt.unlock();
         
-        if (ProcessImage(imgProcess)) {
-            logger.LogImage(imgProcess);
-        }
+        //if (ProcessImage(imgProcess)) {
+        //    logger.LogImage(imgProcess);
+       // }
     }
     delete pSigRGB;
 }
@@ -85,11 +87,12 @@ void ObjectDetection::run()
 TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
 : logger(_logger)
 {
-    pNetwork = segNet::Create(segNet::FCN_RESNET18_SUNRGB_640x512);//segNet::FCN_RESNET18_DEEPSCENE_576x320);FCN_ALEXNET_AERIAL_FPV_720p
+    pNetwork = nullptr;//segNet::Create(segNet::FCN_RESNET18_SUNRGB_640x512);//segNet::FCN_RESNET18_DEEPSCENE_576x320);FCN_ALEXNET_AERIAL_FPV_720p
 }
 
 bool TerrainSegmentation::ProcessImage(image& imgRGB)
 {
+    printf("TerrainSegmentation::ProcessImage");
     uchar3* u3Img = (uchar3*)imgRGB.data;   // shared CPU/GPU pointer to image
     int imgWidth = imgRGB.cols;      // width of the image (in pixels)
     int imgHeight = imgRGB.rows;      // height of the image (in pixels)
@@ -121,6 +124,7 @@ void TerrainSegmentation::SetNewImage(image& img)
 
 void TerrainSegmentation::run()
 {
+    printf("TerrainSegmentation::run");
     Signal* pSigRGB = new Signal(sigNewImage);
     image imgProcess;
 
@@ -130,16 +134,17 @@ void TerrainSegmentation::run()
         imgProcess = imgRecent;
         mt.unlock();
         
-        if (ProcessImage(imgProcess)) {
-            logger.LogImage(imgProcess);
-            logger.LogString("Good Habitat Found");
-        }
+        //if (ProcessImage(imgProcess)) {
+        //    logger.LogImage(imgProcess);
+        //    logger.LogString("Good Habitat Found");
+        //}
     }
     delete pSigRGB;
 }
 
 bool TerrainSegmentation::ScanMask(uchar3* imgMask, int iWidth, int iHeight)
 {
+    printf("TerrainSegmentation::ScanMask");
     int size = iWidth * iHeight;
     float fAngleAvgSum = 0;
     int iAngleAvgCount = 0;
@@ -179,6 +184,7 @@ Navigator::Navigator(FlightController& _control, DataLogger& _logger, CameraCont
 
 void Navigator::runNavigator()
 {
+    printf("Navigator::runNavigator");
     cameraFrame* pFrame = nullptr;
     Signal* pSigRGB = camera.GetSignalRGB();
 

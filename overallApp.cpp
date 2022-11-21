@@ -32,13 +32,13 @@ int main( int argc, char** argv )
 
     DataLogger logger;
 	FlightController controller(logger);
-	CameraController* pCamera = CameraController::OpenCamera(CameraController::CameraController_RGB);
+	CameraController* pCamera = CameraController::OpenCamera(CameraController::CameraController_Depth);
 	Navigator nav(controller, logger, *pCamera);
 
 	try {
 		//std::thread client(&DroneNavigation<Drive_TwinTrackAdv>::run, &navSystem);
 		std::thread thrLogger(&DataLogger::run, &logger);
-		std::thread thrCamera(&CameraController::run, pCamera);
+		pCamera->run();
 		std::thread thrNav(&Navigator::runNavigator, &nav);
 		if (thrNav.joinable()) {
 			std::cout << "Joinable\n";
@@ -48,7 +48,6 @@ int main( int argc, char** argv )
 		// std::system_error if the thread could not be started.
 		do {
 			thrNav.join();
-			thrCamera.join();
 			thrLogger.join();
 			break;
 		} while (bContinueFlight);

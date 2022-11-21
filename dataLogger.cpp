@@ -39,7 +39,6 @@ void DataLogger::run(void)
             pTimeStruct->tm_mday,
             pTimeStruct->tm_hour,
             pTimeStruct->tm_min);
-    delete pTimeStruct;
 
     cv::Mat imageWrite;
     bool bWriteImgLocal = false;
@@ -90,7 +89,6 @@ void DataLogger::run(void)
                     pTimeStruct->tm_min,
                     pTimeStruct->tm_sec);
             cv::imwrite(scFileName, imageWrite);
-            delete pTimeStruct;
         }
 
         // Check if there's a mask we should write
@@ -116,7 +114,6 @@ void DataLogger::run(void)
                     pTimeStruct->tm_min,
                     pTimeStruct->tm_sec);
             cv::imwrite(scFileName, imageWrite);
-            delete pTimeStruct;
         }
     }
 
