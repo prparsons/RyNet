@@ -92,6 +92,7 @@ public:
 protected:
     CameraController(cameraFeatures);
     void run_RS();
+    void run_CV();
 
 private:
     cameraFrame* pFrameCurrent;

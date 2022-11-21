@@ -1,5 +1,8 @@
 #include "cameraMulti.h"
 
+#include <opencv2/core.hpp>
+#include <opencv2/videoio.hpp>
+#include <opencv2/highgui.hpp>
 #include "dataLogger.h"
 
 using namespace cv;
@@ -250,4 +253,28 @@ void CameraController::run_RS()
 
         printf("finished new camera frame\n");
     } while (!ss.shouldStop());
+}
+
+void CameraController::run_CV()
+{
+    printf("CameraController::run_CV");
+    Mat frame;
+
+    // Python way of using gstreamer
+    // cap = cv2.VideoCapture('nvarguscamerasrc sensor-id=0 wbmode=2 gainrange=\"2 2\" ispdigitalgainrange=\"2 2\" exposuretimerange=\"50000000 50000000\" aelock=true ! video/x-raw(memory:NVMM),width=1920,height=1080,framerate=10/1 ! nvvidconv ! video/x-raw,format=BGRx ! videoconvert ! appsink', cv2.CAP_GSTREAMER)
+    VideoCapture cap("nvarguscamerasrc sensor-id=0 wbmode=2 gainrange=\"2 2\" ispdigitalgainrange=\"2 2\" exposuretimerange=\"50000000 50000000\" aelock=true ! video/x-raw(memory:NVMM),width=4056,height=3040,framerate=10/1 ! nvvidconv ! video/x-raw,format=BGRx ! videoconvert ! appsink", cv::CAP_GSTREAMER);
+    
+    if (!cap.isOpened()) {
+        printf("CameraController::run_CV failed to open");
+        return;
+    }
+
+    while (!ss.shouldStop()) { // We need a separate stop signal for each thread
+        cap.read(frame);
+        if (frame.empty()) {
+            printf("CameraController::run_CVempty frame");
+        }
+        // Do something with frame
+    }
+    // According to opencv: the camera will be deinitialized automatically in VideoCapture destructor
 }
