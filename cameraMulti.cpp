@@ -263,6 +263,7 @@ void CameraController::run_RS()
 void CameraController::run_CV(const char* scGStream, cameraFrame** ppFrameCurrent, Signal* pSig, StopSignal* pss)
 {
     printL("CameraController::run_CV");
+    printL(scGStream);
     Mat frame;
 
     // Python way of using gstreamer
