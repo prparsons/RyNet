@@ -48,7 +48,7 @@ void FlightController::SendXML(const char* strMessage)
 		printL("SendXML fail, attempting to connect");
         ConnectMavLink();
         if (send(socketDesc, strMessage, strlen(strMessage), 0) < 0) {
-            printL("  That didn't work, still failed")
+            printL("  That didn't work, still failed");
         }
 	}
 }
@@ -60,26 +60,28 @@ char* FlightController::SendRecXML(const char* strMessage)
 		printL("SendRecXML fail, attempting to connect");
         ConnectMavLink();
         if (send(socketDesc, strMessage, strlen(strMessage), 0) < 0) {
-            printL("  That didn't work, still failed")
-            return;
+            printL("  That didn't work, still failed");
+            return nullptr;
         }
 	}
     char* scResponse = new char[512];
     if(recv(socketDesc, scResponse, sizeof(511), 0) < 0){
         printL("SendRecXML fail, no/bad response");
     }
+
+    return scResponse;
 }
 
 void FlightController::ConnectMavLink()
 {
     socketDesc = socket(AF_INET, SOCK_STREAM, 0);
-    if (socket_desc == -1) {
+    if (socketDesc == -1) {
         printL("FlightController::ConnectMavLink fail socket");
     }
 
     addressMavLink.sin_addr.s_addr = inet_addr(scMavLinkAddress);
     addressMavLink.sin_family = AF_INET;
-    addressMavLink.sin_port = htons(scMavlinkPort);
+    addressMavLink.sin_port = htons(iMavlinkPort);
 
     //Connect to remote server
     if (connect(socketDesc, (struct sockaddr *)&addressMavLink, sizeof(addressMavLink)) < 0) {

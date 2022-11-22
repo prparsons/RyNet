@@ -28,6 +28,6 @@ private:
 	struct sockaddr_in addressMavLink;
     int socketDesc;
     const char* scMavLinkAddress = "127.0.0.1";
-    const char* scMavlinkPort = "9360"
+    const int iMavlinkPort = 9360;
 };
 

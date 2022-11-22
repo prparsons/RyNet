@@ -8,6 +8,11 @@ using namespace std;
 
 //https://learnopencv.com/getting-started-opencv-cuda-module/
 
+void printL(const char* sc)
+{
+    printf("%s\n", sc);
+}
+
 DataLogger::DataLogger()
 : bWriteImg(false)
 , bWriteMask(false)
