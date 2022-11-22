@@ -257,7 +257,7 @@ void CameraController::run_RS()
         sigDepth.signal();
 
         printL("finished new camera frame");
-    } while (!ssRS.shouldStop());
+    } while (!ss[0].shouldStop());
 }
 
 void CameraController::run_CV(const char* scGStream, cameraFrame** ppFrameCurrent, Signal* pSig, StopSignal* pss)
@@ -284,7 +284,7 @@ void CameraController::run_CV(const char* scGStream, cameraFrame** ppFrameCurren
         pNewFrame->pImg = new Mat(frame);
         m.lock(); // Need own mutex lock/whatever?
         if (*ppFrameCurrent != nullptr) delete *ppFrameCurrent;
-        *pFrameCurrent = pNewFrame;
+        *ppFrameCurrent = pNewFrame;
         m.unlock();
 
         pSig->signal();
