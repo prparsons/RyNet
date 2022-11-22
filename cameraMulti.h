@@ -76,28 +76,33 @@ public:
     // Must delete returned pointers
     cameraFrame* GetFrameDepth();
     cameraFrame* GetFrameRGB();
+    cameraFrame* GetFrameIR();
     Signal* GetSignalDepth();
     Signal* GetSignalRGB();
+    Signal* GetSignalIR();
 
     void run();
 
 protected:
     CameraController(cameraFeatures);
     void run_RS();
-    void run_CV();
+    void run_CV(const char* scGStream, cameraFrame** ppFrameCurrent, Signal* pSig, StopSignal* pss);
 
 private:
     cameraFrame* pFrameCurrentDepth;
     cameraFrame* pFrameCurrentRGB;
+    cameraFrame* pFrameCurrentIR;
     ThreadMutex m;
 
     camera_RS* pCameraRS;
     cameraFeatures features;
 
     std::thread* pthrCamera[3];
-    StopSignal ssRS;
-    StopSignal ssCV;
-    Signal sigRGB;
+    StopSignal ss[3];
     Signal sigDepth;
-    Signal sigThermal;
+    Signal sigRGB;
+    Signal sigIR;
+    
+    const char* scGStream_RGB = "nvarguscamerasrc sensor-id=0 wbmode=2 gainrange=\"2 2\" ispdigitalgainrange=\"2 2\" exposuretimerange=\"50000000 50000000\" aelock=true ! video/x-raw(memory:NVMM),width=4056,height=3040,framerate=10/1 ! nvvidconv ! video/x-raw,format=BGRx ! videoconvert ! appsink";
+    const char* scGStream_IR = "stuff ! things ! converterize ! kitchen sinks";
 };

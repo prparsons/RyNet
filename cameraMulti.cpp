@@ -115,6 +115,18 @@ cameraFrame* CameraController::GetFrameRGB()
     return pFrameReturn;
 }
 
+cameraFrame* CameraController::GetFrameIR()
+{
+    m.lock();
+    if (pFrameCurrentIR == nullptr) {
+        m.unlock();
+        return nullptr;
+    }
+    cameraFrame* pFrameReturn = new cameraFrame(*pFrameCurrentIR);
+    m.unlock();
+    return pFrameReturn;
+}
+
 Signal* CameraController::GetSignalDepth()
 {
     return new Signal(sigDepth);
@@ -125,9 +137,15 @@ Signal* CameraController::GetSignalRGB()
     return new Signal(sigRGB);
 }
 
+Signal* CameraController::GetSignalIR()
+{
+    return new Signal(sigIR);
+}
+
 CameraController::CameraController(cameraFeatures _features)
 : pFrameCurrentDepth(nullptr)
 , pFrameCurrentRGB(nullptr)
+, pFrameCurrentIR(nullptr)
 , pCameraRS(nullptr)
 , features(_features)
 {
@@ -149,11 +167,14 @@ CameraController::~CameraController()
 {
     if (pFrameCurrentDepth != nullptr) delete pFrameCurrentDepth;
     if (pFrameCurrentRGB != nullptr) delete pFrameCurrentRGB;
+    if (pFrameCurrentIR != nullptr) delete pFrameCurrentIR;
     if (pCameraRS != nullptr) delete pCameraRS;
-    if (pthrCamera[0] != nullptr) {
-        printf("~CameraController stopping realsense thread");
-        pthrCamera[0]->join();
-        delete pthrCamera[0];
+    for (int i = 0; i < 3; i++) {
+        if (pthrCamera[i] != nullptr) {
+            ss[i].stop();
+            pthrCamera[i]->join();
+            delete pthrCamera[i];
+        }
     }
 }
 
@@ -168,9 +189,16 @@ void CameraController::run()
     }
     if (features & CameraController_RGB) {
         if (pthrCamera[1] == nullptr) {
-            pthrCamera[1] = new std::thread(&CameraController::run_CV, this);
+            pthrCamera[1] = new std::thread(&CameraController::run_CV, this, scGStream_RGB, &pFrameCurrentRGB, &sigRGB, &ss[1]);
         } else {
-            printL("CameraController::run cv already started");
+            printL("CameraController::run cv1 already started");
+        }
+    }
+    if (features & CameraController_IR) {
+        if (pthrCamera[2] == nullptr) {
+            pthrCamera[2] = new std::thread(&CameraController::run_CV, this, scGStream_IR, &pFrameCurrentRGB, &sigIR, &ss[2]);
+        } else {
+            printL("CameraController::run cv2 already started");
         }
     }
 }
@@ -232,34 +260,34 @@ void CameraController::run_RS()
     } while (!ssRS.shouldStop());
 }
 
-void CameraController::run_CV()
+void CameraController::run_CV(const char* scGStream, cameraFrame** ppFrameCurrent, Signal* pSig, StopSignal* pss)
 {
     printL("CameraController::run_CV");
     Mat frame;
 
     // Python way of using gstreamer
     // cap = cv2.VideoCapture('nvarguscamerasrc sensor-id=0 wbmode=2 gainrange=\"2 2\" ispdigitalgainrange=\"2 2\" exposuretimerange=\"50000000 50000000\" aelock=true ! video/x-raw(memory:NVMM),width=1920,height=1080,framerate=10/1 ! nvvidconv ! video/x-raw,format=BGRx ! videoconvert ! appsink', cv2.CAP_GSTREAMER)
-    VideoCapture cap("nvarguscamerasrc sensor-id=0 wbmode=2 gainrange=\"2 2\" ispdigitalgainrange=\"2 2\" exposuretimerange=\"50000000 50000000\" aelock=true ! video/x-raw(memory:NVMM),width=4056,height=3040,framerate=10/1 ! nvvidconv ! video/x-raw,format=BGRx ! videoconvert ! appsink", cv::CAP_GSTREAMER);
+    VideoCapture cap(scGStream, cv::CAP_GSTREAMER);
     
     if (!cap.isOpened()) {
         printL("CameraController::run_CV failed to open");
         return;
     }
 
-    while (!ssCV.shouldStop()) { // We need a separate stop signal for each thread
+    while (!pss->shouldStop()) { // We need a separate stop signal for each thread
         cap.read(frame);
         if (frame.empty()) {
             printf("CameraController::run_CV empty frame");
         }
         // Do something with frame
-        cameraFrame* pNewFrameRGB = new cameraFrame();
-        pNewFrameRGB->pImg = new Mat(frame);
+        cameraFrame* pNewFrame = new cameraFrame();
+        pNewFrame->pImg = new Mat(frame);
         m.lock(); // Need own mutex lock/whatever?
-        if (pFrameCurrentRGB != nullptr) delete pFrameCurrentRGB;
-        pFrameCurrentRGB = pNewFrameRGB;
+        if (*ppFrameCurrent != nullptr) delete *ppFrameCurrent;
+        *pFrameCurrent = pNewFrame;
         m.unlock();
 
-        sigRGB.signal();
+        pSig->signal();
     }
     // According to opencv: the camera will be deinitialized automatically in VideoCapture destructor
 }
