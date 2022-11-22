@@ -5,6 +5,11 @@
 #include "locksignal.h"
 #include "data_types.h"
 
+void printL(const char* sc)
+{
+    printf("%s\n", sc);
+}
+
 class DataLogger {
 public:
     DataLogger();

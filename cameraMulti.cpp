@@ -37,12 +37,12 @@ cameraFrame::cameraFrame()
 , pM(new ThreadMutex())
 , pLock(new ThreadLock(*pM))
 {
-    printf("cameraFrame::cameraFrame");
+    printL("cameraFrame::cameraFrame");
 }
 
 cameraFrame::cameraFrame(const cameraFrame& other)
 {
-    printf("cameraFrame::cameraFrame(other)");
+    printL("cameraFrame::cameraFrame(other)");
     other.pLock->lock();
     pImg = other.pImg;
     piCount = other.piCount;
@@ -55,7 +55,7 @@ cameraFrame::cameraFrame(const cameraFrame& other)
 
 cameraFrame::~cameraFrame()
 {
-    printf("cameraFrame::~cameraFrame");
+    printL("cameraFrame::~cameraFrame");
     pLock->lock();
     if (--(*piCount) == 0) {
         delete pImg;
@@ -131,7 +131,7 @@ CameraController::CameraController(cameraFeatures _features)
 , pCameraRS(nullptr)
 , features(_features)
 {
-    printf("CameraController::CameraController\n");
+    printL("CameraController::CameraController");
     
     if (features & CameraController_Depth) {
         pCameraRS = new camera_RS;
@@ -163,33 +163,33 @@ void CameraController::run()
         if (pthrCamera[0] == nullptr) {
             pthrCamera[0] = new std::thread(&CameraController::run_RS, this);
         } else {
-            printf("CameraController::run realsense already started");
+            printL("CameraController::run realsense already started");
         }
     }
     if (features & CameraController_RGB) {
         if (pthrCamera[1] == nullptr) {
             pthrCamera[1] = new std::thread(&CameraController::run_CV, this);
         } else {
-            printf("CameraController::run cv already started");
+            printL("CameraController::run cv already started");
         }
     }
 }
 
 void CameraController::run_RS()
 {
-    printf("CameraController::run_RS\n");
+    printL("CameraController::run_RS");
     // Declare depth colorizer for pretty visualization of depth data
     rs2::colorizer color_map(2); // 2 should give us a white to black color map
     rs2::pipeline_profile pipelineInfo = pCameraRS->pipe.start();
     if (!pipelineInfo) {
-        printf("CameraController error\n");
+        printL("CameraController error");
         return;
     }
     do {
         rs2::frameset data;
         try {
             if (!pCameraRS->pipe.try_wait_for_frames(&data)) {
-                printf("cam fail\n");
+                printL("cam fail");
                 return;
             }; // Wait for next set of frames from the camera
         } catch (rs2::error e) {
@@ -198,11 +198,11 @@ void CameraController::run_RS()
             try {
                 data = pCameraRS->pipe.wait_for_frames();
             } catch(rs2::error) {
-                printf("cam fail retry\n");
+                printL("cam fail retry");
                 return;
             }
         }
-        printf("newCameraFrame\n");
+        printL("newCameraFrame");
         // Create camera frame
         cameraFrame* pNewFrameDepth = new cameraFrame();
 
@@ -221,7 +221,6 @@ void CameraController::run_RS()
         // Create OpenCV matrix of size (w,h) from the colorized depth data
         pNewFrameDepth->pImg = new Mat(Size(w, h), CV_8UC3, (void*)depth.get_data(), Mat::AUTO_STEP);
         
-        // printf("status monitor new frame\n");
         m.lock();
         if (pFrameCurrentDepth != nullptr) delete pFrameCurrentDepth;
         pFrameCurrentDepth = pNewFrameDepth;
@@ -229,13 +228,13 @@ void CameraController::run_RS()
 
         sigDepth.signal();
 
-        printf("finished new camera frame\n");
+        printL("finished new camera frame");
     } while (!ssRS.shouldStop());
 }
 
 void CameraController::run_CV()
 {
-    printf("CameraController::run_CV");
+    printL("CameraController::run_CV");
     Mat frame;
 
     // Python way of using gstreamer
@@ -243,7 +242,7 @@ void CameraController::run_CV()
     VideoCapture cap("nvarguscamerasrc sensor-id=0 wbmode=2 gainrange=\"2 2\" ispdigitalgainrange=\"2 2\" exposuretimerange=\"50000000 50000000\" aelock=true ! video/x-raw(memory:NVMM),width=4056,height=3040,framerate=10/1 ! nvvidconv ! video/x-raw,format=BGRx ! videoconvert ! appsink", cv::CAP_GSTREAMER);
     
     if (!cap.isOpened()) {
-        printf("CameraController::run_CV failed to open");
+        printL("CameraController::run_CV failed to open");
         return;
     }
 

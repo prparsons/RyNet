@@ -1,8 +1,7 @@
 #include "planner.h"
 
-#include "comms.h"
-
 #include <vector>
+#include "comms.h"
 
 FlightController::FlightController(DataLogger& _logger)
 : logger(_logger)
@@ -42,34 +41,50 @@ void FlightController::runDepth()
 }
 
 
-bool sendXML(const char* strMessage)
-{
-	int socket_desc;
-	struct sockaddr_in server;
-	
-	//Create socket
-	socket_desc = socket(AF_INET, SOCK_STREAM, 0);
-	if (socket_desc == -1) {
-		printf("Could not create socket");
-	}
-		
-	server.sin_addr.s_addr = inet_addr(HOST);
-	server.sin_family = AF_INET;
-	server.sin_port = htons( PORT );
-
-	//Connect to remote server
-	if (connect(socket_desc, (struct sockaddr *)&server, sizeof(server)) < 0) {
-		puts("connect error");
-		return 1;
-	}
-	
+void FlightController::SendXML(const char* strMessage)
+{	
 	//Send some data
-	if(send(socket_desc, strMessage, strlen(strMessage), 0) < 0) {
-		puts("Send failed");
-		return false;
+	if(send(socketDesc, strMessage, strlen(strMessage), 0) < 0) {
+		printL("SendXML fail, attempting to connect");
+        ConnectMavLink();
+        if (send(socketDesc, strMessage, strlen(strMessage), 0) < 0) {
+            printL("  That didn't work, still failed")
+        }
 	}
-	
-	return true;
+}
+
+char* FlightController::SendRecXML(const char* strMessage)
+{	
+	//Send some data
+	if(send(socketDesc, strMessage, strlen(strMessage), 0) < 0) {
+		printL("SendRecXML fail, attempting to connect");
+        ConnectMavLink();
+        if (send(socketDesc, strMessage, strlen(strMessage), 0) < 0) {
+            printL("  That didn't work, still failed")
+            return;
+        }
+	}
+    char* scResponse = new char[512];
+    if(recv(socketDesc, scResponse, sizeof(511), 0) < 0){
+        printL("SendRecXML fail, no/bad response");
+    }
+}
+
+void FlightController::ConnectMavLink()
+{
+    socketDesc = socket(AF_INET, SOCK_STREAM, 0);
+    if (socket_desc == -1) {
+        printL("FlightController::ConnectMavLink fail socket");
+    }
+
+    addressMavLink.sin_addr.s_addr = inet_addr(scMavLinkAddress);
+    addressMavLink.sin_family = AF_INET;
+    addressMavLink.sin_port = htons(scMavlinkPort);
+
+    //Connect to remote server
+    if (connect(socketDesc, (struct sockaddr *)&addressMavLink, sizeof(addressMavLink)) < 0) {
+        printL("FlightController::ConnectMavLink fail connect");
+    }
 }
 
 /*
@@ -108,35 +123,5 @@ Drive_TwinTrackAdv::Drive_TwinTrackAdv(std::vector<Navigator*>& arNav)
             }
         }
     }
-}
-
-bool Drive_TwinTrackAdv::processDestRunningAvg(Destination dest)
-{
-    arDestAvg[iDestAvgCursor] = dest;
-    float fX = 0;
-    float fY = 0;
-    float fZ = 0;
-    //SIMD candidate
-    for (int i = 0; i < arDestAvg.size(); i++) {
-        fX += arDestAvg[i].fX;
-        fY += arDestAvg[i].fY;
-        fZ += arDestAvg[i].fZ;
-    }
-    fX /= arDestAvg.size();
-    fY /= arDestAvg.size();
-    fZ /= arDestAvg.size();
-    if (++iDestAvgCursor == arDestAvg.size()) iDestAvgCursor = 0;
-
-    Destination destCurrent = arRouteList[arRouteList.size() - 1]->GetRoute().GetLocation(1.0);
-    float fDistance = sqrt(((fX - destCurrent.fX) * (fX - destCurrent.fX)) +
-                           ((fY - destCurrent.fY) * (fY - destCurrent.fY)) +
-                           ((fZ - destCurrent.fZ) * (fZ - destCurrent.fZ)));
-    if (fDistance > fDistBeforeChangeDest) {
-        destAvg.fX = fX;
-        destAvg.fY = fY;
-        destAvg.fZ = fZ;
-        return true;
-    }
-    return false;
 }
 */
