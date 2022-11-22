@@ -1,7 +1,5 @@
 #include "planner.h"
 
-#include <vector>
-#include "comms.h"
 
 FlightController::FlightController(DataLogger& _logger)
 : logger(_logger)
