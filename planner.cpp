@@ -9,7 +9,7 @@ FlightController::FlightController(DataLogger& _logger, CameraController& _camer
 
 }
 
-FlightController()::~FlightController()
+FlightController::~FlightController()
 {
     //thread
     //socket
@@ -17,7 +17,7 @@ FlightController()::~FlightController()
 
 void FlightController::SetDirection(float fHeadingOffsetDeg)
 {
-    char* sc[128];
+    char sc[128];
     snprintf(sc, 128, "<direction>%3.3f</direction>", fHeadingOffsetDeg);
     SendXML(sc);
 }
@@ -61,8 +61,8 @@ void FlightController::runDepth()
         int width = frameDepth.getWidth();
         int height = frameDepth.getHeight();
         int iRow;
-        const float* pData = frameDepth.get_data();
-        float32_t f4Min = vmovq_n_f32(999999);
+        const float* pData = frameDepth.getData();
+        float32x4_t f4Min = vmovq_n_f32(999999);
         float32x4_t f4;
         // Scan each row, loading the first 8 depths and keeping the min of them
         for (iRow = 0; iRow < 30; iRow++, pData += width) {

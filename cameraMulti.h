@@ -25,7 +25,7 @@ public:
 
     int getWidth() const { return get_width(); }
     int getHeight() const { return get_height(); }
-
+    const float* getData() const { return (const float*)get_data(); }
     void applyDecimationFilter();
 
 private:
