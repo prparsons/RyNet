@@ -1,21 +1,30 @@
 #include "planner.h"
 
 
-FlightController::FlightController(DataLogger& _logger)
+FlightController::FlightController(DataLogger& _logger, CameraController& _camera)
 : logger(_logger)
+, camera(_camera)
 , pThreadDepth(nullptr)
 {
 
 }
 
+FlightController()::~FlightController()
+{
+    //thread
+    //socket
+}
+
 void FlightController::SetDirection(float fHeadingOffsetDeg)
 {
-
+    char* sc[128];
+    snprintf(sc, 128, "<direction>%3.3f</direction>", fHeadingOffsetDeg);
+    SendXML(sc);
 }
 
 void FlightController::SetDestination(float fHeadingOffsetDeg, float fDistance)
 {
-
+    //?
 }
 
 void FlightController::RestoreRouteNaive()
@@ -35,7 +44,51 @@ void FlightController::SaveRoute()
 
 void FlightController::runDepth()
 {
+    Signal* pSig = camera.GetSignalDepth();
+    while (!ss.shouldStop()) {
+        pSig->wait();
+        //get camera frame
+        cameraFrame* pFrame = camera.GetFrameDepth();
+        if (pFrame == nullptr) continue;
+        cameraFrame_depth* pFrameDepth = pFrame->getDepthRaw();
+        if (pFrameDepth == nullptr) {
+            delete pFrame;
+            continue;
+        }
+        pFrameDepth->applyDecimationFilter();
+        cameraFrame_depth& frameDepth = *pFrameDepth;
+        //1280x720 /8 = 160x90 (original resolution / decimation filter = final resolution)
+        int width = frameDepth.getWidth();
+        int height = frameDepth.getHeight();
+        int iRow;
+        const float* pData = frameDepth.get_data();
+        float32_t f4Min = vmovq_n_f32(999999);
+        float32x4_t f4;
+        // Scan each row, loading the first 8 depths and keeping the min of them
+        for (iRow = 0; iRow < 30; iRow++, pData += width) {
+            f4 = vld1q_f32(pData); // Load 4 float
+            f4Min = vminq_f32(f4, f4Min); // Compares corresponding element in each, returns the min of each
+            f4 = vld1q_f32(pData + 4);
+            f4Min = vminq_f32(f4, f4Min);
+        }
+        float32_t fResultR = vminvq_f32(f4Min); // Sums across the vector and returns single float
+        for (; iRow < 60; iRow++, pData += width) {
+            f4 = vld1q_f32(pData);
+            f4Min = vminq_f32(f4, f4Min);
+            f4 = vld1q_f32(pData + 4);
+            f4Min = vminq_f32(f4, f4Min);
+        }
+        float32_t fResultM = vminvq_f32(f4Min);
+        for (; iRow < 90; iRow++, pData += width) {
+            f4 = vld1q_f32(pData);
+            f4Min = vminq_f32(f4, f4Min);
+            f4 = vld1q_f32(pData + 4);
+            f4Min = vminq_f32(f4, f4Min);
+        }
+        float32_t fResultL = vminvq_f32(f4Min);
 
+
+    }
 }
 
 

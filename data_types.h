@@ -1,5 +1,6 @@
 #pragma once
 
+#include <arm_neon.h>
 #include <opencv2/opencv.hpp>   // Include OpenCV API
 #include <ctime>
 #include <jetson-inference/detectNet.h>

@@ -11,7 +11,8 @@
 
 class CameraController;
 struct point {
-    int iXY[2];
+    int x;
+    int y;
 };
 
 class cameraFrame_depth:protected rs2::depth_frame {
@@ -19,7 +20,7 @@ public:
     cameraFrame_depth(const rs2::depth_frame& _frame);
     ~cameraFrame_depth();
 
-    float operator[](const point& xy) const { return get_distance(xy.iXY[0], xy.iXY[1]); }
+    float operator[](const point& xy) const { return get_distance(xy.x, xy.y); }
     int getMetersPerUnit() const { return get_units(); }
 
     int getWidth() const { return get_width(); }

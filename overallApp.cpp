@@ -17,8 +17,8 @@ int main( int argc, char** argv )
     bool bContinueFlight = true;
 
     DataLogger logger;
-	FlightController controller(logger);
 	CameraController* pCamera = CameraController::OpenCamera(CameraController::CameraController_RGB);
+	FlightController controller(logger, *pCamera);
 	Navigator nav(controller, logger, *pCamera);
 
 	try {
