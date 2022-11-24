@@ -108,7 +108,7 @@ void FlightController::SendXML(const char* strMessage)
 	}
     #else
     if (socketDesc < 0) ConnectMavLink();
-    sendto(socketDesc, strMessage, strlen(strMessage), MSG_CONFIRM, &addressMavLink, sizeof(addressMavLink));
+    sendto(socketDesc, strMessage, strlen(strMessage), MSG_CONFIRM, (const struct sockaddr*) &addressMavLink, sizeof(addressMavLink));
     #endif
 }
 
@@ -133,9 +133,9 @@ char* FlightController::SendRecXML(const char* strMessage)
     return scResponse;
     #else
     if (socketDesc < 0) ConnectMavLink();
-    sendto(socketDesc, strMessage, strlen(strMessage), MSG_CONFIRM, &addressMavLink, sizeof(addressMavLink));
+    sendto(socketDesc, strMessage, strlen(strMessage), MSG_CONFIRM, (const struct sockaddr*)&addressMavLink, sizeof(addressMavLink));
     char* scResponse = new char[512];
-    int length = recvfrom(socketDesc, scResponse, 511, MSG_WAITALL, &addressMavLink, sizeof(addressMavLink)); 
+    int iLength = recvfrom(socketDesc, scResponse, 511, MSG_WAITALL, nullptr, nullptr); 
     scResponse[iLength] = 0;
     return scResponse;
     #endif
