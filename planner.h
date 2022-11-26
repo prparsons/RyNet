@@ -6,6 +6,15 @@
 #include "data_types.h"
 #include "dataLogger.h"
 
+/*
+    Plan for connecting to drone:
+    This connects to a python script and relays commands to it via UDP (i left tcp in there too).
+    Python script can use dronekit to connect, saving the work of having to figure out all the
+    necessary mavlink commands needed. I think this should also mean we don't have to worry about
+    downloading the route to this program...can let the script handle the saving/loading of waypoints.
+
+*/
+
 class FlightController {
 public:
     FlightController(DataLogger& logger, CameraController& camera);

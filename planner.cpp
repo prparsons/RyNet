@@ -19,28 +19,119 @@ FlightController::~FlightController()
 void FlightController::SetDirection(float fHeadingOffsetDeg)
 {
     char sc[128];
-    snprintf(sc, 128, "<direction>%3.3f</direction>", fHeadingOffsetDeg);
+    snprintf(sc, 128, "<dir>%3.3f</dir>", fHeadingOffsetDeg);
     SendXML(sc);
 }
 
 void FlightController::SetDestination(float fHeadingOffsetDeg, float fDistance)
 {
-    //?
+    char sc[128];
+    // Distance for obstacles is in cm, assuming that's the case for everything
+    snprintf(sc, 128, "<dir dist=%6f>%3.3f</dir>", fDistance, fHeadingOffsetDeg);
+    SendXML(sc);
 }
 
 void FlightController::RestoreRouteNaive()
 {
-
+    char sc[128];
+    sputs(sc, "<route_restore />");
+    SendXML(sc);
 }
 
 void FlightController::RestoreRouteClean()
 {
+    // The plan is to somehow track where we've been while not on the pre-planned route,
+    //  and then when we restore the route we remove any waypoints that have us flying
+    //  in the same areas we've already been.
+    // So...do we add stuff to this to keep track of where we've been? or leave it to
+    //  the python script
+    // This needs to because we need to avoid looping on ourselves anyways
 
+    // Simple version: search list for closest point in waypoint list, make that first by
+    //  deleting everything before it
+
+    char sc[32];
+    sputs(sc, "<route_retrieve />");
+    char* scRoute = SendRecXML(sc);
+    if (scRoute == nullptr) {
+        printL("FlightController::RestoreRouteClean route_retrieve fail");
+        return;
+    }
+    sputs(sc, "<pos_retrieve />");
+    char* scPos = SendRecXML(sc);
+    if (scPos == nullptr) {
+        printL("FlightController::RestoreRouteClean pos_retrieve fail");
+        delete[] scRoute;
+        return;
+    }
+
+    //DOUBLE CHECK ALL THIS STRING MATH (unit test?...or do it in python? exception handling should/could be done either way...)
+    // First get current lat/lon
+    int i;
+    for (i = 0; scPos[i] != ' '; i++);
+    scPos[i] = 0;
+    float fLatCurrent = atof(scPos);
+    float fLonCurrent = atof(scPos + i + 1));
+
+    // Get to 2nd line of route
+    for (i = 0; scRoute[i] != '\n'; i++); i++;
+    // Scan through whole thing, each line there are 8 tabs before lat, then lon.
+    //  Figure out distance to each waypoint, storing index of line with shortest
+    //  as we scan. We'll remove everything before that line.
+    float fDistClose = 99999999;
+    int iIndexClose = -1; // Route index = line + 1
+    int iIndexCurrent = 0;
+    while (scRoute[i] != 0) {
+        for (int tabs = 0; tabs != 8; i++) {
+            if (scRoute[i] == '\t') tabs++;
+        }
+        // At first digit of lat
+        int latlongStart = i;
+        while (scRoute[i] != '\t') i++;
+        scRoute[i] = 0;
+        float fLat = atof(scRoute + latlongStart);
+        scRoute[i] = '\t';
+        // At first digit of lon
+        latlongStart = ++i;
+        while (scRoute[i] != '\t') i++;
+        scRoute[i] = 0;
+        float fLon = atof(scRoute + latlongStart);
+        scRoute[i] = '\t';
+        // Compare to see if closest
+        float fDistI = DistanceLatLon(fLat, fLon, fLatCurrent, fLonCurrent);
+        if (fDistI < fDistClose) {
+            fDistClose = fDistI;
+            iIndexClose = iIndexCurrent;
+        }
+        iIndexCurrent++;
+    }
+    // " <set_route>...</set_route>"
+    char* scRouteNew = new char[strlen(scRoute) + 25];
+    sputs(scRouteNew, "<set_route>");
+    int iNew = 11;
+    for (i = 0; scRoute[i] != '\n'; i++); i++;
+    scRoute[i] = 0;
+    strcpy(scRouteNew + iNew, scRoute); // First line of original
+    iNew += strlen(scRoute);
+    scRouteNew[iNew++] = '\n';
+
+    for (int lines = 0; lines < iIndedClose; i++) 
+        if (scRoute[i] == '\n') lines++;
+    strcpy(scRouteNew + iNew, scRoute + i);
+    iNew += strlen(scRoute + i);
+    sputs(scRouteNew + iNew, "</set_route>");
+    SendXML(scRouteNew);
+
+    delete[] scRoute;
+    delete[] scPos;
+    delete[] scRouteNew;
 }
 
 void FlightController::SaveRoute()
 {
-
+    char sc[128];
+    sputs(sc, "<route_save />");
+    SendXML(sc);
 }
 
 void FlightController::runDepth()
