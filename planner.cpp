@@ -1,5 +1,6 @@
 #include "planner.h"
 
+#include <string.h>
 
 FlightController::FlightController(DataLogger& _logger, CameraController& _camera)
 : logger(_logger)
@@ -34,7 +35,7 @@ void FlightController::SetDestination(float fHeadingOffsetDeg, float fDistance)
 void FlightController::RestoreRouteNaive()
 {
     char sc[128];
-    sputs(sc, "<route_restore />");
+    strcpy(sc, "<route_restore />");
     SendXML(sc);
 }
 
@@ -51,13 +52,13 @@ void FlightController::RestoreRouteClean()
     //  deleting everything before it
 
     char sc[32];
-    sputs(sc, "<route_retrieve />");
+    strcpy(sc, "<route_retrieve />");
     char* scRoute = SendRecXML(sc);
     if (scRoute == nullptr) {
         printL("FlightController::RestoreRouteClean route_retrieve fail");
         return;
     }
-    sputs(sc, "<pos_retrieve />");
+    strcpy(sc, "<pos_retrieve />");
     char* scPos = SendRecXML(sc);
     if (scPos == nullptr) {
         printL("FlightController::RestoreRouteClean pos_retrieve fail");
@@ -71,7 +72,7 @@ void FlightController::RestoreRouteClean()
     for (i = 0; scPos[i] != ' '; i++);
     scPos[i] = 0;
     float fLatCurrent = atof(scPos);
-    float fLonCurrent = atof(scPos + i + 1));
+    float fLonCurrent = atof(scPos + i + 1);
 
     // Get to 2nd line of route
     for (i = 0; scRoute[i] != '\n'; i++); i++;
@@ -107,7 +108,7 @@ void FlightController::RestoreRouteClean()
     }
     // " <set_route>...</set_route>"
     char* scRouteNew = new char[strlen(scRoute) + 25];
-    sputs(scRouteNew, "<set_route>");
+    strcpy(scRouteNew, "<set_route>");
     int iNew = 11;
     for (i = 0; scRoute[i] != '\n'; i++); i++;
     scRoute[i] = 0;
@@ -115,11 +116,11 @@ void FlightController::RestoreRouteClean()
     iNew += strlen(scRoute);
     scRouteNew[iNew++] = '\n';
 
-    for (int lines = 0; lines < iIndedClose; i++) 
+    for (int lines = 0; lines < iIndexClose; i++) 
         if (scRoute[i] == '\n') lines++;
     strcpy(scRouteNew + iNew, scRoute + i);
     iNew += strlen(scRoute + i);
-    sputs(scRouteNew + iNew, "</set_route>");
+    strcpy(scRouteNew + iNew, "</set_route>");
     SendXML(scRouteNew);
 
     delete[] scRoute;
@@ -130,8 +131,13 @@ void FlightController::RestoreRouteClean()
 void FlightController::SaveRoute()
 {
     char sc[128];
-    sputs(sc, "<route_save />");
+    strcpy(sc, "<route_save />");
     SendXML(sc);
+}
+
+float FlightController::DistanceLatLon(float fLat1, float fLon1, float fLat2, float fLon2)
+{
+    return -1.0;
 }
 
 void FlightController::runDepth()

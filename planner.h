@@ -28,6 +28,7 @@ public:
 
 private:
     void SaveRoute();
+    float DistanceLatLon(float fLat1, float fLon1, float fLat2, float fLon2);
     void SendXML(const char* sc);
     char* SendRecXML(const char* sc);
     void ConnectMavLink();
