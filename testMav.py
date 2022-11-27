@@ -295,7 +295,6 @@ def readmissionF(aFileName, vehicle):
                 if not line.startswith('QGC WPL 110'):
                     raise Exception('File is not supported WP version')
             else:
-                print(line)
                 linearray=line.split('\t')
                 ln_index=int(linearray[0])
                 ln_currentwp=int(linearray[1])
@@ -382,7 +381,7 @@ def upload_missionStr(strMission, vehicle):
     print(' Upload mission')
     vehicle.commands.upload()
 
-def upload_mission(missionist, vehicle):
+def upload_mission(missionlist, vehicle):
     print("\nUpload mission from a list")
     #Clear existing mission from vehicle
     print(' Clear mission')
@@ -477,7 +476,7 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
         print("Obstacle distance")
         if 'dir' in element.attrib:
             print("dir found")
-        #vehicle.master should be the pymavlink connection we need to send raw distance messages
+        vehicle._master.mav.distance_sensor_send(0, 30, 2000, 400, 0, 0, 0, 0)
         """    conn.mav.distance_sensor_send(
             0,# ms Timestamp (UNIX time or time since system boot) (ignored)
             min_depth_cm,   # min_distance, uint16_t, cm
@@ -489,6 +488,8 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
             0               # covariance : 0 (ignored)
         )
         """
+        UDPServerSocket.sendto(bytesToSend, address)
+
     elif element.tag == 'route_save':
         save_missionF('savedMission.txt', vehicle)
         UDPServerSocket.sendto(bytesToSend, address)
@@ -499,7 +500,6 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
         UDPServerSocket.sendto(str.encode(missionStr), address)
 
     elif element.tag == 'route_set':
-        #print(element.text)
         upload_missionStr(element.text, vehicle)
         UDPServerSocket.sendto(bytesToSend, address)
 
@@ -511,8 +511,8 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
     elif element.tag == 'route_restore':
         missionList = readmissionF('savedMission.txt', vehicle)
         if 'lat' in element.attrib:
-            fLat = element.attrib['lat']
-            fLon = element.attrib['lon']
+            fLat = float(element.attrib['lat'])
+            fLon = float(element.attrib['lon'])
         else:
             fLat = vehicle.location.global_frame.lat
             fLon = vehicle.location.global_frame.lon
