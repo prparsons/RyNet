@@ -510,12 +510,18 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
         
     elif element.tag == 'route_restore':
         missionList = readmissionF('savedMission.txt', vehicle)
+        if 'lat' in element.attrib:
+            fLat = element.attrib['lat']
+            fLon = element.attrib['lon']
+        else:
+            fLat = vehicle.location.global_frame.lat
+            fLon = vehicle.location.global_frame.lon
         if 'clean' in element.attrib:
             if element.attrib['clean'] == 'simple':
                 missionList = mission_cleanStart(missionList, 
                                                 vehicle.commands.next, 
-                                                vehicle.location.global_frame.lat,
-                                                vehicle.location.global_frame.lon)
+                                                fLat,
+                                                fLon)
         upload_mission(missionList, vehicle)
         UDPServerSocket.sendto(bytesToSend, address)
 
