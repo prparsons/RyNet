@@ -1,455 +1,269 @@
 #include "planner.h"
 
-#include <vector>
+#include <string.h>
 
-
-#define Drive_TwinTrackAdv_BRANCH_DIST 1.570796326794
-
-
-// ************
-// DrivePlanner
-
-DrivePlanner::DrivePlanner(std::vector<Navigator*>& _arNav)
-: arNav(_arNav)
-, fSpeed(0)
-, fSteer(0)
-, fClimb(0)
+FlightController::FlightController(DataLogger& _logger, CameraController& _camera)
+: logger(_logger)
+, camera(_camera)
+, pThreadDepth(nullptr)
+, socketDesc(-1)
 {
+    memset(&addressMavLink, 0, sizeof(addressMavLink));
 }
 
-// ***************
-// Drive_TwinTrack
-
-Drive_TwinTrack::Drive_TwinTrack(std::vector<Navigator*>& arNav)
-: DrivePlanner(arNav)
-, arSteerAvg(5)
+FlightController::~FlightController()
 {
-    for (int i = 0; i < 5; i++) {
-        arSteerAvg[i] = 0;
-    }
+    //thread
+    //socket
 }
 
-bool Drive_TwinTrack::isPlanValid(Navigator& nav, Navigator::dirty)
+void FlightController::SetDirection(float fHeadingOffsetDeg)
 {
-    printf("Drive:%.1f;%.1f  Nav:%.1f;%.1f\n", fSpeed, fSteer, nav.getSpeed(), nav.getOrientation().fYaw);
-    bool bReturn = (fSpeed == nav.getSpeed()) && (fSteer == nav.getOrientation().fYaw);
-    if (bReturn) {
-        printf("isPlanValid(true)\n");
-        return true;
-    }
-    printf("isPlanValid(false)\n");
-    return false;
+    char sc[128];
+    snprintf(sc, 128, "<dir>%3.3f</dir>", fHeadingOffsetDeg);
+    SendXML(sc);
 }
 
-void Drive_TwinTrack::createNewPlan()
+void FlightController::SetDestination(float fHeadingOffsetDeg, float fDistance)
 {
-    printf("Drive_TwinTrack::createNewPlan\n");
-    // Tell the nav it isn't dirty anymore
-    float _fSteer = arNav[0]->getOrientation().fYaw;
-    float _fSpeed = arNav[0]->getSpeed();
-
-    fSpeed = _fSpeed;
-    fSteer = _fSteer;
+    char sc[128];
+    // Distance for obstacles is in cm, assuming that's the case for everything
+    snprintf(sc, 128, "<dir dist=%6f>%3.3f</dir>", fDistance, fHeadingOffsetDeg);
+    SendXML(sc);
 }
 
-// ******************
-// Drive_TwinTrackAdv
-
-void twinTrackAdv_CameraCallback(cameraFrame* pFrame, void* pDrivePlanner)
+void FlightController::RestoreRouteNaive()
 {
-    if (pFrame == nullptr || pDrivePlanner == nullptr) {
-        printf("@updateDepthCamera:arguments were null\n");
+    char sc[128];
+    strcpy(sc, "<route_restore />");
+    SendXML(sc);
+}
+
+void FlightController::RestoreRouteClean()
+{
+    // The plan is to somehow track where we've been while not on the pre-planned route,
+    //  and then when we restore the route we remove any waypoints that have us flying
+    //  in the same areas we've already been.
+    // So...do we add stuff to this to keep track of where we've been? or leave it to
+    //  the python script
+    // This needs to because we need to avoid looping on ourselves anyways
+
+    // Simple version: search list for closest point in waypoint list, make that first by
+    //  deleting everything before it
+
+    char sc[32];
+    strcpy(sc, "<route_retrieve />");
+    char* scRoute = SendRecXML(sc);
+    if (scRoute == nullptr) {
+        printL("FlightController::RestoreRouteClean route_retrieve fail");
         return;
     }
-    Drive_TwinTrackAdv& system = *((Drive_TwinTrackAdv*)pDrivePlanner);
-
-    if (!pFrame->hasRGB()) {
-        printf("twinTrackAdv_CameraCallback:frame has no rgb\n");
-        return;
-    }
-    if (!pFrame->hasDepth()) {
-        printf("twinTrackAdv_CameraCallback:frame has no depth\n");
+    strcpy(sc, "<pos_retrieve />");
+    char* scPos = SendRecXML(sc);
+    if (scPos == nullptr) {
+        printL("FlightController::RestoreRouteClean pos_retrieve fail");
+        delete[] scRoute;
         return;
     }
 
-    image imageRGB = pFrame->getImageRGB();
-    cameraFrame_depth depthFrame = pFrame->getImageDepthRaw();
-    system.newImages(depthFrame, imageRGB);
+    //DOUBLE CHECK ALL THIS STRING MATH (unit test?...or do it in python? exception handling should/could be done either way...)
+    // First get current lat/lon
+    int i;
+    for (i = 0; scPos[i] != ' '; i++);
+    scPos[i] = 0;
+    float fLatCurrent = atof(scPos);
+    float fLonCurrent = atof(scPos + i + 1);
+
+    // Get to 2nd line of route
+    for (i = 0; scRoute[i] != '\n'; i++); i++;
+    // Scan through whole thing, each line there are 8 tabs before lat, then lon.
+    //  Figure out distance to each waypoint, storing index of line with shortest
+    //  as we scan. We'll remove everything before that line.
+    float fDistClose = 99999999;
+    int iIndexClose = -1; // Route index = line + 1
+    int iIndexCurrent = 0;
+    while (scRoute[i] != 0) {
+        for (int tabs = 0; tabs != 8; i++) {
+            if (scRoute[i] == '\t') tabs++;
+        }
+        // At first digit of lat
+        int latlongStart = i;
+        while (scRoute[i] != '\t') i++;
+        scRoute[i] = 0;
+        float fLat = atof(scRoute + latlongStart);
+        scRoute[i] = '\t';
+        // At first digit of lon
+        latlongStart = ++i;
+        while (scRoute[i] != '\t') i++;
+        scRoute[i] = 0;
+        float fLon = atof(scRoute + latlongStart);
+        scRoute[i] = '\t';
+        // Compare to see if closest
+        float fDistI = DistanceLatLon(fLat, fLon, fLatCurrent, fLonCurrent);
+        if (fDistI < fDistClose) {
+            fDistClose = fDistI;
+            iIndexClose = iIndexCurrent;
+        }
+        iIndexCurrent++;
+    }
+    // " <set_route>...</set_route>"
+    char* scRouteNew = new char[strlen(scRoute) + 25];
+    strcpy(scRouteNew, "<set_route>");
+    int iNew = 11;
+    for (i = 0; scRoute[i] != '\n'; i++); i++;
+    scRoute[i] = 0;
+    strcpy(scRouteNew + iNew, scRoute); // First line of original
+    iNew += strlen(scRoute);
+    scRouteNew[iNew++] = '\n';
+
+    for (int lines = 0; lines < iIndexClose; i++) 
+        if (scRoute[i] == '\n') lines++;
+    strcpy(scRouteNew + iNew, scRoute + i);
+    iNew += strlen(scRoute + i);
+    strcpy(scRouteNew + iNew, "</set_route>");
+    SendXML(scRouteNew);
+
+    delete[] scRoute;
+    delete[] scPos;
+    delete[] scRouteNew;
 }
 
-Drive_TwinTrackAdv::Drive_TwinTrackAdv(std::vector<Navigator*>& arNav)
-: DrivePlanner(arNav)
-, pCurrentRoute(nullptr)
-, fDistBeforeChangeDest(1000)
-, iDestAvgCursor(0)
-, iSpeedAvgCursor(0)
-, iOrientationAvgCursor(0)
+void FlightController::SaveRoute()
 {
-    cameraMulti::cameraFeatures features = cameraMulti::cameraFeatures(cameraMulti::cameraMulti_RGB | cameraMulti::cameraMulti_IR | cameraMulti::cameraMulti_Align);
-    pCamera = cameraMulti::OpenCamera(cameraMulti::cameraMulti_RS, features);
-    if (pCamera == nullptr) {
-        printf("Error opening camera\n");
+    char sc[128];
+    strcpy(sc, "<route_save />");
+    SendXML(sc);
+}
+
+float FlightController::DistanceLatLon(float fLat1, float fLon1, float fLat2, float fLon2)
+{
+    return -1.0;
+}
+
+void FlightController::runDepth()
+{
+    Signal* pSig = camera.GetSignalDepth();
+    while (!ss.shouldStop()) {
+        pSig->wait();
+        
+        cameraFrame* pFrame = camera.GetFrameDepth();
+        if (pFrame == nullptr) continue;
+        cameraFrame_depth* pFrameDepth = pFrame->getDepthRaw();
+        if (pFrameDepth == nullptr) {
+            delete pFrame;
+            continue;
+        }
+        cameraFrame_depth& frameDepth = *pFrameDepth;
+        frameDepth.applyDecimationFilter();
+        
+        //1280x720 /8 = 160x90 (original resolution / decimation filter = final resolution)
+        int width = frameDepth.getWidth();
+        int height = frameDepth.getHeight();
+        int iRow;
+        const float* pData = frameDepth.getData();
+        // https://developer.arm.com/architectures/instruction-sets/intrinsics/
+        float32x4_t f4Min = vmovq_n_f32(999999);
+        float32x4_t f4;
+        // Scan each row, loading the first 8 depths and keeping the min of them
+        for (iRow = 0; iRow < 30; iRow++, pData += width) {
+            f4 = vld1q_f32(pData); // Load 4 float
+            f4Min = vminq_f32(f4, f4Min); // Compares corresponding element in each, returns the min of each
+        }
+        float32_t fResultR = vminvq_f32(f4Min); // Sums across the vector and returns single float
+        for (; iRow < 60; iRow++, pData += width) {
+            f4 = vld1q_f32(pData);
+            f4Min = vminq_f32(f4, f4Min);
+        }
+        float32_t fResultM = vminvq_f32(f4Min);
+        for (; iRow < 90; iRow++, pData += width) {
+            f4 = vld1q_f32(pData);
+            f4Min = vminq_f32(f4, f4Min);
+        }
+        float32_t fResultL = vminvq_f32(f4Min);
+
+        char sc[128];
+        sprintf(sc, "<obs dir='r'>%5f</obs>", fResultR);
+        SendXML(sc);
+        sprintf(sc, "<obs dir='m'>%5f</obs>", fResultM);
+        SendXML(sc);
+        sprintf(sc, "<obs dir='l'>%5f</obs>", fResultL);
+        SendXML(sc);
+    }
+}
+
+
+void FlightController::SendXML(const char* strMessage)
+{
+    #ifdef FLIGHT_CONTROLLER_TCP
+    //Send some data
+    if(send(socketDesc, strMessage, strlen(strMessage), 0) < 0) {
+        printL("SendXML fail, attempting to connect");
+        ConnectMavLink();
+        if (send(socketDesc, strMessage, strlen(strMessage), 0) < 0) {
+            printL("  That didn't work, still failed");
+        }
+    }
+    #else
+    if (socketDesc < 0) ConnectMavLink();
+    sendto(socketDesc, strMessage, strlen(strMessage), MSG_CONFIRM, (const struct sockaddr*) &addressMavLink, sizeof(addressMavLink));
+    #endif
+}
+
+char* FlightController::SendRecXML(const char* strMessage)
+{
+    #ifdef FLIGHT_CONTROLLER_TCP
+    //Send some data
+    if(send(socketDesc, strMessage, strlen(strMessage), 0) < 0) {
+        printL("SendRecXML fail, attempting to connect");
+        ConnectMavLink();
+        if (send(socketDesc, strMessage, strlen(strMessage), 0) < 0) {
+            printL("  That didn't work, still failed");
+            return nullptr;
+        }
+    }
+    char* scResponse = new char[512];
+    int iLength = recv(socketDesc, scResponse, sizeof(511), 0)
+    if(iLength < 0){
+        printL("SendRecXML fail, no/bad response");
+    }
+    scResponse[iLength] = 0;
+    return scResponse;
+    #else
+    if (socketDesc < 0) ConnectMavLink();
+    sendto(socketDesc, strMessage, strlen(strMessage), MSG_CONFIRM, (const struct sockaddr*)&addressMavLink, sizeof(addressMavLink));
+    char* scResponse = new char[512];
+    int iLength = recvfrom(socketDesc, scResponse, 511, MSG_WAITALL, nullptr, nullptr); 
+    scResponse[iLength] = 0;
+    return scResponse;
+    #endif
+}
+
+void FlightController::ConnectMavLink()
+{
+    #ifdef FLIGHT_CONTROLLER_TCP
+    socketDesc = socket(AF_INET, SOCK_STREAM, 0);
+    if (socketDesc < 0) {
+        printL("FlightController::ConnectMavLink fail socket");
         return;
     }
 
-    try {     
-        pthrCamera = new std::thread(&cameraMulti::run, pCamera, (void*)&twinTrackAdv_CameraCallback, (void*)this);
-    } catch (rs2::error e) {
-        std::cout << "Camera Error. Type: " << e.get_type() << std::endl;
-        std::cout << "Camera Error. Function: " << e.get_failed_function() << std::endl;
-        std::cout << "Camera Error. Args: " << e.get_failed_args() << std::endl;
+    addressMavLink.sin_addr.s_addr = inet_addr(scMavLinkAddress);
+    addressMavLink.sin_family = AF_INET;
+    addressMavLink.sin_port = htons(iMavlinkPort);
 
-        static int iRetryCount = 0;
-        // Try 3 times to restart the camera
-        if (iRetryCount++ < 3) {
-            std::cout << "Camera Error. Restart attempt: " << iRetryCount << std::endl;
-            //figure out if thread is running...if so stop it
-            delete pCamera;
-            pCamera = cameraMulti::OpenCamera(cameraMulti::cameraMulti_RS, features);
-            if (pCamera == nullptr) {
-                std::cout << "Camera Error. Unable to create new camera.\n";
-            }
-        }
+    //Connect to remote server
+    if (connect(socketDesc, (struct sockaddr *)&addressMavLink, sizeof(addressMavLink)) < 0) {
+        printL("FlightController::ConnectMavLink fail connect");
     }
-}
-
-Drive_TwinTrackAdv::~Drive_TwinTrackAdv()
-{
-    pCamera->ss.stop();
-    pthrCamera->join();
-}
-
-bool Drive_TwinTrackAdv::isPlanValid(Navigator& nav, Navigator::dirty flags)
-{
-    if (pCurrentRoute == nullptr) {
-        // We have no destination (or plan) yet, so need to create one
-        return false;
-    }
-    
-    // Check destination
-    if ((flags && Navigator::DEST_X) || (flags && Navigator::DEST_Y) || (flags && Navigator::DEST_Z)) {
-        Destination destDesired = nav.getDest();
-        if (processDestRunningAvg(destDesired)) {
-            // Need to go somewhere else
-            return false;
-        }
-    }
-    
-    // Still going to the same place, so check to see if our route is obstructed
-    std::vector<Obstruction> arObst;
-    if (!nav.getObstructions(arObst)) {
-        // There are no obstructions, so done?
-        return true;
-    }
-    Destination destCurrent = pCurrentRoute->GetRoute().GetLocation(pCurrentRoute->GetRoute().fT);
-    for (int i = 0; i < arRouteList.size(); i++) {
-        if (isRouteObstructed(arRouteList[i]->GetRoute(), arObst, -destCurrent.fX, -destCurrent.fY)) {
-            return false;
-        }
-    }
-    
-    return true;
-}
-
-void Drive_TwinTrackAdv::createNewPlan()
-{
-    printf("Drive_TwinTrackAdv::createNewPlan\n");
-    // Tell the nav it isn't dirty anymore
-    float _fSteer = arNav[0]->getOrientation().fYaw;
-    float _fSpeed = arNav[0]->getSpeed();
-
-    fSpeed = _fSpeed;
-    fSteer = _fSteer;
-    /////////////////
-    // What we need to do here is have a priority system for the nav objects,
-    //      get desired speed, steer, destination from any that have them available (they shouldn't have to have everything)
-    //      use priority for conflicts
-    //      speed doesn't affect destination
-    //      if there's no destination, any steer is fine
-    //      if there is a destination, any higher priority steer should cancel it? (or save it for now?)
-    //      i think priority should be decided when they are being added, and each (speed, steer, dest)
-    //          should have it's own priority (fail if something not set)
-
-    
-    Destination dest = destAvg;
-    float fDx;
-    float fDy;
-    // For this, need to rotate dest
-    DestinationEquation straightShot = createRoute(Destination(), fDx, fDy, dest);
-    std::vector<Obstruction> arObst;
-    bool bObstructionsExist = arNav[0]->getObstructions(arObst);
-    bool bRouteObstructed = false;
-    if (bObstructionsExist) {
-        bRouteObstructed = isRouteObstructed(straightShot, arObst);
-    }
-    if ((!bObstructionsExist) || (!bRouteObstructed)) {
-        // There are no obstructions, we're good to go
-        // Clear the current route list
-        while (arRouteList.size() > 0) {
-            delete arRouteList[arRouteList.size() - 1];
-            arRouteList.pop_back();
-        }
-        arRouteList[0] = new Vertex(straightShot, dest);
-        arRouteList.shrink_to_fit();
+    #else
+    socketDesc = socket(AF_INET, SOCK_DGRAM, 0);
+    if (socketDesc < 0) {
+        printL("FlightController::ConnectMavLink fail dgram");
         return;
     }
-    // There are obstructions, build a route
-    buildRouteTree(dest, arObst);
-}
 
-void Drive_TwinTrackAdv::newImages(cameraFrame_depth& depthRaw, image& imgDepth)
-{
-    for (int i = 0; i < arNav.size(); i++) {
-        arNav[i]->newImageRGB(imgDepth, false);
-        arNav[i]->newImageDepthRaw(depthRaw, true);
-    }
-}
-
-DestinationEquation Drive_TwinTrackAdv::createRoute(Destination start, float fDx, float fDy, Destination _dest)
-{
-    // Cheating right here and not matching derivatives
-    //x = bt + c
-    //start = c
-    // end = bt + c   end - c = b
-    //DestinationEquation cheater(0, dest.fX - start.fX, start.fX, 0, dest.fY - start.fY, start.fY);
-    //return cheater;
-
-    Destination dest = rotateTranslateDestination(_dest);
-    DestinationEquation straightShot(0, dest.fX - start.fX, start.fX, 0, dest.fY - start.fY, start.fY);
-    return straightShot;
-}
-
-bool Drive_TwinTrackAdv::isRouteObstructed(DestinationEquation destEq, std::vector<Obstruction>& arObst, float fOffsetX, float fOffsetY)
-{
-    for (int i = 0; i < arObst.size(); i++) {
-        if (arObst[i].IsObstructed(destEq, destEq.fT, fOffsetX, fOffsetY)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-void Drive_TwinTrackAdv::buildRouteTree(Destination _dest, std::vector<Obstruction>& arObst)
-{
-    std::vector<Vertex*> vertList;
-    VertexList leafList;
-    std::vector<Vertex*> solutionList;
-    // We rotate the destination about the origin so that we always start out at (0,0)
-    //  with derivatives (direction) of (0,1)
-    float fDx = 0;
-    float fDy = 1;
-    Destination dest = rotateTranslateDestination(_dest);
-    // For the parent vertex, leave the coeff all 0, set t = 1
-    DestinationEquation start;
-    start.fT = 1;
-    Vertex vertParent(start, dest);
-    Vertex** arChilds = branch(vertParent);
-    //verify they all are valid, add to leafList
-    for (int i = 0; i < 3; i++) {
-        if (isRouteObstructed(arChilds[i]->GetRoute(), arObst)) {
-            delete arChilds[i];
-        } else {
-            leafList.add(arChilds[i]);
-        }
-    }
-    while (!leafList.isEmpty() && solutionList.size() == 0) {
-        Vertex* pVert = leafList.pop();
-        arChilds = branch(*pVert);
-        for (int i = 0; i < 3; i++) {
-            // Check validity
-            if (isRouteObstructed(arChilds[i]->GetRoute(), arObst)) delete arChilds[i];
-
-            // See if it has unobstructed view of dest
-            DestinationEquation potentialSolution = createRoute(arChilds[i]->GetRoute().GetLocation(1.0), 1, 1, dest);
-            if (!isRouteObstructed(potentialSolution, arObst)) {
-                solutionList.push_back(arChilds[i]);
-            } else {
-                //insert into leaf list smallest at the back
-                leafList.add(arChilds[i]);
-            }
-        }
-        vertList.push_back(pVert);
-    }
-
-    // We have a solution, find the shortest one
-    int iShortest = 1000000;
-    int iShortestIndex = 0;
-    for (int i = 0; i < solutionList.size(); i++) {
-        DestinationEquation potentialSolution = createRoute(solutionList[i]->GetRoute().GetLocation(1.0), 1, 1, dest);
-        if (solutionList[i]->GetDistance() + potentialSolution.GetRouteLength() < iShortest) {
-            iShortestIndex = i;
-        }
-    }
-    
-    // get rid of longer solutions
-    for (int i = 0; i < solutionList.size(); i++) {
-        if (iShortestIndex != i) delete solutionList[i];
-    }
-    //delete all the other leafs
-    while (!leafList.isEmpty()) {
-        Vertex* pVert = leafList.pop();
-        delete pVert;
-    }
-
-   // Clear the current route list
-    while (arRouteList.size() > 0) {
-        delete arRouteList[arRouteList.size() - 1];
-        arRouteList.pop_back();
-    }
-    // Now take the solution, and add it and all its parents to arRouteList. Set each entry
-    //  in vertList to nullptr
-    pCurrentRoute = solutionList[iShortestIndex];
-    for (int i = 0; pCurrentRoute->GetParent() != nullptr; i++) {
-        arRouteList[i] = pCurrentRoute;
-        pCurrentRoute = pCurrentRoute->GetParent();
-        if (pCurrentRoute == &vertParent) {
-            break; // I think this is where it should end, need to verify this
-        }
-        for (int j = 0; j < vertList.size(); j++) {
-            if (vertList[j] == pCurrentRoute) {
-                vertList[j] = nullptr;
-                break;
-            }
-        }
-    }
-    arRouteList.shrink_to_fit();
-    // Now delete anything left in vertList
-    for (int i = 0; i < vertList.size(); i++) {
-        if (vertList[i] != nullptr) {
-            delete vertList[i];
-        }
-    }
-    // List is backwards
-    for (int a = 0, z = arRouteList.size(); a < z; a++, z--) {
-        Vertex* pTemp = arRouteList[a];
-        arRouteList[a] = arRouteList[z];
-        arRouteList[z] = pTemp;
-    }
-    pCurrentRoute = arRouteList[0];
-}
-
-Vertex** Drive_TwinTrackAdv::branch(Vertex& vert)
-{
-    // Where we are
-    DestinationEquation destEqCurrent = vert.GetRoute();
-    Destination destCurrent = destEqCurrent.GetLocation(1); // t ranges from 0-1, so t=1 is the end of that route
-    // Where we are pointing
-    float fDx;
-    float fDy;
-    destEqCurrent.GetDeriv(fDx, fDy, 1);
-    // Where we are going
-    float fX[3];
-    float fY[3];
-    Vertex** lVertices = new Vertex*[3];
-
-    // Straight
-    float f = sqrt(Drive_TwinTrackAdv_BRANCH_DIST * Drive_TwinTrackAdv_BRANCH_DIST) / sqrt((fDx * fDx) + (fDy * fDy));
-    fX[0] = destCurrent.fX + (fDx * f);
-    fY[0] = destCurrent.fY + (fDy * f);
-    DestinationEquation straight(0, destCurrent.fX - fDx, fDx, 0, destCurrent.fY - fDy, fDy);
-    lVertices[0] = new Vertex(vert, straight);
-
-            //**not implementing distance here
-    if (fDx == 0) {
-        // going up or down (90 degree turns)
-        if (fDy == 1) {
-            // Going up
-            // left
-            DestinationEquation left(0, 1, destCurrent.fX - 1, 1, 0, destCurrent.fY, true);
-            lVertices[1] = new Vertex(vert, left);
-            // right
-            DestinationEquation right(0, -1, destCurrent.fX + 1, 1, 0, destCurrent.fY, true);
-            lVertices[2] = new Vertex(vert, right);
-        } else {
-            // Going down
-            DestinationEquation left(0, -1, destCurrent.fX + 1, -1, 0, destCurrent.fY, true);
-            lVertices[1] = new Vertex(vert, left);
-            DestinationEquation right(0, 1, destCurrent.fX - 1, -1, 0, destCurrent.fY, true);
-            lVertices[2] = new Vertex(vert, right);
-        }
-    } else {
-        // Going left or right
-        if (fDx == 1) {
-            // Going right
-            DestinationEquation left(1, 0, destCurrent.fX, 0, -1, destCurrent.fY + 1, true);
-            lVertices[1] = new Vertex(vert, left);
-            DestinationEquation right(1, 0, destCurrent.fX, 0, 1, destCurrent.fY - 1, true);
-            lVertices[2] = new Vertex(vert, right);
-        } else {
-            // going left
-            DestinationEquation left(-1, 0, destCurrent.fX, 0, 1, destCurrent.fY - 1, true);
-            lVertices[1] = new Vertex(vert, left);
-            DestinationEquation right(-1, 0, destCurrent.fX, 0, -1, destCurrent.fY + 1, true);
-            lVertices[2] = new Vertex(vert, right);
-        }
-    }
-
-    return lVertices;
-}
-
-Destination Drive_TwinTrackAdv::rotateTranslateDestination(Destination destFinal) const
-{
-    Destination destStart = pCurrentRoute->GetRoute().GetLocation(pCurrentRoute->GetRoute().fT);
-    // First, translate destination so that our start is (0,0)
-    destFinal.fX -= destStart.fX;
-    destFinal.fY -= destStart.fY;
-    // Now get derivative (direction) so we can rotate the destination about the start. Basically
-    //  easier if we just line things up so we're always going straight up.
-    float fDx;
-    float fDy;
-    pCurrentRoute->GetRoute().GetDeriv(fDx, fDy, pCurrentRoute->GetRoute().fT);
-    // First check along axes
-    float fAngle;
-    if (fDx == 0) {
-        fAngle = fDy > 0 ? 0 : 3.14;
-    } else if (fDy == 0) {
-        if (fDx > 0) {
-            fAngle = -3.14/2;
-        } else {
-            fAngle = 3.14/2;
-        }
-    } else {
-        fAngle = atan2(fDy, fDx); // NOT SURE THIS IS POINTED RIGHT
-    }
-    /*
-[x, y, 1][cos  sin  0]
-         [-sin cos  0]  =  [x*cos + y*-sin + 0*1, x*sin + y*cos + 0*1, ...]
-         [0    0    1]
-    */
-    const float fSin = sin(fAngle);
-    const float fCos = cos(fAngle);
-    Destination destRotated;
-    destRotated.fX = (destFinal.fX * fCos) - (destFinal.fY * fSin);
-    destRotated.fY = (destFinal.fX * fSin) + (destFinal.fY * fCos);
-    return destRotated;
-}
-
-bool Drive_TwinTrackAdv::processDestRunningAvg(Destination dest)
-{
-    arDestAvg[iDestAvgCursor] = dest;
-    float fX = 0;
-    float fY = 0;
-    float fZ = 0;
-    //SIMD candidate
-    for (int i = 0; i < arDestAvg.size(); i++) {
-        fX += arDestAvg[i].fX;
-        fY += arDestAvg[i].fY;
-        fZ += arDestAvg[i].fZ;
-    }
-    fX /= arDestAvg.size();
-    fY /= arDestAvg.size();
-    fZ /= arDestAvg.size();
-    if (++iDestAvgCursor == arDestAvg.size()) iDestAvgCursor = 0;
-
-    Destination destCurrent = arRouteList[arRouteList.size() - 1]->GetRoute().GetLocation(1.0);
-    float fDistance = sqrt(((fX - destCurrent.fX) * (fX - destCurrent.fX)) +
-                           ((fY - destCurrent.fY) * (fY - destCurrent.fY)) +
-                           ((fZ - destCurrent.fZ) * (fZ - destCurrent.fZ)));
-    if (fDistance > fDistBeforeChangeDest) {
-        destAvg.fX = fX;
-        destAvg.fY = fY;
-        destAvg.fZ = fZ;
-        return true;
-    }
-    return false;
+    addressMavLink.sin_family = AF_INET; 
+    addressMavLink.sin_port = htons(iMavlinkPort); 
+    addressMavLink.sin_addr.s_addr = INADDR_ANY;
+    #endif
 }

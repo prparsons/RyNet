@@ -1,83 +1,47 @@
 #pragma once
 
-#include "navigation.h"
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include "cameraMulti.h"
 #include "data_types.h"
+#include "dataLogger.h"
 
-class DrivePlanner {
+/*
+    Plan for connecting to drone:
+    This connects to a python script and relays commands to it via UDP (i left tcp in there too).
+    Python script can use dronekit to connect, saving the work of having to figure out all the
+    necessary mavlink commands needed. I think this should also mean we don't have to worry about
+    downloading the route to this program...can let the script handle the saving/loading of waypoints.
+
+*/
+
+class FlightController {
 public:
-    DrivePlanner(std::vector<Navigator*>& arNav);
-    virtual ~DrivePlanner() {}
+    FlightController(DataLogger& logger, CameraController& camera);
+    ~FlightController();
 
-    virtual bool isPlanValid(Navigator& nav, Navigator::dirty isDirty) = 0;
-    virtual void createNewPlan() = 0;
+    void SetDirection(float fHeadingOffsetDeg); // Store the currently programmed route, adjust heading
+    void SetDestination(float fHeadingOffsetDeg, float fDistance); // Store route, adjust heading, after distance will automatically restore route
 
-    float getSpeed() const { return fSpeed; }
-    float getSteer() const { return fSteer; }
-    float getClimb() const { return fClimb; }
-    Orientation getOrient() const { return orient; }
-
-    virtual int getLoopTimeoutMS() const { return 1000;}
-
-protected:
-    std::vector<Navigator*>& arNav;
-
-    float fSpeed; // 0 <-> 1 stopped to max speed
-    float fSteer; // -1 <-> 1 full left to full right
-    float fClimb; // -1 <-> 1 full dive to full climb
-    float fMaxSteer; // Max steering in degrees per sec
-    float fMaxSpeed; // m/s
-    float fMaxClimb; // m/s
-    // Direction of travel
-    Orientation orient;
-    
-    //Need mapping from equation t to realtime
-    //Need way to get new speed settings while incrementing t the correct amount since last update (time() libraries?)
-};
-
-class Drive_TwinTrack: public DrivePlanner {
-public:
-    Drive_TwinTrack(std::vector<Navigator*>& arNav);
-
-    virtual bool isPlanValid(Navigator& nav, Navigator::dirty isDirty) override;
-    virtual void createNewPlan() override;
+    void RestoreRouteNaive();
+    void RestoreRouteClean();
 
 private:
-    std::vector<float> arSteerAvg;
+    void SaveRoute();
+    float DistanceLatLon(float fLat1, float fLon1, float fLat2, float fLon2);
+    void SendXML(const char* sc);
+    char* SendRecXML(const char* sc);
+    void ConnectMavLink();
+    void runDepth(); // Thread function to continuously send depth info for obstacle avoidance
+
+    DataLogger& logger;
+    CameraController& camera;
+    std::thread* pThreadDepth;
+    StopSignal ss;
+
+	struct sockaddr_in addressMavLink;
+    int socketDesc;
+    const char* scMavLinkAddress = "127.0.0.1";
+    const int iMavlinkPort = 3636;
 };
 
-class Drive_TwinTrackAdv: public DrivePlanner {
-public:
-    Drive_TwinTrackAdv(std::vector<Navigator*>& arNav);
-    virtual ~Drive_TwinTrackAdv();
-
-    virtual bool isPlanValid(Navigator& nav, Navigator::dirty isDirty) override;
-    virtual void createNewPlan() override;
-
-    virtual void newImages(cameraFrame_depth& depthRaw, image& imgRGB);
-
-protected:
-    DestinationEquation createRoute(Destination start, float fDx, float fDy, Destination dest);
-    bool isRouteObstructed(DestinationEquation, std::vector<Obstruction>& arObs, float fOffsetX = 0, float fOffsetY = 0);
-
-    void buildRouteTree(Destination dest, std::vector<Obstruction>& arObst);
-    Vertex** branch(Vertex& vert);
-    Destination rotateTranslateDestination(Destination dest) const;
-
-    bool processDestRunningAvg(Destination dest); // Returns true if change
-
-    Vertex* pCurrentRoute;
-    std::vector<Vertex*> arRouteList;
-
-    std::vector<Destination> arDestAvg;
-    std::vector<float> arSpeedAvg;
-    std::vector<Orientation> arOrientAvg;
-    Destination destAvg;
-
-    cameraMulti* pCamera;
-    std::thread* pthrCamera;
-
-    float fDistBeforeChangeDest;
-    int iDestAvgCursor;
-    int iSpeedAvgCursor;
-    int iOrientationAvgCursor;
-};

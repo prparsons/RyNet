@@ -24,13 +24,16 @@ find_package(Qt4)
 include(${QT_USE_FILE})
 add_definitions(${QT_DEFINITIONS})
 
+#was getting a missing lnvbuf_util linker error
+link_directories(/usr/lib/aarch64-linux-gnu/tegra) 
+
 # compiler flags
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 
 # compile the my-recognition program
-cuda_add_executable(overallApp overallApp.cpp serverDroneStatus.cpp droneNavigation.cpp cameraMulti.cpp planner.cpp navigation.cpp data_types.cpp)
+cuda_add_executable(overallApp overallApp.cpp dataLogger.cpp cameraMulti.cpp planner.cpp navigation.cpp data_types.cpp)
 
 # link my-recognition to jetson-inference library
 target_link_libraries(overallApp jetson-inference realsense2 ${OpenCV_LIBS})

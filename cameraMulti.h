@@ -9,9 +9,10 @@
 #include "locksignal.h"
 #include "data_types.h"
 
-class cameraMulti;
+class CameraController;
 struct point {
-    int iXY[2];
+    int x;
+    int y;
 };
 
 class cameraFrame_depth:protected rs2::depth_frame {
@@ -19,12 +20,12 @@ public:
     cameraFrame_depth(const rs2::depth_frame& _frame);
     ~cameraFrame_depth();
 
-    float operator[](const point& xy) const { return get_distance(xy.iXY[0], xy.iXY[1]); }
+    float operator[](const point& xy) const { return get_distance(xy.x, xy.y); }
     int getMetersPerUnit() const { return get_units(); }
 
     int getWidth() const { return get_width(); }
     int getHeight() const { return get_height(); }
-
+    const float* getData() const { return (const float*)get_data(); }
     void applyDecimationFilter();
 
 private:
@@ -36,29 +37,20 @@ class cameraFrame {
 public:
     cameraFrame();
     cameraFrame(const cameraFrame& other);
-    cameraFrame& operator=(const cameraFrame& other);
+    //cameraFrame& operator=(const cameraFrame& other);
     ~cameraFrame();
 
-    image getImageRGB();
-    image getImageDepth();
-    cameraFrame_depth getImageDepthRaw();
-    image getImageIR();
-    image getImageREdge();
-
-    bool hasRGB() const;
-    bool hasDepth() const;
-    bool hasIR() const;
-    bool hasREdge() const;
+    image getImage();
+    cameraFrame_depth* getDepthRaw();
 
 private:
     // whatever needed for each type
-    cv::Mat* pRGB;
-    cv::Mat* pDepth;
-    cv::Mat* pIR;
-    cv::Mat* pREdge;
+    cv::Mat* pImg;
     cameraFrame_depth* pDepthRaw;
     int* piCount;
-    friend class cameraMulti;
+    ThreadMutex* pM;
+    ThreadLock* pLock;
+    friend class CameraController;
 };
 
 class camera_RS {
@@ -67,44 +59,51 @@ public:
     rs2::config cfg;
 };
 
-class cameraMulti {
+//rename CameraController
+class CameraController {
 public:
-    ~cameraMulti();
-    enum cameraType {
-        cameraMulti_CV,
-        cameraMulti_RS };
+    ~CameraController();
 
     enum cameraFeatures {
-        cameraMulti_RGB = 0x01,
-        cameraMulti_IR = 0x02,
-        cameraMulti_Depth = 0x04,
-        cameraMulti_REdge = 0x08,
+        CameraController_RGB = 0x01,
+        CameraController_IR = 0x02,
+        CameraController_Depth = 0x04,
 
-        cameraMulti_DownsampleDepth = 0x10,
-        cameraMulti_Align = 0x20
+        CameraController_DownsampleDepth = 0x08
     };
 
-    static cameraMulti* OpenCamera(cameraType type, cameraFeatures features);
-    static bool isCameraTypeAvail(cameraType type);
+    static CameraController* OpenCamera(cameraFeatures features);
 
-    int getAvailFeatures() const;
+    // Must delete returned pointers
+    cameraFrame* GetFrameDepth();
+    cameraFrame* GetFrameRGB();
+    cameraFrame* GetFrameIR();
+    Signal* GetSignalDepth();
+    Signal* GetSignalRGB();
+    Signal* GetSignalIR();
 
-    void runCameraLoop();
-    cameraFrame* waitForCamera();
-    void run(void* pCallbackFrame, void* pCallbackData);
-    StopSignal ss;
+    void run();
 
 protected:
-    cameraMulti(cameraType, cameraFeatures);
-    cameraMulti(const cameraMulti&);
-
+    CameraController(cameraFeatures);
     void run_RS();
+    void run_CV(const char* scGStream, cameraFrame** ppFrameCurrent, Signal* pSig, StopSignal* pss);
 
 private:
-    void (*callbackFrame)(cameraFrame*, void*);
-    void* pCallbackData;
+    cameraFrame* pFrameCurrentDepth;
+    cameraFrame* pFrameCurrentRGB;
+    cameraFrame* pFrameCurrentIR;
+    ThreadMutex m;
 
     camera_RS* pCameraRS;
-    cameraType type;
     cameraFeatures features;
+
+    std::thread* pthrCamera[3];
+    StopSignal ss[3];
+    Signal sigDepth;
+    Signal sigRGB;
+    Signal sigIR;
+    
+    const char* scGStream_RGB = "nvarguscamerasrc sensor-id=0 wbmode=2 gainrange=\"2 2\" ispdigitalgainrange=\"2 2\" exposuretimerange=\"50000000 50000000\" aelock=true ! video/x-raw(memory:NVMM),width=4056,height=3040,framerate=10/1 ! nvvidconv ! video/x-raw,format=BGRx ! videoconvert ! appsink";
+    const char* scGStream_IR = "stuff ! things ! converterize ! kitchen sinks";
 };
