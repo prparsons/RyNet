@@ -50,82 +50,7 @@ void FlightController::RestoreRouteClean()
 
     // Simple version: search list for closest point in waypoint list, make that first by
     //  deleting everything before it
-
-    char sc[32];
-    strcpy(sc, "<route_retrieve />");
-    char* scRoute = SendRecXML(sc);
-    if (scRoute == nullptr) {
-        printL("FlightController::RestoreRouteClean route_retrieve fail");
-        return;
-    }
-    strcpy(sc, "<pos_retrieve />");
-    char* scPos = SendRecXML(sc);
-    if (scPos == nullptr) {
-        printL("FlightController::RestoreRouteClean pos_retrieve fail");
-        delete[] scRoute;
-        return;
-    }
-
-    //DOUBLE CHECK ALL THIS STRING MATH (unit test?...or do it in python? exception handling should/could be done either way...)
-    // First get current lat/lon
-    int i;
-    for (i = 0; scPos[i] != ' '; i++);
-    scPos[i] = 0;
-    float fLatCurrent = atof(scPos);
-    float fLonCurrent = atof(scPos + i + 1);
-
-    // Get to 2nd line of route
-    for (i = 0; scRoute[i] != '\n'; i++); i++;
-    // Scan through whole thing, each line there are 8 tabs before lat, then lon.
-    //  Figure out distance to each waypoint, storing index of line with shortest
-    //  as we scan. We'll remove everything before that line.
-    float fDistClose = 99999999;
-    int iIndexClose = -1; // Route index = line + 1
-    int iIndexCurrent = 0;
-    while (scRoute[i] != 0) {
-        for (int tabs = 0; tabs != 8; i++) {
-            if (scRoute[i] == '\t') tabs++;
-        }
-        // At first digit of lat
-        int latlongStart = i;
-        while (scRoute[i] != '\t') i++;
-        scRoute[i] = 0;
-        float fLat = atof(scRoute + latlongStart);
-        scRoute[i] = '\t';
-        // At first digit of lon
-        latlongStart = ++i;
-        while (scRoute[i] != '\t') i++;
-        scRoute[i] = 0;
-        float fLon = atof(scRoute + latlongStart);
-        scRoute[i] = '\t';
-        // Compare to see if closest
-        float fDistI = DistanceLatLon(fLat, fLon, fLatCurrent, fLonCurrent);
-        if (fDistI < fDistClose) {
-            fDistClose = fDistI;
-            iIndexClose = iIndexCurrent;
-        }
-        iIndexCurrent++;
-    }
-    // " <set_route>...</set_route>"
-    char* scRouteNew = new char[strlen(scRoute) + 25];
-    strcpy(scRouteNew, "<set_route>");
-    int iNew = 11;
-    for (i = 0; scRoute[i] != '\n'; i++); i++;
-    scRoute[i] = 0;
-    strcpy(scRouteNew + iNew, scRoute); // First line of original
-    iNew += strlen(scRoute);
-    scRouteNew[iNew++] = '\n';
-
-    for (int lines = 0; lines < iIndexClose; i++) 
-        if (scRoute[i] == '\n') lines++;
-    strcpy(scRouteNew + iNew, scRoute + i);
-    iNew += strlen(scRoute + i);
-    strcpy(scRouteNew + iNew, "</set_route>");
-    SendXML(scRouteNew);
-
-    delete[] scRoute;
-    delete[] scPos;
-    delete[] scRouteNew;
+    SendXML("<route_restore clean='simple' />");
 }
 
 void FlightController::SaveRoute()
@@ -232,7 +157,9 @@ char* FlightController::SendRecXML(const char* strMessage)
     if (socketDesc < 0) ConnectMavLink();
     sendto(socketDesc, strMessage, strlen(strMessage), MSG_CONFIRM, (const struct sockaddr*)&addressMavLink, sizeof(addressMavLink));
     char* scResponse = new char[512];
-    int iLength = recvfrom(socketDesc, scResponse, 511, MSG_WAITALL, nullptr, nullptr); 
+    //*************HOW DO WE PREVENT THIS FROM BLOCKING FOREVER?
+    //int iLength = recvfrom(socketDesc, scResponse, 511, MSG_WAITALL, nullptr, nullptr); // MSG_WAITALL -- This flag has no effect for datagram sockets.
+    int iLength = recv(socketDesc, scResponse, 511, 0);
     scResponse[iLength] = 0;
     return scResponse;
     #endif
