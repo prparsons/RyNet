@@ -258,9 +258,6 @@ void CameraController::run_CV(const char* scGStream, cameraFrame** ppFrameCurren
     printL(scGStream);
     Mat frame;
 
-    // Python way of using gstreamer
-    // str = 'nvarguscamerasrc sensor-id=0 wbmode=2 gainrange=\"4 4\" ispdigitalgainrange=\"1 1\" exposuretimerange=\"30000000 30000000\" aelock=true !'
-    //str += 'video/x-raw(memory:NVMM),width=3840,height=2560,framerate=30/1 ! nvvidconv ! video/x-raw,format=BGRx ! videoconvert ! videorate ! video/x-raw,framerate=2/1 ! appsink'
     VideoCapture cap(scGStream, cv::CAP_GSTREAMER);
     
     if (!cap.isOpened()) {
