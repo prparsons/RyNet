@@ -14,6 +14,7 @@ find_package(jetson-inference)
 find_package( realsense2 REQUIRED )
 find_package( OpenCV REQUIRED )
 include_directories( ${OpenCV_INCLUDE_DIRS} )
+link_directories(/usr/lib/aarch64-linux-gnu/tegra)
 
 # CUDA and Qt4 are required
 find_package(CUDA)
