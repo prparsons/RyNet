@@ -26,7 +26,7 @@ void ObjectDetection::SetNewImage(image& img)
 
 bool ObjectDetection::ProcessImage(image& imgRGB)
 {
-    printf("ObjectDetection::ProcessImage");
+    printL("ObjectDetection::ProcessImage");
     // these variables will store the image data pointer and dimensions
     uchar3* u3Img = (uchar3*)imgRGB.data;   // shared CPU/GPU pointer to image
     int imgWidth = imgRGB.cols;      // width of the image (in pixels)
@@ -65,7 +65,7 @@ bool ObjectDetection::ProcessImage(image& imgRGB)
 
 void ObjectDetection::run()
 {
-    printf("ObjectDetection::run");
+    printL("ObjectDetection::run");
     Signal* pSigRGB = new Signal(sigNewImage);
     image imgProcess;
 
@@ -92,7 +92,7 @@ TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
 
 bool TerrainSegmentation::ProcessImage(image& imgRGB)
 {
-    printf("TerrainSegmentation::ProcessImage");
+    printL("TerrainSegmentation::ProcessImage");
     uchar3* u3Img = (uchar3*)imgRGB.data;   // shared CPU/GPU pointer to image
     int imgWidth = imgRGB.cols;      // width of the image (in pixels)
     int imgHeight = imgRGB.rows;      // height of the image (in pixels)
@@ -124,7 +124,7 @@ void TerrainSegmentation::SetNewImage(image& img)
 
 void TerrainSegmentation::run()
 {
-    printf("TerrainSegmentation::run");
+    printL("TerrainSegmentation::run");
     Signal* pSigRGB = new Signal(sigNewImage);
     image imgProcess;
 
@@ -144,7 +144,7 @@ void TerrainSegmentation::run()
 
 bool TerrainSegmentation::ScanMask(uchar3* imgMask, int iWidth, int iHeight)
 {
-    printf("TerrainSegmentation::ScanMask");
+    printL("TerrainSegmentation::ScanMask");
     int size = iWidth * iHeight;
     float fAngleAvgSum = 0;
     int iAngleAvgCount = 0;

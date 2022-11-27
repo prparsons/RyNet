@@ -51,7 +51,6 @@ void DataLogger::run(void)
     while (!ss.shouldStop()) {
         // Wait on signal
         pSigImage->wait();
-        printf("statusLoop\n");
 
         // check text list, if not empty write
         mt.lock();
@@ -186,7 +185,6 @@ catch (const std::exception& e)
 
 void DataLogger::LogImage(cv::Mat& im)
 {
-    printf("DataLogger::LogImage cv::Mat\n");
     mt.lock();
     image = im.clone();
     bWriteImg = true;
@@ -196,7 +194,6 @@ void DataLogger::LogImage(cv::Mat& im)
 
 void DataLogger::LogMask(uchar3* pImg, int width, int height)
 {
-    printf("DataLogger::LogImage uchar3\n");
     mt.lock();
    // mask = cv::Mat(height, width, cv::CV_8UC3, (void*)pImg);
     bWriteMask = true;
@@ -206,7 +203,6 @@ void DataLogger::LogMask(uchar3* pImg, int width, int height)
 
 void DataLogger::LogString(const char* scData)
 {
-    printf("DataLogger::LogString\n");
     mt.lock();
     string strData(scData);
     listStrings.push_back(strData);

@@ -20,7 +20,7 @@ int main( int argc, char** argv )
 	CameraController* pCamera = CameraController::OpenCamera(CameraController::CameraController_RGB);
 	FlightController controller(logger, *pCamera);
 	Navigator nav(controller, logger, *pCamera);
-
+        printL("Starting main loop");
 	try {
 		std::thread thrLogger(&DataLogger::run, &logger);
 		pCamera->run();

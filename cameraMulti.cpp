@@ -37,12 +37,10 @@ cameraFrame::cameraFrame()
 , pM(new ThreadMutex())
 , pLock(new ThreadLock(*pM))
 {
-    printL("cameraFrame::cameraFrame");
 }
 
 cameraFrame::cameraFrame(const cameraFrame& other)
 {
-    printL("cameraFrame::cameraFrame(other)");
     other.pLock->lock();
     pImg = other.pImg;
     piCount = other.piCount;
@@ -55,7 +53,6 @@ cameraFrame::cameraFrame(const cameraFrame& other)
 
 cameraFrame::~cameraFrame()
 {
-    printL("cameraFrame::~cameraFrame");
     pLock->lock();
     if (--(*piCount) == 0) {
         delete pImg;
@@ -83,11 +80,6 @@ cameraFrame_depth* cameraFrame::getDepthRaw()
 CameraController* CameraController::OpenCamera(cameraFeatures features)
 {
     CameraController* pReturn = new CameraController(features);
-    if (pReturn->pCameraRS == nullptr) {
-        delete pReturn;
-        printf("CameraController didn't have valid pCameraRS - deleted\n");
-        return nullptr;
-    }
     return pReturn;
 }
 
@@ -267,7 +259,8 @@ void CameraController::run_CV(const char* scGStream, cameraFrame** ppFrameCurren
     Mat frame;
 
     // Python way of using gstreamer
-    // cap = cv2.VideoCapture('nvarguscamerasrc sensor-id=0 wbmode=2 gainrange=\"2 2\" ispdigitalgainrange=\"2 2\" exposuretimerange=\"50000000 50000000\" aelock=true ! video/x-raw(memory:NVMM),width=1920,height=1080,framerate=10/1 ! nvvidconv ! video/x-raw,format=BGRx ! videoconvert ! appsink', cv2.CAP_GSTREAMER)
+    // str = 'nvarguscamerasrc sensor-id=0 wbmode=2 gainrange=\"4 4\" ispdigitalgainrange=\"1 1\" exposuretimerange=\"30000000 30000000\" aelock=true !'
+    //str += 'video/x-raw(memory:NVMM),width=3840,height=2560,framerate=30/1 ! nvvidconv ! video/x-raw,format=BGRx ! videoconvert ! videorate ! video/x-raw,framerate=2/1 ! appsink'
     VideoCapture cap(scGStream, cv::CAP_GSTREAMER);
     
     if (!cap.isOpened()) {
@@ -278,7 +271,7 @@ void CameraController::run_CV(const char* scGStream, cameraFrame** ppFrameCurren
     while (!pss->shouldStop()) { // We need a separate stop signal for each thread
         cap.read(frame);
         if (frame.empty()) {
-            printf("CameraController::run_CV empty frame");
+            printL("CameraController::run_CV empty frame");
         }
         // Do something with frame
         cameraFrame* pNewFrame = new cameraFrame();
