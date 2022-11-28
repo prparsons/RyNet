@@ -31,6 +31,7 @@ class TerrainSegmentation {
 public:
     TerrainSegmentation(DataLogger& logger);
 
+    bool IsHabitatVisible();
     float GetHabitatDirection();
     void SetNewImage(image& img);
     void run();
@@ -47,6 +48,7 @@ private:
     bool ProcessImage(image& img);
     bool ScanMask(uchar3* imgMask, int iWidth, int iHeight);
 
+    bool bHabitatVisible;
     DataLogger& logger;
     segNet* pNetwork;
     float fBestDirection;

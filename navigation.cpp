@@ -10,7 +10,7 @@ ObjectDetection::ObjectDetection(DataLogger& _logger)
 : logger(_logger)
 {
 	// For Jetson Nano (just let it use gpu)
-    pNetwork = nullptr;//detectNet::Create(detectNet::SSD_MOBILENET_V2);
+    pNetwork = detectNet::Create(detectNet::SSD_MOBILENET_V2);
     // SSD_INCEPTION_V2 ?
 	// For Xavier (try to use one of the DLA engines so we can use the gpu for opencv stuff)
 	//detectNet* net = detectNet::Create(detectNet::SSD_MOBILENET_V2, 0.5f, 1, TYPE_FASTEST, DEVICE_DLA_0);DEVICE_DLA_1 DEVICE_GPU
@@ -26,19 +26,20 @@ void ObjectDetection::SetNewImage(image& img)
 
 bool ObjectDetection::ProcessImage(image& imgRGB)
 {
-    printL("ObjectDetection::ProcessImage");
     // these variables will store the image data pointer and dimensions
-    uchar3* u3Img = (uchar3*)imgRGB.data;   // shared CPU/GPU pointer to image
     int imgWidth = imgRGB.cols;      // width of the image (in pixels)
     int imgHeight = imgRGB.rows;      // height of the image (in pixels)
+    uchar3* u3Img;
 
-	// For Jetson Nano (just let it use gpu)
-
-	detectNet::Detection* arDetections = nullptr;
-	int iDetections = pNetwork->Detect(u3Img, imgWidth, imgHeight, &arDetections);
-
+    if (CUDA_FAILED(cudaMalloc(&u3Img, imgWidth*imgHeight*3))) {
+        printL("ObjectDetection::ProcessImage cudaMalloc fail");
+        return false;
+    }
+    cudaMemcpy(u3Img, (void*)imgRGB.data, imgWidth*imgHeight*3, cudaMemcpyHostToDevice);   // shared CPU/GPU pointer to image
+    detectNet::Detection* arDetections = nullptr;
+    int iDetections = pNetwork->Detect(u3Img, imgWidth, imgHeight, &arDetections);
+    
     if (iDetections < 1) {
-        //printf("no things");
         return false;
     }
 
@@ -46,7 +47,7 @@ bool ObjectDetection::ProcessImage(image& imgRGB)
     char sc[128];
     for (int i = 0; i < iDetections; i++) {
         //if (arDetections[i].Confidence < 0.5) continue; // This isn't necessary since the argument is passed to detectNet
-        if (arDetections[i].ClassID != 1) continue; // Should be a person (looking for people)
+        //if (arDetections[i].ClassID == 1) continue; // Should be a person (looking for people)
 
         bRet = true;
         snprintf(sc, 127, "Detection Class[%d] LTRB:%d %d %d %d", 
@@ -58,8 +59,7 @@ bool ObjectDetection::ProcessImage(image& imgRGB)
         logger.LogString(sc);
     }
 
-	// Not sure if this is right for freeing the memory
-	cudaFree(arDetections);
+    cudaFree(u3Img);
     return bRet;
 }
 
@@ -75,9 +75,9 @@ void ObjectDetection::run()
         imgProcess = imgRecent;
         mt.unlock();
         
-        //if (ProcessImage(imgProcess)) {
-        //    logger.LogImage(imgProcess);
-       // }
+        if (ProcessImage(imgProcess)) {
+            //logger.LogImage(imgProcess);
+        }
     }
     delete pSigRGB;
 }
@@ -85,7 +85,8 @@ void ObjectDetection::run()
 // ** TerrainSegmentation
 
 TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
-: logger(_logger)
+: bHabitatVisible(false)
+, logger(_logger)
 {
     pNetwork = nullptr;//segNet::Create(segNet::FCN_RESNET18_SUNRGB_640x512);//segNet::FCN_RESNET18_DEEPSCENE_576x320);FCN_ALEXNET_AERIAL_FPV_720p
 }
@@ -107,6 +108,11 @@ bool TerrainSegmentation::ProcessImage(image& imgRGB)
     }
 
     return ScanMask(u3Mask, imgWidth, imgHeight);
+}
+
+bool TerrainSegmentation::IsHabitatVisible()
+{
+    return bHabitatVisible;
 }
 
 float TerrainSegmentation::GetHabitatDirection()
@@ -188,9 +194,8 @@ void Navigator::runNavigator()
     cameraFrame* pFrame = nullptr;
     Signal* pSigRGB = camera.GetSignalRGB();
 
-    bool bGridSearching = false;
+    bool bGridSearching = true;
     float fMargin = 0;
-    float fCurrentDirection = 0;
 
     std::thread thrObject(&ObjectDetection::run, &detector);
     std::thread thrSegment(&TerrainSegmentation::run, &segmenter);
@@ -205,21 +210,18 @@ void Navigator::runNavigator()
         segmenter.SetNewImage(imgNew);
 
         if (bGridSearching) {
-            if (segmenter.GetHabitatDirection() >= 0.0) { // good terrain visible?
+            if (segmenter.IsHabitatVisible()) { // good terrain visible?
                 control.SetDirection(segmenter.GetHabitatDirection());
-                fCurrentDirection = segmenter.GetHabitatDirection();
                 char sc[64];
-                sprintf(sc, "Grid Search -> Good Habitat %1.3f", fCurrentDirection);
+                sprintf(sc, "Grid Search -> Good Habitat %1.3f", segmenter.GetHabitatDirection());
                 logger.LogString(sc);
             }
         } else {
-            float fDiff = abs(segmenter.GetHabitatDirection() - fCurrentDirection);
-            if (fDiff < fMargin) continue; // good terrain in current direction?
-            if (segmenter.GetHabitatDirection() >= 0.0) { // good terrain in different direction?
+	    if (segmenter.IsHabitatVisible()) {
+                if (abs(segmenter.GetHabitatDirection()) < fMargin) continue; // good terrain in current direction?
                 control.SetDirection(segmenter.GetHabitatDirection());
-                fCurrentDirection = segmenter.GetHabitatDirection();
                 char sc[64];
-                sprintf(sc, "Grid Search Change -> %1.3f", fCurrentDirection);
+                sprintf(sc, "Grid Search Change -> %1.3f", segmenter.GetHabitatDirection());
                 logger.LogString(sc);
             } else {
                 control.RestoreRouteNaive();

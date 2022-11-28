@@ -269,6 +269,7 @@ void CameraController::run_CV(const char* scGStream, cameraFrame** ppFrameCurren
         cap.read(frame);
         if (frame.empty()) {
             printL("CameraController::run_CV empty frame");
+            continue;
         }
         // Do something with frame
         cameraFrame* pNewFrame = new cameraFrame();
