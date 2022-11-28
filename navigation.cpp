@@ -50,8 +50,9 @@ bool ObjectDetection::ProcessImage(image& imgRGB)
         //if (arDetections[i].ClassID == 1) continue; // Should be a person (looking for people)
 
         bRet = true;
-        snprintf(sc, 127, "Detection Class[%d] LTRB:%d %d %d %d", 
+        snprintf(sc, 127, "Detection Class,Confidence[%d,%d] LTRB:%d %d %d %d", 
                 int(arDetections[i].ClassID), 
+                int(arDetections[i].Confidence * 100),
                 int(arDetections[i].Left), 
                 int(arDetections[i].Top), 
                 int(arDetections[i].Right), 
@@ -75,9 +76,11 @@ void ObjectDetection::run()
         imgProcess = imgRecent;
         mt.unlock();
         
-        if (ProcessImage(imgProcess)) {
+        //if (ProcessImage(imgProcess)) {
+            // This works, but at 2fps, this could still add up to way more than necessary.
+            // Need a rate limit 
             //logger.LogImage(imgProcess);
-        }
+        //}
     }
     delete pSigRGB;
 }
@@ -87,27 +90,52 @@ void ObjectDetection::run()
 TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
 : bHabitatVisible(false)
 , logger(_logger)
+, u3Mask(nullptr)
 {
-    pNetwork = nullptr;//segNet::Create(segNet::FCN_RESNET18_SUNRGB_640x512);//segNet::FCN_RESNET18_DEEPSCENE_576x320);FCN_ALEXNET_AERIAL_FPV_720p
+    pNetwork = segNet::Create(segNet::FCN_RESNET18_SUNRGB_640x512);//segNet::FCN_RESNET18_DEEPSCENE_576x320);FCN_ALEXNET_AERIAL_FPV_720p
+}
+
+TerrainSegmentation::~TerrainSegmentation()
+{
+    if (u3Mask != nullptr) cudaFree(u3Mask);
 }
 
 bool TerrainSegmentation::ProcessImage(image& imgRGB)
 {
     printL("TerrainSegmentation::ProcessImage");
-    uchar3* u3Img = (uchar3*)imgRGB.data;   // shared CPU/GPU pointer to image
     int imgWidth = imgRGB.cols;      // width of the image (in pixels)
     int imgHeight = imgRGB.rows;      // height of the image (in pixels)
+    uchar3* u3Img;
+    if (CUDA_FAILED(cudaMalloc(&u3Img, imgWidth*imgHeight*3))) {
+        printL("TerrainSegmentation::ProcessImage cudaMalloc fail");
+        return false;
+    }
+    cudaMemcpy(u3Img, (void*)imgRGB.data, imgWidth*imgHeight*3, cudaMemcpyHostToDevice);
+    printL(" after memcpy");
 
     if(!pNetwork->Process(u3Img, imgWidth, imgHeight)) {
         printf("TerrainSegmentation::ProcessImage fail");
+        cudaFree(u3Img);        
         return false;
     }
-    
-    if(!pNetwork->Mask(u3Mask, imgWidth, imgHeight, segNet::FILTER_POINT)) {
-        return false;
-    }
+    printL(" after process");
 
-    return ScanMask(u3Mask, imgWidth, imgHeight);
+    if (u3Mask == nullptr) {
+        if (CUDA_FAILED(cudaMalloc(&u3Mask, imgWidth*imgHeight*3))) {
+            printL("TerrainSegmentation::ProcessImage mask alloc fail");
+            cudaFree(u3Img);
+            return false;
+        }
+    }
+    if(!pNetwork->Mask(u3Mask, imgWidth, imgHeight, segNet::FILTER_POINT)) {
+        printL("TerrainSegmentation::ProcessImage mask fail");
+        cudaFree(u3Img);
+        return false;
+    }
+    printL(" after mask");
+    cudaFree(u3Img);
+    return true;
+    //return ScanMask(u3Mask, imgWidth, imgHeight);
 }
 
 bool TerrainSegmentation::IsHabitatVisible()
@@ -140,10 +168,10 @@ void TerrainSegmentation::run()
         imgProcess = imgRecent;
         mt.unlock();
         
-        //if (ProcessImage(imgProcess)) {
+        if (ProcessImage(imgProcess)) {
         //    logger.LogImage(imgProcess);
-        //    logger.LogString("Good Habitat Found");
-        //}
+            logger.LogString("Good Habitat Found");
+        }
     }
     delete pSigRGB;
 }
@@ -170,7 +198,7 @@ bool TerrainSegmentation::ScanMask(uchar3* imgMask, int iWidth, int iHeight)
     }
 
     // We've found the desired category
-    logger.LogMask(imgMask, iWidth, iHeight);
+    //logger.LogMask(imgMask, iWidth, iHeight);
     fBestDirection = fAngleAvgSum / iAngleAvgCount;
     return true;
 }

@@ -30,6 +30,7 @@ private:
 class TerrainSegmentation {
 public:
     TerrainSegmentation(DataLogger& logger);
+    ~TerrainSegmentation();
 
     bool IsHabitatVisible();
     float GetHabitatDirection();

@@ -194,8 +194,9 @@ void DataLogger::LogImage(cv::Mat& im)
 
 void DataLogger::LogMask(uchar3* pImg, int width, int height)
 {
+    cv::Mat tempMat(height, width, CV_8UC3, (void*)pImg);
     mt.lock();
-   // mask = cv::Mat(height, width, cv::CV_8UC3, (void*)pImg);
+    mask = tempMat;
     bWriteMask = true;
     mt.unlock();
     sigNewData.signal();
