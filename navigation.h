@@ -50,15 +50,17 @@ private:
     bool ScanMask(uchar3* imgMask, int iWidth, int iHeight);
 
     bool bHabitatVisible;
-    DataLogger& logger;
-    segNet* pNetwork;
     float fBestDirection;
     float fImageFOV;
+    DataLogger& logger;
+    segNet* pNetwork;
+    uchar3* u3Mask; // only access from thread
+    std::vector<float4> vecClassColor;
+    std::vector<const char*> vecClassLabel;
     ThreadMutex mt;
     Signal sigNewImage;
     StopSignal ss;
     image imgRecent;
-    uchar3* u3Mask; // only access from thread
 };
 
 class Navigator {

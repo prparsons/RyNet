@@ -87,12 +87,25 @@ void ObjectDetection::run()
 
 // ** TerrainSegmentation
 
+#define NETWORK_PRINT_LABELS
+
 TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
 : bHabitatVisible(false)
 , logger(_logger)
 , u3Mask(nullptr)
 {
     pNetwork = segNet::Create(segNet::FCN_RESNET18_SUNRGB_640x512);//segNet::FCN_RESNET18_DEEPSCENE_576x320);FCN_ALEXNET_AERIAL_FPV_720p
+    vecClassColor.reserve(pNetwork->GetNumClasses());
+    vecClassLabel.reserve(pNetwork->GetNumClasses());
+    for (int i = 0; i < pNetwork->GetNumClasses(); i++) {
+        vecClassColor[i] = pNetwork->GetClassColor(i);
+        vecClassLabel[i] = pNetwork->GetClassDesc(i);
+        #ifdef NETWORK_PRINT_LABELS
+        printf("%s\t\t[%2.2f,%2.2f,,%2.2f]\n", vecClassLabel[i], *((float*)&vecClassColor[i]),
+                                                                *(((float*)&vecClassColor[i]) + 1)
+                                                                *(((float*)&vecClassColor[i]) + 2));
+        #endif
+    }
 }
 
 TerrainSegmentation::~TerrainSegmentation()
