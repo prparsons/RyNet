@@ -92,13 +92,11 @@ void ObjectDetection::run()
 TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
 : bHabitatVisible(false)
 , logger(_logger)
-, u3Mask(nullptr)
+, pMask(nullptr)
 {
     pNetwork = segNet::Create(segNet::FCN_RESNET18_SUNRGB_640x512);//segNet::FCN_RESNET18_DEEPSCENE_576x320);FCN_ALEXNET_AERIAL_FPV_720p
-    vecClassColor.reserve(pNetwork->GetNumClasses());
     vecClassLabel.reserve(pNetwork->GetNumClasses());
     for (int i = 0; i < pNetwork->GetNumClasses(); i++) {
-        vecClassColor[i] = pNetwork->GetClassColor(i);
         vecClassLabel[i] = pNetwork->GetClassDesc(i);
         #ifdef NETWORK_PRINT_LABELS
         printf("[%d]  %s\n", i, vecClassLabel[i]);
@@ -108,7 +106,7 @@ TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
 
 TerrainSegmentation::~TerrainSegmentation()
 {
-    if (pMask != nullptr) cudaFree(pMask);
+    if (pMask != nullptr) delete[] pMask;// cudaFree(pMask);
 }
 
 bool TerrainSegmentation::ProcessImage(image& imgRGB)
@@ -132,11 +130,7 @@ bool TerrainSegmentation::ProcessImage(image& imgRGB)
     printL(" after process");
 
     if (pMask == nullptr) {
-        if (CUDA_FAILED(cudaMalloc(&pMask, imgWidth*imgHeight))) {
-            printL("TerrainSegmentation::ProcessImage mask alloc fail");
-            cudaFree(u3Img);
-            return false;
-        }
+        pMask = new uint8_t[imgWidth*imgHeight];
     }
     if(!pNetwork->Mask(pMask, imgWidth, imgHeight)) {
         printL("TerrainSegmentation::ProcessImage mask fail");
