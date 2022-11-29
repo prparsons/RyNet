@@ -2,7 +2,7 @@
 
 #include <thread>
 #include <unistd.h>
-
+#include <jetson-utils/cudaMappedMemory.h>
 
 // ** ObjectDetection
 
@@ -91,6 +91,7 @@ void ObjectDetection::run()
 
 TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
 : bHabitatVisible(false)
+, fImageFOV(75) // I MADE UP THIS NUMBER
 , logger(_logger)
 , pMask(nullptr)
 {
@@ -111,7 +112,6 @@ TerrainSegmentation::~TerrainSegmentation()
 
 bool TerrainSegmentation::ProcessImage(image& imgRGB)
 {
-    printL("TerrainSegmentation::ProcessImage");
     int imgWidth = imgRGB.cols;      // width of the image (in pixels)
     int imgHeight = imgRGB.rows;      // height of the image (in pixels)
     uchar3* u3Img;
@@ -120,14 +120,12 @@ bool TerrainSegmentation::ProcessImage(image& imgRGB)
         return false;
     }
     cudaMemcpy(u3Img, (void*)imgRGB.data, imgWidth*imgHeight*3, cudaMemcpyHostToDevice);
-    printL(" after memcpy");
 
     if(!pNetwork->Process(u3Img, imgWidth, imgHeight)) {
         printf("TerrainSegmentation::ProcessImage fail");
         cudaFree(u3Img);        
         return false;
     }
-    printL(" after process");
 
     if (pMask == nullptr) {
         pMask = new uint8_t[imgWidth*imgHeight];
@@ -137,7 +135,6 @@ bool TerrainSegmentation::ProcessImage(image& imgRGB)
         cudaFree(u3Img);
         return false;
     }
-    printL(" after mask");
     cudaFree(u3Img);
     
     return ScanMask(pMask, imgWidth, imgHeight);
@@ -185,7 +182,6 @@ void TerrainSegmentation::run()
 
 bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iWidth, int iHeight)
 {
-    printL("TerrainSegmentation::ScanMask");
     int size = iWidth * iHeight;
     float fAngleAvgSum = 0;
     int iAngleAvgCount = 0;
@@ -203,9 +199,15 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iWidth, int iHeight)
         fBestDirection = -1;
         return false;
     }
-
     // We've found the desired category
-    //logger.LogMask(imgMask, iWidth, iHeight);
+    int maskWidth = 640;
+    int maskHeight = 360;
+    float4* imgMask;
+    if (!CUDA_FAILED(cudaHostAlloc(&imgMask, maskWidth*maskHeight*16, cudaHostAllocMapped))) {
+        pNetwork->Mask(imgMask, maskWidth, maskHeight, segNet::FILTER_POINT);
+        logger.LogMask(imgMask, maskWidth, maskHeight);
+        cudaFreeHost(imgMask);
+    }
     fBestDirection = fAngleAvgSum / iAngleAvgCount;
     return true;
 }
