@@ -101,16 +101,14 @@ TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
         vecClassColor[i] = pNetwork->GetClassColor(i);
         vecClassLabel[i] = pNetwork->GetClassDesc(i);
         #ifdef NETWORK_PRINT_LABELS
-        printf("%s\t\t[%2.2f,%2.2f,,%2.2f]\n", vecClassLabel[i], *((float*)&vecClassColor[i]),
-                                                                *(((float*)&vecClassColor[i]) + 1)
-                                                                *(((float*)&vecClassColor[i]) + 2));
+        printf("[%d]  %s\n", i, vecClassLabel[i]);
         #endif
     }
 }
 
 TerrainSegmentation::~TerrainSegmentation()
 {
-    if (u3Mask != nullptr) cudaFree(u3Mask);
+    if (pMask != nullptr) cudaFree(pMask);
 }
 
 bool TerrainSegmentation::ProcessImage(image& imgRGB)
@@ -133,22 +131,22 @@ bool TerrainSegmentation::ProcessImage(image& imgRGB)
     }
     printL(" after process");
 
-    if (u3Mask == nullptr) {
-        if (CUDA_FAILED(cudaMalloc(&u3Mask, imgWidth*imgHeight*3))) {
+    if (pMask == nullptr) {
+        if (CUDA_FAILED(cudaMalloc(&pMask, imgWidth*imgHeight))) {
             printL("TerrainSegmentation::ProcessImage mask alloc fail");
             cudaFree(u3Img);
             return false;
         }
     }
-    if(!pNetwork->Mask(u3Mask, imgWidth, imgHeight, segNet::FILTER_POINT)) {
+    if(!pNetwork->Mask(pMask, imgWidth, imgHeight)) {
         printL("TerrainSegmentation::ProcessImage mask fail");
         cudaFree(u3Img);
         return false;
     }
     printL(" after mask");
     cudaFree(u3Img);
-    return true;
-    //return ScanMask(u3Mask, imgWidth, imgHeight);
+    
+    return ScanMask(pMask, imgWidth, imgHeight);
 }
 
 bool TerrainSegmentation::IsHabitatVisible()
@@ -183,21 +181,23 @@ void TerrainSegmentation::run()
         
         if (ProcessImage(imgProcess)) {
         //    logger.LogImage(imgProcess);
-            logger.LogString("Good Habitat Found");
+            char sc[128];
+            sprintf(sc, "Good Habitat Found %2.2f", fBestDirection);
+            logger.LogString(sc);
         }
     }
     delete pSigRGB;
 }
 
-bool TerrainSegmentation::ScanMask(uchar3* imgMask, int iWidth, int iHeight)
+bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iWidth, int iHeight)
 {
     printL("TerrainSegmentation::ScanMask");
     int size = iWidth * iHeight;
     float fAngleAvgSum = 0;
     int iAngleAvgCount = 0;
-    uint32_t pixel;
+    uint8_t pixel;
     for (int i = 0; i < size; i++) {
-        pixel = *((uint32_t*)(&imgMask[i])) >> 8;
+        pixel = pMask[i];
         if (pixel == HABITAT) {
             int x = i / iWidth;
             fAngleAvgSum += (abs(x - (iWidth * .5)) / (iWidth * .5)) * (fImageFOV * .5);

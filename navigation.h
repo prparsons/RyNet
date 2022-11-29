@@ -47,15 +47,14 @@ public:
 
 private:
     bool ProcessImage(image& img);
-    bool ScanMask(uchar3* imgMask, int iWidth, int iHeight);
+    bool ScanMask(uint8_t* pMask, int iWidth, int iHeight);
 
     bool bHabitatVisible;
     float fBestDirection;
     float fImageFOV;
     DataLogger& logger;
     segNet* pNetwork;
-    uchar3* u3Mask; // only access from thread
-    std::vector<float4> vecClassColor;
+    uint8_t* pMask; // only access from thread
     std::vector<const char*> vecClassLabel;
     ThreadMutex mt;
     Signal sigNewImage;
