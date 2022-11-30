@@ -65,7 +65,6 @@ private:
 class Navigator {
 public:
     Navigator(FlightController& control, DataLogger& logger, CameraController& camera);
-    ~Navigator();
 
     void runNavigator();
 

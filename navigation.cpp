@@ -103,13 +103,6 @@ TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
     pNetwork = segNet::Create(segNet::FCN_RESNET18_VOC_512x320);//FCN_RESNET18_SUNRGB_640x512);//segNet::FCN_RESNET18_DEEPSCENE_576x320);FCN_ALEXNET_AERIAL_FPV_720p
 //  static segNet* Create( NetworkType networkType=FCN_ALEXNET_CITYSCAPES_SD, uint32_t maxBatchSize=DEFAULT_MAX_BATCH_SIZE,
 //					   precisionType precision=TYPE_FASTEST, deviceType device=DEVICE_GPU, bool allowGPUFallback=true );
-    vecClassLabel.reserve(pNetwork->GetNumClasses());
-    for (int i = 0; i < pNetwork->GetNumClasses(); i++) {
-        vecClassLabel[i] = pNetwork->GetClassDesc(i);
-        #ifdef NETWORK_PRINT_LABELS
-        printf("[%d]  %s\n", i, vecClassLabel[i]);
-        #endif
-    }
 }
 
 TerrainSegmentation::~TerrainSegmentation()
@@ -236,9 +229,6 @@ Navigator::Navigator(FlightController& _control, DataLogger& _logger, CameraCont
 : control(_control)
 , logger(_logger)
 , camera(_camera)
-, pThreadNav(nullptr)
-, pThreadDet(nullptr)
-, pThreadSeg(nullptr)
 , detector(logger)
 , segmenter(logger)
 {
