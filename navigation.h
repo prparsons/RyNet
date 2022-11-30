@@ -12,6 +12,7 @@ class segNet;
 class ObjectDetection {
 public:
     ObjectDetection(DataLogger& logger);
+    ~ObjectDetection();
 
     void SetNewImage(image& img);
     void run();
@@ -51,11 +52,10 @@ private:
 
     bool bHabitatVisible;
     float fBestDirection;
-    float fImageFOV;
+    float fImageFOV; // should get this from camera
     DataLogger& logger;
     segNet* pNetwork;
-    uint8_t* pMask; // only access from thread
-    std::vector<const char*> vecClassLabel;
+    uint8_t* pMask; // only access from thread (this really doesn't even need to be a class member)
     ThreadMutex mt;
     Signal sigNewImage;
     StopSignal ss;
@@ -65,6 +65,7 @@ private:
 class Navigator {
 public:
     Navigator(FlightController& control, DataLogger& logger, CameraController& camera);
+    ~Navigator();
 
     void runNavigator();
 
@@ -72,9 +73,6 @@ private:
     FlightController& control;
     DataLogger& logger;
     CameraController& camera;
-    std::thread* pThreadNav;
-    std::thread* pThreadDet;
-    std::thread* pThreadSeg;
     StopSignal ssMain;
     ObjectDetection detector;
     TerrainSegmentation segmenter;

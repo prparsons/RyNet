@@ -10,17 +10,12 @@
 #include "data_types.h"
 
 class CameraController;
-struct point {
-    int x;
-    int y;
-};
 
 class cameraFrame_depth:protected rs2::depth_frame {
 public:
     cameraFrame_depth(const rs2::depth_frame& _frame);
     ~cameraFrame_depth();
 
-    float operator[](const point& xy) const { return get_distance(xy.x, xy.y); }
     int getMetersPerUnit() const { return get_units(); }
 
     int getWidth() const { return get_width(); }
@@ -32,12 +27,10 @@ private:
     rs2::decimation_filter* pDownsample;
 };
 
-
 class cameraFrame {
 public:
     cameraFrame();
     cameraFrame(const cameraFrame& other);
-    //cameraFrame& operator=(const cameraFrame& other);
     ~cameraFrame();
 
     image getImage();
@@ -59,7 +52,6 @@ public:
     rs2::config cfg;
 };
 
-//rename CameraController
 class CameraController {
 public:
     ~CameraController();

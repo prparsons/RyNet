@@ -8,13 +8,16 @@
 
 ObjectDetection::ObjectDetection(DataLogger& _logger)
 : logger(_logger)
+, pNetwork(nullptr)
 {
-	// For Jetson Nano (just let it use gpu)
-    pNetwork = detectNet::Create(detectNet::SSD_MOBILENET_V2);//, 0.5, 1, TYPE_FASTEST, DEVICE_DLA_0);
-    // SSD_INCEPTION_V2 ?
-	// For Xavier (try to use one of the DLA engines so we can use the gpu for opencv stuff)
+    pNetwork = detectNet::Create(detectNet::SSD_MOBILENET_V2);
 	//detectNet* net = detectNet::Create(detectNet::SSD_MOBILENET_V2, 0.5f, 1, TYPE_FASTEST, DEVICE_DLA_0);DEVICE_DLA_1 DEVICE_GPU
     // DLA fails with segmentation fault using detectnet with that network. even resizing images
+}
+
+ObjectDetection::~ObjectDetection()
+{
+    if (pNetwork != nullptr) delete pNetwork;
 }
 
 void ObjectDetection::SetNewImage(image& img)
@@ -288,6 +291,7 @@ void Navigator::runNavigator()
     if (pFrame != nullptr) delete pFrame;
     delete pSigRGB;
 
+    // NEED TO SIGNAL THEM TO STOP
     thrObject.join();
     thrSegment.join();
 }
