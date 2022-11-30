@@ -13,7 +13,6 @@ public:
     ~DataLogger();
 
     void run(void);
-    static DataLogger& GetDataLogger();
 
     void LogImage(cv::Mat& im);
     void LogMask(float4* pImg, int width, int height);

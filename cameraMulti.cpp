@@ -198,58 +198,55 @@ void CameraController::run()
 void CameraController::run_RS()
 {
     printL("CameraController::run_RS");
-    // Declare depth colorizer for pretty visualization of depth data
-    rs2::colorizer color_map(2); // 2 should give us a white to black color map
-    rs2::pipeline_profile pipelineInfo = pCameraRS->pipe.start();
-    if (!pipelineInfo) {
-        printL("CameraController error");
-        return;
-    }
-    do {
-        rs2::frameset data;
-        try {
+    try {
+        rs2::colorizer color_map(2); // 2 should give us a white to black color map
+        rs2::pipeline_profile pipelineInfo = pCameraRS->pipe.start();
+        if (!pipelineInfo) {
+            printL("CameraController error");
+            return;
+        }
+        do {
+            rs2::frameset data;
             if (!pCameraRS->pipe.try_wait_for_frames(&data)) {
                 printL("cam fail");
                 return;
-            }; // Wait for next set of frames from the camera
-        } catch (rs2::error e) {
-            printf("wait fail, tryin 1 more time; %d\n", e.get_type());
-            std::this_thread::sleep_for (std::chrono::seconds(1));
-            try {
-                data = pCameraRS->pipe.wait_for_frames();
-            } catch(rs2::error) {
-                printL("cam fail retry");
-                return;
             }
-        }
-        printL("newCameraFrame");
-        // Create camera frame
-        cameraFrame* pNewFrameDepth = new cameraFrame();
+            // Create camera frame
+            cameraFrame* pNewFrameDepth = new cameraFrame();
 
-        // Save the raw depth. If applying the decimation filter, before/after color map makes a difference in 
-        //      how big the image is
-        pNewFrameDepth->pDepthRaw = new cameraFrame_depth(data.get_depth_frame());
-        if (features & CameraController_DownsampleDepth) {
-            pNewFrameDepth->pDepthRaw->applyDecimationFilter();
-        }
-        rs2::frame depth = ((rs2::frame*)pNewFrameDepth->pDepthRaw)->apply_filter(color_map);
+            // Save the raw depth. If applying the decimation filter, before/after color map makes a difference in 
+            //      how big the image is
+            pNewFrameDepth->pDepthRaw = new cameraFrame_depth(data.get_depth_frame());
+            if (features & CameraController_DownsampleDepth) {
+                pNewFrameDepth->pDepthRaw->applyDecimationFilter();
+            }
+            rs2::frame depth = ((rs2::frame*)pNewFrameDepth->pDepthRaw)->apply_filter(color_map);
 
-        // Query depth frame size (width and height)
-        int w = depth.as<rs2::video_frame>().get_width();
-        int h = depth.as<rs2::video_frame>().get_height();
+            // Query depth frame size (width and height)
+            int w = depth.as<rs2::video_frame>().get_width();
+            int h = depth.as<rs2::video_frame>().get_height();
 
-        // Create OpenCV matrix of size (w,h) from the colorized depth data
-        pNewFrameDepth->pImg = new Mat(Size(w, h), CV_8UC3, (void*)depth.get_data(), Mat::AUTO_STEP);
-        
-        m.lock();
-        if (pFrameCurrentDepth != nullptr) delete pFrameCurrentDepth;
-        pFrameCurrentDepth = pNewFrameDepth;
-        m.unlock();
+            // Create OpenCV matrix of size (w,h) from the colorized depth data
+            pNewFrameDepth->pImg = new Mat(Size(w, h), CV_8UC3, (void*)depth.get_data(), Mat::AUTO_STEP);
+            
+            m.lock();
+            if (pFrameCurrentDepth != nullptr) delete pFrameCurrentDepth;
+            pFrameCurrentDepth = pNewFrameDepth;
+            m.unlock();
 
-        sigDepth.signal();
+            sigDepth.signal();
 
-        printL("finished new camera frame");
-    } while (!ss[0].shouldStop());
+            printL("finished new camera frame");
+        } while (!ss[0].shouldStop());
+    } catch (rs2::error e) {
+        printL("run_RS failed");
+        // Could stop the flight controller's depth thread, though it'll just sit on a wait not doing
+        //  anything regardless. 
+        // If it were to fail mid-flight, we could send a climb and RTL command, or perhaps just change
+        //  the relative altitude of everything in the mission to a higher value above the terrain. Make
+        //  that a run-time option, some places it could be plenty safe to continue while others might
+        //  not be.
+    }
 }
 
 void CameraController::run_CV(const char* scGStream, cameraFrame** ppFrameCurrent, Signal* pSig, StopSignal* pss)
