@@ -85,7 +85,7 @@ void DataLogger::run(void)
             char scFileName[128];
             snprintf(scFileName, 
                     127, 
-                    "img_%d_%d_%d_%d_%d_%d.jpg", 
+                    "images/img_%d_%d_%d_%d_%d_%d.jpg", 
                     pTimeStruct->tm_year + 1900, 
                     pTimeStruct->tm_mon + 1,
                     pTimeStruct->tm_mday,
@@ -110,7 +110,7 @@ void DataLogger::run(void)
             char scFileName[128];
             snprintf(scFileName, 
                     127, 
-                    "mask_%d_%d_%d_%d_%d_%d.jpg", 
+                    "masks/mask_%d_%d_%d_%d_%d_%d.jpg", 
                     pTimeStruct->tm_year + 1900, 
                     pTimeStruct->tm_mon + 1,
                     pTimeStruct->tm_mday,
@@ -204,9 +204,21 @@ void DataLogger::LogMask(float4* pImg, int width, int height)
 
 void DataLogger::LogString(const char* scData)
 {
+    char scText[256];
+    time_t timeNow = time(nullptr);
+    struct tm* pTimeStruct;
+    pTimeStruct = localtime(&timeNow);
+    snprintf(scText,
+            255,
+            "%2d:%2d:%2d %s",
+            pTimeStruct->tm_hour,
+            pTimeStruct->tm_min,
+            pTimeStruct->tm_sec,
+            scData);
+
     mt.lock();
-    string strData(scData);
-    listStrings.push_back(strData);
+    string strData(scText);
+    listStrings.insert(listStrings.begin(), strData);
     mt.unlock();
     sigNewData.signal();
 }
