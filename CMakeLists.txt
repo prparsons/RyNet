@@ -33,7 +33,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 
 # compile the my-recognition program
-cuda_add_executable(overallApp overallApp.cpp dataLogger.cpp cameraMulti.cpp planner.cpp navigation.cpp data_types.cpp)
+cuda_add_executable(overallApp overallApp.cpp dataLogger.cpp cameraMulti.cpp planner.cpp navigation.cpp )
 
 # link my-recognition to jetson-inference library
 target_link_libraries(overallApp jetson-inference realsense2 ${OpenCV_LIBS})

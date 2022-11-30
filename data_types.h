@@ -14,38 +14,4 @@
 
 typedef cv::Mat image;
 
-class DetectionBox {
-public:
-    DetectionBox();
-    DetectionBox(const DetectionBox& other);
-
-    DetectionBox& operator=(const DetectionBox& other);
-
-    float fTop;
-    float fRight;
-    float fBottom;
-    float fLeft;
-};
-
-class Destination {
-public:
-    Destination();
-
-    bool operator==(const Destination& other);
-    bool operator!=(const Destination& other);
-
-    float fX, fY, fZ;
-};
-
-class Point {
-public:
-    Point():fX(0),fY(0){}
-    Point(float _fX, float _fY):fX(_fX), fY(_fY){}
-    Point(const Point& other){ *this = other; }
-
-    Point& operator=(const Point& other) { fX = other.fX; fY = other.fY; }
-
-    float fX;
-    float fY;
-};
 
