@@ -42,7 +42,7 @@ public:
         TREES,
         WATER,
         TERRAIN,
-        HABITAT = 5 //sunrgb, chair is 5
+        HABITAT = 15
     };
 
 private:

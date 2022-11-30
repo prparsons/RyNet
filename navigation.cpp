@@ -10,10 +10,11 @@ ObjectDetection::ObjectDetection(DataLogger& _logger)
 : logger(_logger)
 {
 	// For Jetson Nano (just let it use gpu)
-    pNetwork = detectNet::Create(detectNet::SSD_MOBILENET_V2);
+    pNetwork = detectNet::Create(detectNet::SSD_MOBILENET_V2);//, 0.5, 1, TYPE_FASTEST, DEVICE_DLA_0);
     // SSD_INCEPTION_V2 ?
 	// For Xavier (try to use one of the DLA engines so we can use the gpu for opencv stuff)
 	//detectNet* net = detectNet::Create(detectNet::SSD_MOBILENET_V2, 0.5f, 1, TYPE_FASTEST, DEVICE_DLA_0);DEVICE_DLA_1 DEVICE_GPU
+    // DLA fails with segmentation fault using detectnet with that network. even resizing images
 }
 
 void ObjectDetection::SetNewImage(image& img)
@@ -24,9 +25,11 @@ void ObjectDetection::SetNewImage(image& img)
     sigNewImage.signal();
 }
 
-bool ObjectDetection::ProcessImage(image& imgRGB)
+bool ObjectDetection::ProcessImage(image& _imgRGB)
 {
-    // these variables will store the image data pointer and dimensions
+    cv::Mat imgRGB;
+    cv::resize(_imgRGB, imgRGB, cv::Size(640, 360), cv::INTER_LINEAR);
+
     int imgWidth = imgRGB.cols;      // width of the image (in pixels)
     int imgHeight = imgRGB.rows;      // height of the image (in pixels)
     uchar3* u3Img;
@@ -38,7 +41,6 @@ bool ObjectDetection::ProcessImage(image& imgRGB)
     cudaMemcpy(u3Img, (void*)imgRGB.data, imgWidth*imgHeight*3, cudaMemcpyHostToDevice);   // shared CPU/GPU pointer to image
     detectNet::Detection* arDetections = nullptr;
     int iDetections = pNetwork->Detect(u3Img, imgWidth, imgHeight, &arDetections);
-    
     if (iDetections < 1) {
         return false;
     }
@@ -76,11 +78,11 @@ void ObjectDetection::run()
         imgProcess = imgRecent;
         mt.unlock();
         
-        //if (ProcessImage(imgProcess)) {
+        if (ProcessImage(imgProcess)) {
             // This works, but at 2fps, this could still add up to way more than necessary.
             // Need a rate limit 
             //logger.LogImage(imgProcess);
-        //}
+        }
     }
     delete pSigRGB;
 }
@@ -95,7 +97,9 @@ TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
 , logger(_logger)
 , pMask(nullptr)
 {
-    pNetwork = segNet::Create(segNet::FCN_RESNET18_SUNRGB_640x512);//segNet::FCN_RESNET18_DEEPSCENE_576x320);FCN_ALEXNET_AERIAL_FPV_720p
+    pNetwork = segNet::Create(segNet::FCN_RESNET18_VOC_512x320);//FCN_RESNET18_SUNRGB_640x512);//segNet::FCN_RESNET18_DEEPSCENE_576x320);FCN_ALEXNET_AERIAL_FPV_720p
+//  static segNet* Create( NetworkType networkType=FCN_ALEXNET_CITYSCAPES_SD, uint32_t maxBatchSize=DEFAULT_MAX_BATCH_SIZE,
+//					   precisionType precision=TYPE_FASTEST, deviceType device=DEVICE_GPU, bool allowGPUFallback=true );
     vecClassLabel.reserve(pNetwork->GetNumClasses());
     for (int i = 0; i < pNetwork->GetNumClasses(); i++) {
         vecClassLabel[i] = pNetwork->GetClassDesc(i);
@@ -142,12 +146,18 @@ bool TerrainSegmentation::ProcessImage(image& imgRGB)
 
 bool TerrainSegmentation::IsHabitatVisible()
 {
-    return bHabitatVisible;
+    mt.lock();
+    bool bReturn = bHabitatVisible;
+    mt.unlock();
+    return bReturn;
 }
 
 float TerrainSegmentation::GetHabitatDirection()
 {
-    return 1.0;
+    mt.lock();
+    float fReturn = fBestDirection;
+    mt.unlock();
+    return fReturn;
 }
 
 void TerrainSegmentation::SetNewImage(image& img)
@@ -173,7 +183,9 @@ void TerrainSegmentation::run()
         if (ProcessImage(imgProcess)) {
         //    logger.LogImage(imgProcess);
             char sc[128];
+            mt.lock();
             sprintf(sc, "Good Habitat Found %2.2f", fBestDirection);
+            mt.unlock();
             logger.LogString(sc);
         }
     }
@@ -196,7 +208,9 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iWidth, int iHeight)
     }
 
     if (iAngleAvgCount == 0) {
-        fBestDirection = -1;
+        mt.lock();
+        bHabitatVisible = false;
+        mt.unlock();
         return false;
     }
     // We've found the desired category
@@ -208,7 +222,10 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iWidth, int iHeight)
         logger.LogMask(imgMask, maskWidth, maskHeight);
         cudaFreeHost(imgMask);
     }
+    mt.lock();
     fBestDirection = fAngleAvgSum / iAngleAvgCount;
+    bHabitatVisible = true;
+    mt.unlock();
     return true;
 }
 
@@ -232,7 +249,7 @@ void Navigator::runNavigator()
     Signal* pSigRGB = camera.GetSignalRGB();
 
     bool bGridSearching = true;
-    float fMargin = 0;
+    float fMargin = 5;
 
     std::thread thrObject(&ObjectDetection::run, &detector);
     std::thread thrSegment(&TerrainSegmentation::run, &segmenter);
@@ -246,23 +263,25 @@ void Navigator::runNavigator()
         detector.SetNewImage(imgNew);
         segmenter.SetNewImage(imgNew);
 
-        if (bGridSearching) {
+        if (bGridSearching) { // Habitat not visible, we're currently running search pattern
             if (segmenter.IsHabitatVisible()) { // good terrain visible?
                 control.SetDirection(segmenter.GetHabitatDirection());
                 char sc[64];
                 sprintf(sc, "Grid Search -> Good Habitat %1.3f", segmenter.GetHabitatDirection());
                 logger.LogString(sc);
+                bGridSearching = false;
             }
-        } else {
-	    if (segmenter.IsHabitatVisible()) {
+        } else { // Habitat already visible
+	        if (segmenter.IsHabitatVisible()) {
                 if (abs(segmenter.GetHabitatDirection()) < fMargin) continue; // good terrain in current direction?
                 control.SetDirection(segmenter.GetHabitatDirection());
                 char sc[64];
-                sprintf(sc, "Grid Search Change -> %1.3f", segmenter.GetHabitatDirection());
+                sprintf(sc, "Good Habitat Change -> %1.3f", segmenter.GetHabitatDirection());
                 logger.LogString(sc);
             } else {
                 control.RestoreRouteNaive();
                 logger.LogString("Good Habitat -> Grid Search");
+                bGridSearching = true;
             }
         }
     }
