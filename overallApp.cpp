@@ -3,6 +3,7 @@
 #include <jetson-utils/loadImage.h>
 #include <sys/socket.h>
 
+#include <string.h>
 #include <thread>
 
 #include "navigation.h"
@@ -13,8 +14,8 @@ int main( int argc, char** argv )
     bool bStopNavOnDepthFail = true;
     bool bSendRTL = false;
     for (int i = 0; i < argc; i++) {
-        if (stricmp("--continue", argv[i]) == 0) bStopNavOnDepthFail = false;
-        else if (stricmp("--rtlfinish", argv[i])) bSendRTL = true;
+        if (strcmp("--continue", argv[i]) == 0) bStopNavOnDepthFail = false;
+        else if (strcmp("--rtlfinish", argv[i])) bSendRTL = true;
     }
     try {
         DataLogger logger;
@@ -44,9 +45,9 @@ int main( int argc, char** argv )
         struct sockaddr_in addressMavLink;
         int socketDesc;
         socketDesc = socket(AF_INET, SOCK_DGRAM, 0);
-        if (socketDesc < 0) return;
+        if (socketDesc < 0) return 1;
         addressMavLink.sin_family = AF_INET; 
-        addressMavLink.sin_port = htons(iMavlinkPort); 
+        addressMavLink.sin_port = htons(3636); 
         addressMavLink.sin_addr.s_addr = INADDR_ANY;
         sendto(socketDesc, "<rtl />", 7, MSG_CONFIRM, (const struct sockaddr*) &addressMavLink, sizeof(addressMavLink));
     }

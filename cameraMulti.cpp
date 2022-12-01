@@ -256,7 +256,7 @@ void CameraController::run_CV(const char* scGStream, cameraFrame** ppFrameCurren
     printL(scGStream);
     Mat frame;
 
-    VideoCapture pCap = new VideoCapture(scGStream, cv::CAP_GSTREAMER);
+    VideoCapture* pCap = new VideoCapture(scGStream, cv::CAP_GSTREAMER);
     
     if (!pCap->isOpened()) {
         printL("CameraController::run_CV failed to open");
