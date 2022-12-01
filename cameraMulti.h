@@ -75,6 +75,7 @@ public:
     Signal* GetSignalIR();
 
     void run();
+    void JoinDepth();
 
 protected:
     CameraController(cameraFeatures);

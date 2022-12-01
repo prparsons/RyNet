@@ -195,6 +195,11 @@ void CameraController::run()
     }
 }
 
+void CameraController::JoinDepth()
+{
+    if (pthrCamera[0] != nullptr) pthrCamera[0]->join();
+}
+
 void CameraController::run_RS()
 {
     printL("CameraController::run_RS");
@@ -240,12 +245,8 @@ void CameraController::run_RS()
         } while (!ss[0].shouldStop());
     } catch (rs2::error e) {
         printL("run_RS failed");
-        // Could stop the flight controller's depth thread, though it'll just sit on a wait not doing
-        //  anything regardless. 
-        // If it were to fail mid-flight, we could send a climb and RTL command, or perhaps just change
-        //  the relative altitude of everything in the mission to a higher value above the terrain. Make
-        //  that a run-time option, some places it could be plenty safe to continue while others might
-        //  not be.
+        // If we get an exception, we aren't getting the camera working again (at least I've never
+        //  been able too yet...)
     }
 }
 
@@ -255,17 +256,26 @@ void CameraController::run_CV(const char* scGStream, cameraFrame** ppFrameCurren
     printL(scGStream);
     Mat frame;
 
-    VideoCapture cap(scGStream, cv::CAP_GSTREAMER);
+    VideoCapture pCap = new VideoCapture(scGStream, cv::CAP_GSTREAMER);
     
-    if (!cap.isOpened()) {
+    if (!pCap->isOpened()) {
         printL("CameraController::run_CV failed to open");
         return;
     }
 
     while (!pss->shouldStop()) { // We need a separate stop signal for each thread
-        cap.read(frame);
+        pCap->read(frame);
         if (frame.empty()) {
             printL("CameraController::run_CV empty frame");
+            // The only mentioned reasons for failure are camera has been disconnected, or there are
+            //  no more frames in the video file (not applicable here). So, we'll try reconnecting
+            delete pCap;
+            pCap = new VideoCapture(scGStream, cv::CAP_GSTREAMER);
+            if (!pCap->isOpened()) {
+                // Still failed, no point in just giving up, we can keep trying every second or so
+                printL("CameraController::run_CV, reconnect attempt failed");
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            }
             continue;
         }
         // Do something with frame
@@ -279,4 +289,5 @@ void CameraController::run_CV(const char* scGStream, cameraFrame** ppFrameCurren
         pSig->signal();
     }
     // According to opencv: the camera will be deinitialized automatically in VideoCapture destructor
+    delete pCap;
 }

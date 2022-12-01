@@ -1,6 +1,7 @@
 #include "planner.h"
 
 #include <string.h>
+#include <chrono>
 
 FlightController::FlightController(DataLogger& _logger, CameraController& _camera)
 : logger(_logger)
@@ -32,6 +33,18 @@ void FlightController::SetDestination(float fHeadingOffsetDeg, float fDistance)
     SendXML(sc);
 }
 
+void FlightController::SetRTL()
+{
+    SendXML("<rtl />");
+}
+
+void FlightController::SetAltitude(float fAltitudeMeters)
+{
+    char sc[128];
+    snprintf(sc, 128, "<altitude_set>%.2f</altitude_set>", fAltitudeMeters);
+    SendXML(sc);
+}
+
 void FlightController::RestoreRouteNaive()
 {
     char sc[128];
@@ -58,11 +71,6 @@ void FlightController::SaveRoute()
     char sc[128];
     strcpy(sc, "<route_save />");
     SendXML(sc);
-}
-
-float FlightController::DistanceLatLon(float fLat1, float fLon1, float fLat2, float fLon2)
-{
-    return -1.0;
 }
 
 void FlightController::runDepth()
@@ -157,9 +165,17 @@ char* FlightController::SendRecXML(const char* strMessage)
     if (socketDesc < 0) ConnectMavLink();
     sendto(socketDesc, strMessage, strlen(strMessage), MSG_CONFIRM, (const struct sockaddr*)&addressMavLink, sizeof(addressMavLink));
     char* scResponse = new char[512];
-    //*************HOW DO WE PREVENT THIS FROM BLOCKING FOREVER?
-    //int iLength = recvfrom(socketDesc, scResponse, 511, MSG_WAITALL, nullptr, nullptr); // MSG_WAITALL -- This flag has no effect for datagram sockets.
-    int iLength = recv(socketDesc, scResponse, 511, 0);
+    int iLength = recv(socketDesc, scResponse, 511, MSG_DONTWAIT);
+    if (iLength < 0) {
+        // It failed, give it __msec then try one more time
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        iLength = recv(socketDesc, scResponse, 511, MSG_DONTWAIT);
+        if (iLength < 0) {
+            // Still failed...give up
+            delete[] scResponse;
+            return nullptr;
+        }
+    }
     scResponse[iLength] = 0;
     return scResponse;
     #endif

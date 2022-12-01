@@ -10,25 +10,45 @@
 
 int main( int argc, char** argv )
 {
-    bool bContinueFlight = true;
-    DataLogger logger;
-    CameraController* pCamera = CameraController::OpenCamera(CameraController::CameraController_RGB);
-    FlightController controller(logger, *pCamera);
-    Navigator nav(controller, logger, *pCamera);
-    printL("Starting main loop");
+    bool bStopNavOnDepthFail = true;
+    bool bSendRTL = false;
+    for (int i = 0; i < argc; i++) {
+        if (stricmp("--continue", argv[i]) == 0) bStopNavOnDepthFail = false;
+        else if (stricmp("--rtlfinish", argv[i])) bSendRTL = true;
+    }
     try {
+        DataLogger logger;
+        CameraController* pCamera = CameraController::OpenCamera(CameraController::CameraController_RGB);
+        FlightController controller(logger, *pCamera);
+        Navigator nav(controller, logger, *pCamera);
+        printL("Starting main loop");
         std::thread thrLogger(&DataLogger::run, &logger);
         pCamera->run(); // Camera starts all it's own threads
         std::thread thrNav(&Navigator::runNavigator, &nav);
         // std::system_error if the thread could not be started.
-        do {
-            thrNav.join();
-            thrLogger.join();
-            break;
-        } while (bContinueFlight);
+        
+        pCamera->JoinDepth();
+        // If we get here, depth failed 
+        if (bStopNavOnDepthFail) {
+            StopSignal* pss = nav.GetStopSignal();
+            pss->stop();
+            delete pss;
+        } // else could have a set alititude option, climb a bit if no depth?
+        thrNav.join();
+        if (bSendRTL) controller.SetRTL();
+        thrLogger.join();
     } catch (std::exception e) {
-        std::cout << "Exception: " << e.what();
+        std::cout << "Exception: " << e.what() << std::endl;
+        std::cout << "Sending RTL";
+        // What it we exec a script that just sends a RTL to the server script?
+        struct sockaddr_in addressMavLink;
+        int socketDesc;
+        socketDesc = socket(AF_INET, SOCK_DGRAM, 0);
+        if (socketDesc < 0) return;
+        addressMavLink.sin_family = AF_INET; 
+        addressMavLink.sin_port = htons(iMavlinkPort); 
+        addressMavLink.sin_addr.s_addr = INADDR_ANY;
+        sendto(socketDesc, "<rtl />", 7, MSG_CONFIRM, (const struct sockaddr*) &addressMavLink, sizeof(addressMavLink));
     }
-
     return 0;
 }

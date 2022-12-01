@@ -278,10 +278,17 @@ void Navigator::runNavigator()
             }
         }
     }
+
+    // Handle all the cleanup
+    StopSignal* pss = detector.GetStopSignal();
+    pss->stop();
+    delete pss;
+    pss = segmenter.GetStopSignal();
+    pss->stop();
+    delete pss;
     if (pFrame != nullptr) delete pFrame;
     delete pSigRGB;
-
-    // NEED TO SIGNAL THEM TO STOP
+    // Do we really need to join them?
     thrObject.join();
     thrSegment.join();
 }

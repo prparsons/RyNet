@@ -22,13 +22,14 @@ public:
 
     void SetDirection(float fHeadingOffsetDeg); // Store the currently programmed route, adjust heading
     void SetDestination(float fHeadingOffsetDeg, float fDistance); // Store route, adjust heading, after distance will automatically restore route
-
+    void SetRTL();
+    void SetAltitude(float fAltitudeMeters);
     void RestoreRouteNaive();
     void RestoreRouteClean();
 
+
 private:
     void SaveRoute();
-    float DistanceLatLon(float fLat1, float fLon1, float fLat2, float fLon2);
     void SendXML(const char* sc);
     char* SendRecXML(const char* sc);
     void ConnectMavLink();
@@ -39,7 +40,7 @@ private:
     std::thread* pThreadDepth;
     StopSignal ss;
 
-	struct sockaddr_in addressMavLink;
+    struct sockaddr_in addressMavLink;
     int socketDesc;
     const char* scMavLinkAddress = "127.0.0.1";
     const int iMavlinkPort = 3636;

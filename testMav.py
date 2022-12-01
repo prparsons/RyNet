@@ -264,7 +264,7 @@ except KeyboardInterrupt:
 """
 
 from __future__ import print_function
-from dronekit import connect, Command
+from dronekit import connect, Command, VehicleMode
 import time
 import socket
 import xml.etree.ElementTree as ET
@@ -507,6 +507,13 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
         print("Position retrieve")
         strReply = "%f\n%f\n" % (vehicle.location.global_frame.lat, vehicle.location.global_frame.lon)
         UDPServerSocket.sendto(str.encode(strReply), address)
+
+    #elif element.tag == 'altitude_set':
+        #need to read through the whole route and set each one, at least I'm pretty sure that's the case
+
+    elif element.tag == 'rtl':
+        vehicle.mode = VehicleMode("RTL")
+        UDPServerSocket.sendto(bytesToSend, address)
         
     elif element.tag == 'route_restore':
         missionList = readmissionF('savedMission.txt', vehicle)
