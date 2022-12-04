@@ -55,8 +55,8 @@ import argparse
 parser = argparse.ArgumentParser(description='UDP Dronekit server')
 parser.add_argument('--connect', 
                     help="Vehicle connection target string.\nMission Planner SITL example: 'tcp:127.0.0.1:5762'\nIf not specified, dronekit SITL used")
-parser.add_argument('--port', type=int, default=3636,
-                    help="Port to listen on [default:3636]")
+parser.add_argument('--port', type=int, default=3636, help="Port to listen on [default:3636]")
+parser.add_argument('--livetest', default='False', help='If True, will only send <obs /> messages to the drone.')
 args = parser.parse_args()
 
 def readmissionF(aFileName, vehicle):
@@ -272,13 +272,24 @@ def cmdRouteRestore(vehicle, element):
             while not vehicle.mode.name=='AUTO':
                 time.sleep(0.01)
 
+def cmdRoutRetrieve(vehicle, UDPServerSocket, address):
+    missionList = download_mission(vehicle)
+    missionStr = mission_to_str(missionList)
+    UDPServerSocket.sendto(str.encode(missionStr), address)
+
+def cmdPosRetrieve(vehicle, UDPServerSocket, address):
+    strReply = "%f\n%f\n" % (vehicle.location.global_frame.lat, vehicle.location.global_frame.lon)
+    UDPServerSocket.sendto(str.encode(strReply), address)
+
 def handleCommand(element, vehicle, UDPServerSocket, address):
-    if element.tag == 'test':
-        print("<test>")
-        if 'things' in element.attrib:
-            print("things")
+    if args.livetest == 'True':
+        if element.tag == 'obs':
+            cmdObs(vehicle, element)
+        else:
+            print("Testing Cmd: " % element.tag)
+        return
     
-    elif element.tag == 'takeoff':
+    if element.tag == 'takeoff':
         cmdTakeoff(vehicle, element)
 
     elif element.tag == 'dir':
@@ -291,9 +302,7 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
         save_missionF('savedMission.txt', vehicle)
 
     elif element.tag == 'route_retrieve':
-        missionList = download_mission(vehicle)
-        missionStr = mission_to_str(missionList)
-        UDPServerSocket.sendto(str.encode(missionStr), address)
+        cmdRoutRetrieve(vehicle, UDPServerSocket, address)
 
     elif element.tag == 'route_set':
         cmdRouteSet(vehicle, element)
@@ -302,9 +311,7 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
         cmdRouteLoad(vehicle, element)
 
     elif element.tag == 'pos_retrieve':
-        print("Position retrieve")
-        strReply = "%f\n%f\n" % (vehicle.location.global_frame.lat, vehicle.location.global_frame.lon)
-        UDPServerSocket.sendto(str.encode(strReply), address)
+        cmdPosRetrieve(vehicle, UDPServerSocket, address)
 
     #elif element.tag == 'altitude_set':
         #need to read through the whole route and set each one
