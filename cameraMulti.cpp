@@ -77,7 +77,7 @@ cameraFrame_depth* cameraFrame::getDepthRaw()
 // ***********
 // CameraController
 
-CameraController* CameraController::OpenCamera(cameraFeatures features)
+CameraController* CameraController::OpenCamera(uint32_t features)
 {
     CameraController* pReturn = new CameraController(features);
     return pReturn;
@@ -134,7 +134,7 @@ Signal* CameraController::GetSignalIR()
     return new Signal(sigIR);
 }
 
-CameraController::CameraController(cameraFeatures _features)
+CameraController::CameraController(uint32_t _features)
 : pFrameCurrentDepth(nullptr)
 , pFrameCurrentRGB(nullptr)
 , pFrameCurrentIR(nullptr)
@@ -172,7 +172,9 @@ CameraController::~CameraController()
 
 void CameraController::run()
 {
+    printf("CameraController::run features=%u", features);
     if (features & CameraController_Depth) {
+        printL("CameraController::run starting depth");
         if (pthrCamera[0] == nullptr) {
             pthrCamera[0] = new std::thread(&CameraController::run_RS, this);
         } else {
@@ -180,6 +182,7 @@ void CameraController::run()
         }
     }
     if (features & CameraController_RGB) {
+        printL("CameraController::run starting RGB");
         if (pthrCamera[1] == nullptr) {
             pthrCamera[1] = new std::thread(&CameraController::run_CV, this, scGStream_RGB, &pFrameCurrentRGB, &sigRGB, &ss[1]);
         } else {
@@ -198,23 +201,27 @@ void CameraController::run()
 void CameraController::JoinDepth()
 {
     if (pthrCamera[0] != nullptr) pthrCamera[0]->join();
+    else printL("CameraController::JoinDepth depth thread was not started");
 }
 
 void CameraController::run_RS()
 {
     printL("CameraController::run_RS");
     try {
+        bool bFrameRetrieved = false;
         rs2::colorizer color_map(2); // 2 should give us a white to black color map
-        rs2::pipeline_profile pipelineInfo = pCameraRS->pipe.start();
+        rs2::pipeline_profile pipelineInfo = pCameraRS->pipe.start(pCameraRS->cfg);
         if (!pipelineInfo) {
-            printL("CameraController error");
+            printL("CameraController::run_RS error");
             return;
         }
         do {
             rs2::frameset data;
             if (!pCameraRS->pipe.try_wait_for_frames(&data)) {
-                printL("cam fail");
+                printL("CameraController::run_RS cam fail");
                 return;
+            } else if (bFrameRetrieved) {
+                printL("CameraController::run_RS frames have been retrieved");
             }
             // Create camera frame
             cameraFrame* pNewFrameDepth = new cameraFrame();
@@ -240,8 +247,6 @@ void CameraController::run_RS()
             m.unlock();
 
             sigDepth.signal();
-
-            printL("finished new camera frame");
         } while (!ss[0].shouldStop());
     } catch (rs2::error e) {
         printL("run_RS failed");

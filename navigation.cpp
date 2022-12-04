@@ -74,7 +74,7 @@ void ObjectDetection::run()
     printL("ObjectDetection::run");
     Signal* pSigRGB = new Signal(sigNewImage);
     image imgProcess;
-
+    time_t uLastImg = 0;
     while (!ss.shouldStop()) {
         pSigRGB->wait();
         mt.lock();
@@ -84,7 +84,10 @@ void ObjectDetection::run()
         if (ProcessImage(imgProcess)) {
             // This works, but at 2fps, this could still add up to way more than necessary.
             // Need a rate limit 
-            //logger.LogImage(imgProcess);
+            if (time(nullptr) - uLastImg > 5) {
+                logger.LogImage(imgProcess);
+                uLastImg = time(nullptr);
+            }
         }
     }
     delete pSigRGB;
@@ -239,7 +242,7 @@ Navigator::Navigator(FlightController& _control, DataLogger& _logger, CameraCont
 
 void Navigator::runNavigator()
 {
-    printf("Navigator::runNavigator");
+    printL("Navigator::runNavigator");
     cameraFrame* pFrame = nullptr;
     Signal* pSigRGB = camera.GetSignalRGB();
 
@@ -302,6 +305,7 @@ void Navigator::runNavigator()
         }
     }
 
+    printL("Navigator::runNavigator loop done, stopping segmenter and detector");
     // Handle all the cleanup
     StopSignal* pss = detector.GetStopSignal();
     pss->stop();

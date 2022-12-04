@@ -75,6 +75,7 @@ void FlightController::SaveRoute()
 
 void FlightController::runDepth()
 {
+    printL("FlightController::runDepth");
     Signal* pSig = camera.GetSignalDepth();
     while (!ss.shouldStop()) {
         pSig->wait();

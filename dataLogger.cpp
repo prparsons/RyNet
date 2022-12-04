@@ -158,8 +158,7 @@ void DataLogger::LogString(const char* scData)
             scData);
 
     mt.lock();
-    string strData(scText);
-    listStrings.insert(listStrings.begin(), strData);
+    listStrings.insert(listStrings.begin(), scData);
     mt.unlock();
     sigNewData.signal();
 }

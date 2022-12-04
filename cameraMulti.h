@@ -52,19 +52,16 @@ public:
     rs2::config cfg;
 };
 
+#define CameraController_RGB 0x01
+#define CameraController_IR 0x02
+#define CameraController_Depth 0x04
+#define CameraController_DownsampleDepth 0x08
+
 class CameraController {
 public:
     ~CameraController();
 
-    enum cameraFeatures {
-        CameraController_RGB = 0x01,
-        CameraController_IR = 0x02,
-        CameraController_Depth = 0x04,
-
-        CameraController_DownsampleDepth = 0x08
-    };
-
-    static CameraController* OpenCamera(cameraFeatures features);
+    static CameraController* OpenCamera(uint32_t features);
 
     // Must delete returned pointers
     cameraFrame* GetFrameDepth();
@@ -78,7 +75,7 @@ public:
     void JoinDepth();
 
 protected:
-    CameraController(cameraFeatures);
+    CameraController(uint32_t);
     void run_RS();
     void run_CV(const char* scGStream, cameraFrame** ppFrameCurrent, Signal* pSig, StopSignal* pss);
 
@@ -89,7 +86,7 @@ private:
     ThreadMutex m;
 
     camera_RS* pCameraRS;
-    cameraFeatures features;
+    uint32_t features;
 
     std::thread* pthrCamera[3];
     StopSignal ss[3];

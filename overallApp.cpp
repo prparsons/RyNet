@@ -19,7 +19,7 @@ int main( int argc, char** argv )
     }
     try {
         DataLogger logger;
-        CameraController* pCamera = CameraController::OpenCamera(CameraController::CameraController_RGB);
+        CameraController* pCamera = CameraController::OpenCamera(CameraController_RGB | CameraController_Depth);
         FlightController controller(logger, *pCamera);
         Navigator nav(controller, logger, *pCamera);
         printL("Starting main loop");
@@ -27,10 +27,12 @@ int main( int argc, char** argv )
         pCamera->run(); // Camera starts all it's own threads
         std::thread thrNav(&Navigator::runNavigator, &nav);
         // std::system_error if the thread could not be started.
-        
+        printL("Threads Started, waiting on camera");        
         pCamera->JoinDepth();
+        printL("Camera Depth joined");
         // If we get here, depth failed 
         if (bStopNavOnDepthFail) {
+            printL("Getting stop signal to stop Nav");
             StopSignal* pss = nav.GetStopSignal();
             pss->stop();
             delete pss;
