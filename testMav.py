@@ -212,7 +212,16 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
             print("things")
 
     elif element.tag == 'takeoff':
-        print("should do this")
+        arm_and_takeoff(vehicle, 100)
+        time.sleep(3)
+        
+        if 'setauto' in element.attrib:
+            if element.attrib['setauto'] == 'true':
+                vehicle.mode = VehicleMode("AUTO")
+                while not vehicle.mode.name=='AUTO':
+                    time.sleep(0.01)
+        UDPServerSocket.sendto(bytesToSend, address)
+
     elif element.tag == 'dir':
         ptCurrent = (vehicle.location.global_frame.lat, vehicle.location.global_frame.lon)
         distanceM = 1000
@@ -255,6 +264,17 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
         upload_missionStr(element.text, vehicle)
         UDPServerSocket.sendto(bytesToSend, address)
 
+    elif element.tag == 'route_load':
+        missionName = element.text
+        missionList = readmissionF(missionName, vehicle)
+        upload_mission(missionList, vehicle)
+        if 'setauto' in element.attrib:
+            if element.attrib['setauto'] == 'true':
+                vehicle.mode = VehicleMode("AUTO")
+                while not vehicle.mode.name=='AUTO':
+                    time.sleep(0.01)
+        UDPServerSocket.sendto(bytesToSend, address)
+
     elif element.tag == 'pos_retrieve':
         print("Position retrieve")
         strReply = "%f\n%f\n" % (vehicle.location.global_frame.lat, vehicle.location.global_frame.lon)
@@ -268,10 +288,12 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
         UDPServerSocket.sendto(bytesToSend, address)
         
     elif element.tag == 'route_restore':
-        vehicle.mode = VehicleMode("AUTO")
-        while not vehicle.mode.name=='AUTO':
-            time.sleep(0.01)
-        missionList = readmissionF('savedMission.txt', vehicle)
+        if 'loadsaved' in element.attrib:
+            if element.attrib['loadsaved'] == 'true':
+                missionList = readmissionF('savedMission.txt', vehicle)
+        else:
+            missionList = missionList = download_mission(vehicle)
+            
         if 'lat' in element.attrib:
             fLat = float(element.attrib['lat'])
             fLon = float(element.attrib['lon'])
@@ -285,6 +307,10 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
                                                 fLat,
                                                 fLon)
         upload_mission(missionList, vehicle)
+
+        vehicle.mode = VehicleMode("AUTO")
+        while not vehicle.mode.name=='AUTO':
+            time.sleep(0.01)
         UDPServerSocket.sendto(bytesToSend, address)
 
     else:
@@ -294,8 +320,42 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
     for attribute in element.attrib:
         print(attribute)
 
+def arm_and_takeoff(vehicle, aTargetAltitude):
+    """
+    Arms vehicle and fly to aTargetAltitude.
+    """
+
+    print("Basic pre-arm checks")
+    # Don't try to arm until autopilot is ready
+    while not vehicle.is_armable:
+        print(" Waiting for vehicle to initialise...")
+        time.sleep(1)
+
+    print("Arming motors")
+    # Copter should arm in GUIDED mode
+    vehicle.mode    = VehicleMode("GUIDED")
+    vehicle.armed   = True
+
+    # Confirm vehicle armed before attempting to take off
+    while not vehicle.armed:
+        print(" Waiting for arming...")
+        time.sleep(1)
+
+    print("Taking off!")
+    vehicle.simple_takeoff(aTargetAltitude) # Take off to target altitude
+
+    # Wait until the vehicle reaches a safe height before processing the goto (otherwise the command
+    #  after Vehicle.simple_takeoff will execute immediately).
+    while True:
+        print(" Altitude: ", vehicle.location.global_relative_frame.alt)
+        #Break and return from function just below target altitude.
+        if vehicle.location.global_relative_frame.alt>=aTargetAltitude*0.95:
+            print("Reached target altitude")
+            break
+        time.sleep(1)
+
 # Set up connection string to the drone
-connection_string = None#args.connect
+connection_string = 'tcp:127.0.0.1:5762'#None#args.connect
 sitl = None
 #Start SITL if no connection string specified
 if not connection_string:
