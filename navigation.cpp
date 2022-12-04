@@ -226,7 +226,9 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iWidth, int iHeight)
 }
 
 Navigator::Navigator(FlightController& _control, DataLogger& _logger, CameraController& _camera)
-: control(_control)
+: tLastChange(0)
+, tMinTimeBetweenChanges(5)
+, control(_control)
 , logger(_logger)
 , camera(_camera)
 , detector(logger)
@@ -257,24 +259,45 @@ void Navigator::runNavigator()
         segmenter.SetNewImage(imgNew);
 
         if (bGridSearching) { // Habitat not visible, we're currently running search pattern
-            if (segmenter.IsHabitatVisible()) { // good terrain visible?
-                control.SetDirection(segmenter.GetHabitatDirection());
+            // Good terrain visible?
+            if (segmenter.IsHabitatVisible()) {
                 char sc[64];
-                sprintf(sc, "Grid Search -> Good Habitat %1.3f", segmenter.GetHabitatDirection());
+                // If enough time since last command, then we'll change
+                if (time(nullptr) - tLastChange > tMinTimeBetweenChanges) {
+                    control.SetDirection(segmenter.GetHabitatDirection());
+                    sprintf(sc, "Grid Search -> Good Habitat %1.3f", segmenter.GetHabitatDirection());
+                    bGridSearching = false;
+                    tLastChange = time(nullptr);
+                } else {
+                    sprintf(sc, "[delay]Grid Search -> Good Habitat %1.3f", segmenter.GetHabitatDirection());
+                }
                 logger.LogString(sc);
-                bGridSearching = false;
             }
         } else { // Habitat already visible
+            // Good terrain still visible?
 	        if (segmenter.IsHabitatVisible()) {
-                if (abs(segmenter.GetHabitatDirection()) < fMargin) continue; // good terrain in current direction?
-                control.SetDirection(segmenter.GetHabitatDirection());
+                // If it's in the same direction then do nothing
+                if (abs(segmenter.GetHabitatDirection()) < fMargin) continue;
                 char sc[64];
-                sprintf(sc, "Good Habitat Change -> %1.3f", segmenter.GetHabitatDirection());
+                // If enough time since last command, then we can change
+                if (time(nullptr) - tLastChange > tMinTimeBetweenChanges) {
+                    control.SetDirection(segmenter.GetHabitatDirection());
+                    sprintf(sc, "Good Habitat Change -> %1.3f", segmenter.GetHabitatDirection());
+                    tLastChange = time(nullptr);
+                } else {
+                    sprintf(sc, "[delay]Good Habitat Change -> %1.3f", segmenter.GetHabitatDirection());
+                }
                 logger.LogString(sc);
-            } else {
-                control.RestoreRouteNaive();
-                logger.LogString("Good Habitat -> Grid Search");
-                bGridSearching = true;
+            } else { // No good terrain is visible right now
+                // So if there's been enough time we'll switch back to grid
+                if (time(nullptr) - tLastChange > tMinTimeBetweenChanges) {
+                    control.RestoreRouteNaive();
+                    logger.LogString("Good Habitat -> Grid Search");
+                    bGridSearching = true;
+                    tLastChange = time(nullptr);
+                } else {
+                    logger.LogString("[delay]Good Habitat -> Grid Search");
+                }
             }
         }
     }

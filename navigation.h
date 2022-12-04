@@ -72,6 +72,8 @@ public:
     StopSignal* GetStopSignal() { return new StopSignal(ssMain); }
 
 private:
+    time_t tLastChange;
+    time_t tMinTimeBetweenChanges;
     FlightController& control;
     DataLogger& logger;
     CameraController& camera;
