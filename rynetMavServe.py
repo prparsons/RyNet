@@ -7,6 +7,7 @@ import time
 import socket
 import xml.etree.ElementTree as ET
 import haversine as hs
+import selectors
 
 """
 <dir dist='200'>OFFSET_HEADING_DEGREES</dir>
@@ -279,19 +280,15 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
     
     elif element.tag == 'takeoff':
         cmdTakeoff(vehicle, element)
-        UDPServerSocket.sendto(bytesToSend, address)
 
     elif element.tag == 'dir':
         cmdDir(vehicle, element)
-        UDPServerSocket.sendto(bytesToSend, address)
 
     elif element.tag == 'obs':
         cmdObs(vehicle, element)
-        UDPServerSocket.sendto(bytesToSend, address)
 
     elif element.tag == 'route_save':
         save_missionF('savedMission.txt', vehicle)
-        UDPServerSocket.sendto(bytesToSend, address)
 
     elif element.tag == 'route_retrieve':
         missionList = download_mission(vehicle)
@@ -300,11 +297,9 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
 
     elif element.tag == 'route_set':
         cmdRouteSet(vehicle, element)
-        UDPServerSocket.sendto(bytesToSend, address)
 
     elif element.tag == 'route_load':
         cmdRouteLoad(vehicle, element)
-        UDPServerSocket.sendto(bytesToSend, address)
 
     elif element.tag == 'pos_retrieve':
         print("Position retrieve")
@@ -316,16 +311,13 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
 
     elif element.tag == 'rtl':
         vehicle.mode = VehicleMode("RTL")
-        UDPServerSocket.sendto(bytesToSend, address)
         
     elif element.tag == 'route_restore':
         cmdRouteRestore(vehicle, element)
-        UDPServerSocket.sendto(bytesToSend, address)
 
     else:
         print("Unknown command")
         print(element.tag)
-
 
 def arm_and_takeoff(vehicle, aTargetAltitude):
     print("Basic pre-arm checks")
@@ -357,6 +349,13 @@ def arm_and_takeoff(vehicle, aTargetAltitude):
             break
         time.sleep(1)
 
+def recvUDP(sock, vehicle):
+    try:
+        message,address = sock.recvfrom(1024)
+        parseXML(message, vehicle, sock, address)
+    except:
+        print('recv failure')
+
 # Set up connection string to the drone
 connection_string = args.connect#'tcp:127.0.0.1:5762'#None
 sitl = None
@@ -377,22 +376,25 @@ while not vehicle.is_armable:
 # Now set up everything for the UDP server
 localIP = "127.0.0.1"
 localPort = 3636
-bytesToSend = str.encode("ack")
+
+selectorDefault = selectors.DefaultSelector()
 # Create a datagram socket
-UDPServerSocket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+sockUDP = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
 # Bind to address and ip
-UDPServerSocket.bind((localIP, localPort))
+sockUDP.bind((localIP, localPort))
+sockUDP.setblocking(False)
+selectorDefault.register(sockUDP, selectors.EVENT_READ, recvUDP)
+
 print("UDP server up and listening")
+try:
+    while True:
+        events = selectorDefault.select(timeout=None)
+        for key, mask in events:
+            key.data(key.fileobj, vehicle)
+except KeyboardInterrupt:
+    print("caught keyboard interrupt, exiting")
 
-# Main loop
-# Listen for incoming datagrams
-while(True):
-    try:
-        message,address = UDPServerSocket.recvfrom(1024)
-        parseXML(message, vehicle, UDPServerSocket, address)
-    except:
-        break
-
+selectorDefault.close()
 print("Close vehicle object")
 vehicle.close()
 # Shut down simulator if it was started.
