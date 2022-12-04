@@ -8,6 +8,7 @@ import socket
 import xml.etree.ElementTree as ET
 import haversine as hs
 import selectors
+import argparse  
 
 """
 <dir dist='200'>OFFSET_HEADING_DEGREES</dir>
@@ -51,13 +52,12 @@ import selectors
 
 """
 
-#Set up option parsing to get connection string
-import argparse  
-parser = argparse.ArgumentParser(description='Demonstrates mission import/export from a file.')
+parser = argparse.ArgumentParser(description='UDP Dronekit server')
 parser.add_argument('--connect', 
-                   help="Vehicle connection target string. If not specified, SITL automatically started and used.")
+                    help="Vehicle connection target string.\nMission Planner SITL example: 'tcp:127.0.0.1:5762'\nIf not specified, dronekit SITL used")
+parser.add_argument('--port', type=int, default=3636,
+                    help="Port to listen on [default:3636]")
 args = parser.parse_args()
-
 
 def readmissionF(aFileName, vehicle):
     print("\nReading mission from file: %s" % aFileName)
@@ -357,7 +357,7 @@ def recvUDP(sock, vehicle):
         print('recv failure')
 
 # Set up connection string to the drone
-connection_string = args.connect#'tcp:127.0.0.1:5762'#None
+connection_string = args.connect
 sitl = None
 #Start SITL if no connection string specified
 if not connection_string:
@@ -373,15 +373,11 @@ while not vehicle.is_armable:
     print(" Waiting for vehicle to initialise...")
     time.sleep(1)
 
-# Now set up everything for the UDP server
-localIP = "127.0.0.1"
-localPort = 3636
-
 selectorDefault = selectors.DefaultSelector()
 # Create a datagram socket
 sockUDP = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
 # Bind to address and ip
-sockUDP.bind((localIP, localPort))
+sockUDP.bind(("127.0.0.1", args.port))
 sockUDP.setblocking(False)
 selectorDefault.register(sockUDP, selectors.EVENT_READ, recvUDP)
 
