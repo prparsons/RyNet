@@ -32,7 +32,7 @@ void DataLogger::run(void)
     struct tm* pTimeStruct;
 
     fstream fileLog;
-    vector<string> listStringsT;
+    vector<char*> listStringsT;
     char scFileNameText[128];
     timeNow = time(nullptr);
     pTimeStruct = localtime(&timeNow);
@@ -55,15 +55,17 @@ void DataLogger::run(void)
         // check text list, if not empty write
         mt.lock();
         listStringsT.assign(listStrings.begin(), listStrings.end());
+        listStrings.clear();
         mt.unlock();
         if (listStringsT.size() > 0) {
-            fileLog.open(scFileNameText, ios::out);
+            fileLog.open(scFileNameText, ios::out | ios::app);
             if (!fileLog) {
                 printf("Failed to open log files\n");
             } else {
                 do {
-                    string str = listStringsT.back();
-                    fileLog << str << endl;
+                    char* sc = listStringsT.back();
+                    fileLog << sc << endl;
+                    delete[] sc;
                     listStringsT.pop_back();
                 } while (listStringsT.size() > 0);
                 fileLog.close();
@@ -145,12 +147,12 @@ void DataLogger::LogMask(float4* pImg, int width, int height)
 
 void DataLogger::LogString(const char* scData)
 {
-    char scText[256];
+    char* scText = new char[strlen(scData) + 32];
     time_t timeNow = time(nullptr);
     struct tm* pTimeStruct;
     pTimeStruct = localtime(&timeNow);
     snprintf(scText,
-            255,
+            strlen(scData) + 31,
             "%2d:%2d:%2d %s",
             pTimeStruct->tm_hour,
             pTimeStruct->tm_min,
@@ -158,7 +160,7 @@ void DataLogger::LogString(const char* scData)
             scData);
 
     mt.lock();
-    listStrings.insert(listStrings.begin(), scData);
+    listStrings.insert(listStrings.begin(), scText);
     mt.unlock();
     sigNewData.signal();
 }

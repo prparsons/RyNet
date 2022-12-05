@@ -29,5 +29,5 @@ private:
     StopSignal ss;
     cv::Mat image;
     cv::Mat mask;
-    std::vector<std::string> listStrings;
+    std::vector<char*> listStrings;
 };
