@@ -259,7 +259,7 @@ void CameraController::run_CV(const char* scGStream, cameraFrame** ppFrameCurren
 {
     printL("CameraController::run_CV");
     printL(scGStream);
-    Mat frame;
+    Mat frameRotated;
 
     VideoCapture* pCap = new VideoCapture(scGStream, cv::CAP_GSTREAMER);
     
@@ -269,6 +269,7 @@ void CameraController::run_CV(const char* scGStream, cameraFrame** ppFrameCurren
     }
 
     while (!pss->shouldStop()) { // We need a separate stop signal for each thread
+        Mat frame;
         pCap->read(frame);
         if (frame.empty()) {
             printL("CameraController::run_CV empty frame");
@@ -283,9 +284,10 @@ void CameraController::run_CV(const char* scGStream, cameraFrame** ppFrameCurren
             }
             continue;
         }
+        rotate(frame, frameRotated, ROTATE_90_COUNTERCLOCKWISE);
         // Do something with frame
         cameraFrame* pNewFrame = new cameraFrame();
-        pNewFrame->pImg = new Mat(frame);
+        pNewFrame->pImg = new Mat(frameRotated);
         m.lock(); // Need own mutex lock/whatever?
         if (*ppFrameCurrent != nullptr) delete *ppFrameCurrent;
         *ppFrameCurrent = pNewFrame;
