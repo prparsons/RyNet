@@ -31,7 +31,9 @@ void ObjectDetection::SetNewImage(image& img)
 bool ObjectDetection::ProcessImage(image& _imgRGB)
 {
     cv::Mat imgRGB;
-    cv::resize(_imgRGB, imgRGB, cv::Size(640, 360), cv::INTER_LINEAR);
+    cv::resize(_imgRGB, imgRGB, cv::Size(_imgRGB.cols / 4, _imgRGB.rows / 4), cv::INTER_LINEAR);
+    // 2160x3840 -> 540x960  --- 3 images at 540x320
+    // 1080x1920 -> 270x480  --- 3 images at 270x160
 
     int imgWidth = imgRGB.cols;      // width of the image (in pixels)
     int imgHeight = imgRGB.rows;      // height of the image (in pixels)
@@ -213,8 +215,8 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iWidth, int iHeight)
         return false;
     }
     // We've found the desired category
-    int maskWidth = 640;
-    int maskHeight = 360;
+    int maskWidth = iWidth / 4;
+    int maskHeight = iHeight / 4;
     float4* imgMask;
     if (!CUDA_FAILED(cudaHostAlloc(&imgMask, maskWidth*maskHeight*16, cudaHostAllocMapped))) {
         pNetwork->Mask(imgMask, maskWidth, maskHeight, segNet::FILTER_POINT);
