@@ -94,7 +94,8 @@ private:
     Signal sigRGB;
     Signal sigIR;
     
-    const char* scGStream_RGB = "nvarguscamerasrc sensor-id=0 wbmode=2 gainrange=\"4 4\" ispdigitalgainrange=\"1 1\" exposuretimerange=\"30000000 30000000\" aelock=true ! video/x-raw(memory:NVMM),width=3840,height=2560,framerate=30/1 ! nvvidconv ! video/x-raw,format=BGRx ! videoconvert ! videorate ! video/x-raw,framerate=1/1 ! appsink";
+    // wbmode=2 //exposuretimerange=\"30000000 30000000\" aelock=true
+    const char* scGStream_RGB = "nvarguscamerasrc sensor-id=0 gainrange=\"4 4\" ispdigitalgainrange=\"1 1\" ! video/x-raw(memory:NVMM),width=3840,height=2560,framerate=30/1 ! nvvidconv ! video/x-raw,format=BGRx ! videoconvert ! videorate ! video/x-raw,framerate=1/1 ! appsink";
     const char* scGStream_RGB_F = "nvarguscamerasrc sensor-id=0 wbmode=%d gainrange=\"%d %d\" ispdigitalgainrange=\"1 1\" exposuretimerange=\"%d %d\" aelock=true ! video/x-raw(memory:NVMM),width=3840,height=2560,framerate=30/1 ! nvvidconv ! video/x-raw,format=BGRx ! videoconvert ! videorate ! video/x-raw,framerate=2/1 ! appsink";
     const char* scGStream_IR = "stuff ! things ! converterize ! kitchen sinks";
 };
