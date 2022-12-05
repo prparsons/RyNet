@@ -23,7 +23,7 @@ ObjectDetection::~ObjectDetection()
 void ObjectDetection::SetNewImage(image& img)
 {
     mt.lock();
-    imgRecent = img;
+    img.copyTo(imgRecent);
     mt.unlock();
     sigNewImage.signal();
 }
@@ -162,7 +162,7 @@ float TerrainSegmentation::GetHabitatDirection()
 void TerrainSegmentation::SetNewImage(image& img)
 {
     mt.lock();
-    imgRecent = img;
+    img.copyTo(imgRecent);
     mt.unlock();
     sigNewImage.signal();
 }
@@ -243,7 +243,6 @@ Navigator::Navigator(FlightController& _control, DataLogger& _logger, CameraCont
 void Navigator::runNavigator()
 {
     printL("Navigator::runNavigator");
-    cameraFrame* pFrame = nullptr;
     Signal* pSigRGB = camera.GetSignalRGB();
 
     bool bGridSearching = true;
@@ -251,15 +250,15 @@ void Navigator::runNavigator()
 
     std::thread thrObject(&ObjectDetection::run, &detector);
     std::thread thrSegment(&TerrainSegmentation::run, &segmenter);
-
     while (!ssMain.shouldStop()) {
         pSigRGB->wait();
-        if (pFrame) delete pFrame;
-        pFrame = camera.GetFrameRGB();
-        
-        image imgNew = pFrame->getImage();
-        detector.SetNewImage(imgNew);
-        segmenter.SetNewImage(imgNew);
+        cv::Mat Frame;
+        if (!camera.GetFrameRGB(Frame)) {
+            printL("runNavigator frame was valid");
+            continue;
+        }
+        detector.SetNewImage(Frame);
+        segmenter.SetNewImage(Frame);
 
         if (bGridSearching) { // Habitat not visible, we're currently running search pattern
             // Good terrain visible?
@@ -313,7 +312,6 @@ void Navigator::runNavigator()
     pss = segmenter.GetStopSignal();
     pss->stop();
     delete pss;
-    if (pFrame != nullptr) delete pFrame;
     delete pSigRGB;
     // Do we really need to join them?
     thrObject.join();

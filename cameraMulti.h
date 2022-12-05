@@ -27,25 +27,6 @@ private:
     rs2::decimation_filter* pDownsample;
 };
 
-class cameraFrame {
-public:
-    cameraFrame();
-    cameraFrame(const cameraFrame& other);
-    ~cameraFrame();
-
-    image getImage();
-    cameraFrame_depth* getDepthRaw();
-
-private:
-    // whatever needed for each type
-    cv::Mat* pImg;
-    cameraFrame_depth* pDepthRaw;
-    int* piCount;
-    ThreadMutex* pM;
-    ThreadLock* pLock;
-    friend class CameraController;
-};
-
 class camera_RS {
 public:
     rs2::pipeline pipe;
@@ -64,9 +45,9 @@ public:
     static CameraController* OpenCamera(uint32_t features);
 
     // Must delete returned pointers
-    cameraFrame* GetFrameDepth();
-    cameraFrame* GetFrameRGB();
-    cameraFrame* GetFrameIR();
+    cameraFrame_depth* GetFrameDepth();
+    bool GetFrameRGB(cv::Mat& imgCopy);
+    bool GetFrameIR(cv::Mat& imgCopy);
     Signal* GetSignalDepth();
     Signal* GetSignalRGB();
     Signal* GetSignalIR();
@@ -77,12 +58,12 @@ public:
 protected:
     CameraController(uint32_t);
     void run_RS();
-    void run_CV(const char* scGStream, cameraFrame** ppFrameCurrent, Signal* pSig, StopSignal* pss);
+    void run_CV(const char* scGStream, cv::Mat* pFrameCurrent, Signal* pSig, StopSignal* pss);
 
 private:
-    cameraFrame* pFrameCurrentDepth;
-    cameraFrame* pFrameCurrentRGB;
-    cameraFrame* pFrameCurrentIR;
+    cameraFrame_depth* pFrameCurrentDepth;
+    cv::Mat FrameCurrentRGB;
+    cv::Mat FrameCurrentIR;
     ThreadMutex m;
 
     camera_RS* pCameraRS;
@@ -95,7 +76,8 @@ private:
     Signal sigIR;
     
     // wbmode=2 //exposuretimerange=\"30000000 30000000\" aelock=true
-    const char* scGStream_RGB = "nvarguscamerasrc sensor-id=0 gainrange=\"4 4\" ispdigitalgainrange=\"1 1\" ! video/x-raw(memory:NVMM),width=3840,height=2560,framerate=30/1 ! nvvidconv ! video/x-raw,format=BGRx ! videoconvert ! videorate ! video/x-raw,framerate=1/1 ! appsink";
+    //  ! videoflip method=counterclockwise
+    const char* scGStream_RGB = "nvarguscamerasrc sensor-id=0 gainrange=\"4 4\" ispdigitalgainrange=\"1 1\" ! video/x-raw(memory:NVMM),width=3840,height=2560,framerate=30/1 ! nvvidconv ! video/x-raw,format=BGRx ! videoflip method=counterclockwise ! videoconvert ! videorate ! video/x-raw,framerate=1/1 ! appsink";
     const char* scGStream_RGB_F = "nvarguscamerasrc sensor-id=0 wbmode=%d gainrange=\"%d %d\" ispdigitalgainrange=\"1 1\" exposuretimerange=\"%d %d\" aelock=true ! video/x-raw(memory:NVMM),width=3840,height=2560,framerate=30/1 ! nvvidconv ! video/x-raw,format=BGRx ! videoconvert ! videorate ! video/x-raw,framerate=2/1 ! appsink";
     const char* scGStream_IR = "stuff ! things ! converterize ! kitchen sinks";
 };

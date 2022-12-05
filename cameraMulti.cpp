@@ -28,53 +28,6 @@ void cameraFrame_depth::applyDecimationFilter()
 }
 
 // ***********
-// cameraFrame
-
-cameraFrame::cameraFrame()
-: pImg(nullptr)
-, pDepthRaw(nullptr)
-, piCount(new int(1))
-, pM(new ThreadMutex())
-, pLock(new ThreadLock(*pM))
-{
-}
-
-cameraFrame::cameraFrame(const cameraFrame& other)
-{
-    other.pLock->lock();
-    pImg = other.pImg;
-    piCount = other.piCount;
-    pDepthRaw = other.pDepthRaw;
-    pM = other.pM;
-    pLock = new ThreadLock(*pM);
-    (*piCount)++;
-    other.pLock->unlock();
-}
-
-cameraFrame::~cameraFrame()
-{
-    pLock->lock();
-    if (--(*piCount) == 0) {
-        delete pImg;
-        delete pDepthRaw;
-        delete piCount;
-        delete pM;
-    }
-    pLock->unlock();
-    delete pLock;
-}
-
-image cameraFrame::getImage()
-{
-    return *pImg;
-}
-
-cameraFrame_depth* cameraFrame::getDepthRaw()
-{
-    return pDepthRaw;
-}
-
-// ***********
 // CameraController
 
 CameraController* CameraController::OpenCamera(uint32_t features)
@@ -83,40 +36,36 @@ CameraController* CameraController::OpenCamera(uint32_t features)
     return pReturn;
 }
 
-cameraFrame* CameraController::GetFrameDepth()
+cameraFrame_depth* CameraController::GetFrameDepth()
 {
     m.lock();
     if (pFrameCurrentDepth == nullptr) {
         m.unlock();
         return nullptr;
     }
-    cameraFrame* pFrameReturn = new cameraFrame(*pFrameCurrentDepth);
+    cameraFrame_depth* pFrameReturn = new cameraFrame_depth(*pFrameCurrentDepth);
     m.unlock();
     return pFrameReturn;
 }
 
-cameraFrame* CameraController::GetFrameRGB()
+bool CameraController::GetFrameRGB(cv::Mat& imgCopy)
 {
+    bool bReturn = true;
     m.lock();
-    if (pFrameCurrentRGB == nullptr) {
-        m.unlock();
-        return nullptr;
-    }
-    cameraFrame* pFrameReturn = new cameraFrame(*pFrameCurrentRGB);
+    if (FrameCurrentRGB.empty()) bReturn = false;
+    else FrameCurrentRGB.copyTo(imgCopy);
     m.unlock();
-    return pFrameReturn;
+    return bReturn;
 }
 
-cameraFrame* CameraController::GetFrameIR()
+bool CameraController::GetFrameIR(cv::Mat& imgCopy)
 {
+    bool bReturn = true;
     m.lock();
-    if (pFrameCurrentIR == nullptr) {
-        m.unlock();
-        return nullptr;
-    }
-    cameraFrame* pFrameReturn = new cameraFrame(*pFrameCurrentIR);
+    if (FrameCurrentIR.empty()) bReturn = false;
+    else FrameCurrentIR.copyTo(imgCopy);
     m.unlock();
-    return pFrameReturn;
+    return true;
 }
 
 Signal* CameraController::GetSignalDepth()
@@ -136,8 +85,6 @@ Signal* CameraController::GetSignalIR()
 
 CameraController::CameraController(uint32_t _features)
 : pFrameCurrentDepth(nullptr)
-, pFrameCurrentRGB(nullptr)
-, pFrameCurrentIR(nullptr)
 , pCameraRS(nullptr)
 , features(_features)
 {
@@ -158,8 +105,6 @@ CameraController::CameraController(uint32_t _features)
 CameraController::~CameraController()
 {
     if (pFrameCurrentDepth != nullptr) delete pFrameCurrentDepth;
-    if (pFrameCurrentRGB != nullptr) delete pFrameCurrentRGB;
-    if (pFrameCurrentIR != nullptr) delete pFrameCurrentIR;
     if (pCameraRS != nullptr) delete pCameraRS;
     for (int i = 0; i < 3; i++) {
         if (pthrCamera[i] != nullptr) {
@@ -184,14 +129,14 @@ void CameraController::run()
     if (features & CameraController_RGB) {
         printL("CameraController::run starting RGB");
         if (pthrCamera[1] == nullptr) {
-            pthrCamera[1] = new std::thread(&CameraController::run_CV, this, scGStream_RGB, &pFrameCurrentRGB, &sigRGB, &ss[1]);
+            pthrCamera[1] = new std::thread(&CameraController::run_CV, this, scGStream_RGB, &FrameCurrentRGB, &sigRGB, &ss[1]);
         } else {
             printL("CameraController::run cv1 already started");
         }
     }
     if (features & CameraController_IR) {
         if (pthrCamera[2] == nullptr) {
-            pthrCamera[2] = new std::thread(&CameraController::run_CV, this, scGStream_IR, &pFrameCurrentRGB, &sigIR, &ss[2]);
+            pthrCamera[2] = new std::thread(&CameraController::run_CV, this, scGStream_IR, &FrameCurrentIR, &sigIR, &ss[2]);
         } else {
             printL("CameraController::run cv2 already started");
         }
@@ -223,27 +168,17 @@ void CameraController::run_RS()
             } else if (bFrameRetrieved) {
                 printL("CameraController::run_RS frames have been retrieved");
             }
-            // Create camera frame
-            cameraFrame* pNewFrameDepth = new cameraFrame();
 
             // Save the raw depth. If applying the decimation filter, before/after color map makes a difference in 
             //      how big the image is
-            pNewFrameDepth->pDepthRaw = new cameraFrame_depth(data.get_depth_frame());
+            cameraFrame_depth* pDepthRaw = new cameraFrame_depth(data.get_depth_frame());
             if (features & CameraController_DownsampleDepth) {
-                pNewFrameDepth->pDepthRaw->applyDecimationFilter();
+                pDepthRaw->applyDecimationFilter();
             }
-            rs2::frame depth = ((rs2::frame*)pNewFrameDepth->pDepthRaw)->apply_filter(color_map);
-
-            // Query depth frame size (width and height)
-            int w = depth.as<rs2::video_frame>().get_width();
-            int h = depth.as<rs2::video_frame>().get_height();
-
-            // Create OpenCV matrix of size (w,h) from the colorized depth data
-            pNewFrameDepth->pImg = new Mat(Size(w, h), CV_8UC3, (void*)depth.get_data(), Mat::AUTO_STEP);
             
             m.lock();
             if (pFrameCurrentDepth != nullptr) delete pFrameCurrentDepth;
-            pFrameCurrentDepth = pNewFrameDepth;
+            pFrameCurrentDepth = pDepthRaw;
             m.unlock();
 
             sigDepth.signal();
@@ -255,11 +190,14 @@ void CameraController::run_RS()
     }
 }
 
-void CameraController::run_CV(const char* scGStream, cameraFrame** ppFrameCurrent, Signal* pSig, StopSignal* pss)
+void CameraController::run_CV(const char* scGStream, Mat* pFrameCurrent, Signal* pSig, StopSignal* pss)
 {
     printL("CameraController::run_CV");
     printL(scGStream);
-    Mat frameRotated;
+    if (pFrameCurrent == nullptr) {
+        printL("run_CV no current frame");
+        return;
+    }
 
     VideoCapture* pCap = new VideoCapture(scGStream, cv::CAP_GSTREAMER);
     
@@ -284,13 +222,9 @@ void CameraController::run_CV(const char* scGStream, cameraFrame** ppFrameCurren
             }
             continue;
         }
-        rotate(frame, frameRotated, ROTATE_90_COUNTERCLOCKWISE);
         // Do something with frame
-        cameraFrame* pNewFrame = new cameraFrame();
-        pNewFrame->pImg = new Mat(frameRotated);
-        m.lock(); // Need own mutex lock/whatever?
-        if (*ppFrameCurrent != nullptr) delete *ppFrameCurrent;
-        *ppFrameCurrent = pNewFrame;
+        m.lock();
+        frame.copyTo(*pFrameCurrent);
         m.unlock();
 
         pSig->signal();

@@ -80,11 +80,8 @@ void FlightController::runDepth()
     while (!ss.shouldStop()) {
         pSig->wait();
         
-        cameraFrame* pFrame = camera.GetFrameDepth();
-        if (pFrame == nullptr) continue;
-        cameraFrame_depth* pFrameDepth = pFrame->getDepthRaw();
+        cameraFrame_depth* pFrameDepth = camera.GetFrameDepth();
         if (pFrameDepth == nullptr) {
-            delete pFrame;
             continue;
         }
         cameraFrame_depth& frameDepth = *pFrameDepth;
