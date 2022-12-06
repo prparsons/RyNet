@@ -31,40 +31,42 @@ void ObjectDetection::SetNewImage(image& img)
 bool ObjectDetection::ProcessImage(image& _imgRGB)
 {
     cv::Mat imgRGB;
-    cv::resize(_imgRGB, imgRGB, cv::Size(_imgRGB.cols / 4, _imgRGB.rows / 4), cv::INTER_LINEAR);
-    // 2160x3840 -> 540x960  --- 3 images at 540x320
-    // 1080x1920 -> 270x480  --- 3 images at 270x160
+    cv::resize(_imgRGB, imgRGB, cv::Size(_imgRGB.cols / 2, _imgRGB.rows / 2), cv::INTER_LINEAR);
+    // 1080x1920 -> 540x960  --- 3 images at 540x320
 
     int imgWidth = imgRGB.cols;      // width of the image (in pixels)
     int imgHeight = imgRGB.rows;      // height of the image (in pixels)
     uchar3* u3Img;
-
-    if (CUDA_FAILED(cudaMalloc(&u3Img, imgWidth*imgHeight*3))) {
+    if (CUDA_FAILED(cudaMalloc(&u3Img, imgWidth * imgHeight))) {
         printL("ObjectDetection::ProcessImage cudaMalloc fail");
         return false;
     }
-    cudaMemcpy(u3Img, (void*)imgRGB.data, imgWidth*imgHeight*3, cudaMemcpyHostToDevice);   // shared CPU/GPU pointer to image
-    detectNet::Detection* arDetections = nullptr;
-    int iDetections = pNetwork->Detect(u3Img, imgWidth, imgHeight, &arDetections);
-    if (iDetections < 1) {
-        return false;
-    }
+    // Going to do 3 horizontal slices of the image. That and it being a 3 channel image is why size is only widthxheight
+    if (imgHeight % 3 != 0) printL("ObjectDetection::ProcessImage doesn't divide by 3");
+    int iSliceHeight = imgHeight / 3;
+    for (int s = 0; s < 3; s++) {
+        intptr_t imgRGBOffset = s * imgWidth * imgHeight;
+        cudaMemcpy(u3Img, ((void*)imgRGB.data) + imgRGBOffset, imgWidth * iSliceHeight, cudaMemcpyHostToDevice);   // shared CPU/GPU pointer to image
+        detectNet::Detection* arDetections = nullptr;
+        int iDetections = pNetwork->Detect(u3Img, imgWidth, imgHeight, &arDetections);
+        if (iDetections < 1) {
+            return false;
+        }
 
-    bool bRet = false;
-    char sc[128];
-    for (int i = 0; i < iDetections; i++) {
-        //if (arDetections[i].Confidence < 0.5) continue; // This isn't necessary since the argument is passed to detectNet
-        //if (arDetections[i].ClassID == 1) continue; // Should be a person (looking for people)
-
-        bRet = true;
-        snprintf(sc, 127, "Detection Class,Confidence[%d,%d] LTRB:%d %d %d %d", 
-                int(arDetections[i].ClassID), 
-                int(arDetections[i].Confidence * 100),
-                int(arDetections[i].Left), 
-                int(arDetections[i].Top), 
-                int(arDetections[i].Right), 
-                int(arDetections[i].Bottom));
-        logger.LogString(sc);
+        bool bRet = false;
+        char sc[128];
+        for (int i = 0; i < iDetections; i++) {
+            bRet = true;
+            snprintf(sc, 127, "Detection Slice,Class,Confidence[%d,%d,%d] LTRB:%d %d %d %d", 
+                    s,
+                    int(arDetections[i].ClassID), 
+                    int(arDetections[i].Confidence * 100),
+                    int(arDetections[i].Left), 
+                    int(arDetections[i].Top), 
+                    int(arDetections[i].Right), 
+                    int(arDetections[i].Bottom));
+            logger.LogString(sc);
+        }
     }
 
     cudaFree(u3Img);
@@ -119,6 +121,7 @@ bool TerrainSegmentation::ProcessImage(image& imgRGB)
 {
     int imgWidth = imgRGB.cols;      // width of the image (in pixels)
     int imgHeight = imgRGB.rows;      // height of the image (in pixels)
+    // 1080x1920  -- 3 images at 1080x640
     uchar3* u3Img;
     if (CUDA_FAILED(cudaMalloc(&u3Img, imgWidth*imgHeight*3))) {
         printL("TerrainSegmentation::ProcessImage cudaMalloc fail");
