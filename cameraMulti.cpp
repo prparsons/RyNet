@@ -186,11 +186,11 @@ void CameraController::run_RS()
             }
 
             if (data.size() >= 2) {
-                rs2::motion_frame frameAccel;
-                if (data[0].get_profile().stream_type() == RS2_STREAM_ACCEL) frameAccel = data[0];
-                else frameAccel = data[1];
+                rs2_vector frameAccel;
+                if (data[0].get_profile().stream_type() == RS2_STREAM_ACCEL) frameAccel = data[0].as<rs2::motion_frame>().get_motion_data();
+                else frameAccel = data[1].as<rs2::motion_frame>().get_motion_data();
                 m.lock();
-                FrameCurrentAccel = frameAccel.get_motion_data();
+                FrameCurrentAccel = frameAccel;
             } else {            
                 m.lock();
             }

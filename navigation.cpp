@@ -44,16 +44,16 @@ bool ObjectDetection::ProcessImage(image& _imgRGB)
     // Going to do 3 horizontal slices of the image. That and it being a 3 channel image is why size is only widthxheight
     if (imgHeight % 3 != 0) printL("ObjectDetection::ProcessImage doesn't divide by 3");
     int iSliceHeight = imgHeight / 3;
+    bool bRet = false;
     for (int s = 0; s < 3; s++) {
         intptr_t imgRGBOffset = s * imgWidth * imgHeight;
-        cudaMemcpy(u3Img, ((void*)imgRGB.data) + imgRGBOffset, imgWidth * iSliceHeight * 3, cudaMemcpyHostToDevice);   // shared CPU/GPU pointer to image
+        cudaMemcpy(u3Img, ((uint8_t*)imgRGB.data) + imgRGBOffset, imgWidth * iSliceHeight * 3, cudaMemcpyHostToDevice);   // shared CPU/GPU pointer to image
         detectNet::Detection* arDetections = nullptr;
         int iDetections = pNetwork->Detect(u3Img, imgWidth, imgHeight, &arDetections);
         if (iDetections < 1) {
             return false;
         }
 
-        bool bRet = false;
         char sc[128];
         for (int i = 0; i < iDetections; i++) {
             bRet = true;
@@ -181,7 +181,7 @@ bool TerrainSegmentation::ProcessImage(image& imgRGB)
     bool bRet = false;
     for (int s = 0; s < 3; s++) {
         intptr_t imgRGBOffset = s * imgWidth * imgHeight;
-        cudaMemcpy(u3Img, ((void*)imgRGB.data) + imgRGBOffset, imgWidth * iSliceHeight * 3, cudaMemcpyHostToDevice);
+        cudaMemcpy(u3Img, ((uint8_t*)imgRGB.data) + imgRGBOffset, imgWidth * iSliceHeight * 3, cudaMemcpyHostToDevice);
 
         if(!pNetwork->Process(u3Img, imgWidth, iSliceHeight)) {
             printf("TerrainSegmentation::ProcessImage fail");
