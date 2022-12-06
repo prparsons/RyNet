@@ -48,6 +48,14 @@ cameraFrame_depth* CameraController::GetFrameDepth()
     return pFrameReturn;
 }
 
+rs2_vector CameraController::GetFrameAccel()
+{
+    m.lock();
+    rs2_vector ret = FrameCurrentAccel;
+    m.unlock();
+    return ret;
+}
+
 bool CameraController::GetFrameRGB(cv::Mat& imgCopy)
 {
     bool bReturn = true;
@@ -93,6 +101,7 @@ CameraController::CameraController(uint32_t _features)
     if (features & CameraController_Depth) {
         pCameraRS = new camera_RS;
         pCameraRS->cfg.enable_stream(RS2_STREAM_DEPTH, 1280, 720);
+        pCameraRS->cfg.enable_stream(RS2_STREAM_ACCEL);
     }
     if (features & CameraController_RGB) {
         // Set up anything here? resolution, framerate, exposure, white balance?
@@ -175,8 +184,16 @@ void CameraController::run_RS()
             if (features & CameraController_DownsampleDepth) {
                 pDepthRaw->applyDecimationFilter();
             }
-            
-            m.lock();
+
+            if (data.size() >= 2) {
+                rs2::motion_frame frameAccel;
+                if (data[0].get_profile().stream_type() == RS2_STREAM_ACCEL) frameAccel = data[0];
+                else frameAccel = data[1];
+                m.lock();
+                FrameCurrentAccel = frameAccel.get_motion_data();
+            } else {            
+                m.lock();
+            }
             if (pFrameCurrentDepth != nullptr) delete pFrameCurrentDepth;
             pFrameCurrentDepth = pDepthRaw;
             m.unlock();
