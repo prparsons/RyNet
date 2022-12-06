@@ -46,7 +46,7 @@ bool ObjectDetection::ProcessImage(image& _imgRGB)
     int iSliceHeight = imgHeight / 3;
     for (int s = 0; s < 3; s++) {
         intptr_t imgRGBOffset = s * imgWidth * imgHeight;
-        cudaMemcpy(u3Img, ((void*)imgRGB.data) + imgRGBOffset, imgWidth * iSliceHeight, cudaMemcpyHostToDevice);   // shared CPU/GPU pointer to image
+        cudaMemcpy(u3Img, ((void*)imgRGB.data) + imgRGBOffset, imgWidth * iSliceHeight * 3, cudaMemcpyHostToDevice);   // shared CPU/GPU pointer to image
         detectNet::Detection* arDetections = nullptr;
         int iDetections = pNetwork->Detect(u3Img, imgWidth, imgHeight, &arDetections);
         if (iDetections < 1) {
@@ -117,37 +117,6 @@ TerrainSegmentation::~TerrainSegmentation()
     if (pMask != nullptr) delete[] pMask;// cudaFree(pMask);
 }
 
-bool TerrainSegmentation::ProcessImage(image& imgRGB)
-{
-    int imgWidth = imgRGB.cols;      // width of the image (in pixels)
-    int imgHeight = imgRGB.rows;      // height of the image (in pixels)
-    // 1080x1920  -- 3 images at 1080x640
-    uchar3* u3Img;
-    if (CUDA_FAILED(cudaMalloc(&u3Img, imgWidth*imgHeight*3))) {
-        printL("TerrainSegmentation::ProcessImage cudaMalloc fail");
-        return false;
-    }
-    cudaMemcpy(u3Img, (void*)imgRGB.data, imgWidth*imgHeight*3, cudaMemcpyHostToDevice);
-
-    if(!pNetwork->Process(u3Img, imgWidth, imgHeight)) {
-        printf("TerrainSegmentation::ProcessImage fail");
-        cudaFree(u3Img);        
-        return false;
-    }
-
-    if (pMask == nullptr) {
-        pMask = new uint8_t[imgWidth*imgHeight];
-    }
-    if(!pNetwork->Mask(pMask, imgWidth, imgHeight)) {
-        printL("TerrainSegmentation::ProcessImage mask fail");
-        cudaFree(u3Img);
-        return false;
-    }
-    cudaFree(u3Img);
-    
-    return ScanMask(pMask, imgWidth, imgHeight);
-}
-
 bool TerrainSegmentation::IsHabitatVisible()
 {
     mt.lock();
@@ -196,6 +165,53 @@ void TerrainSegmentation::run()
     delete pSigRGB;
 }
 
+bool TerrainSegmentation::ProcessImage(image& imgRGB)
+{
+    int imgWidth = imgRGB.cols;      // width of the image (in pixels)
+    int imgHeight = imgRGB.rows;      // height of the image (in pixels)
+    // 1080x1920  -- 3 images at 1080x640
+    uchar3* u3Img;
+    if (CUDA_FAILED(cudaMalloc(&u3Img, imgWidth*imgHeight*3))) {
+        printL("TerrainSegmentation::ProcessImage cudaMalloc fail");
+        return false;
+    }
+    // Going to do 3 horizontal slices of the image. That and it being a 3 channel image is why size is only widthxheight
+    if (imgHeight % 3 != 0) printL("ObjectDetection::ProcessImage doesn't divide by 3");
+    int iSliceHeight = imgHeight / 3;
+    bool bRet = false;
+    for (int s = 0; s < 3; s++) {
+        intptr_t imgRGBOffset = s * imgWidth * imgHeight;
+        cudaMemcpy(u3Img, ((void*)imgRGB.data) + imgRGBOffset, imgWidth * iSliceHeight * 3, cudaMemcpyHostToDevice);
+
+        if(!pNetwork->Process(u3Img, imgWidth, iSliceHeight)) {
+            printf("TerrainSegmentation::ProcessImage fail");
+            cudaFree(u3Img);        
+            return false;
+        }
+
+        if (pMask == nullptr) {
+            pMask = new uint8_t[imgWidth*iSliceHeight];
+        }
+        if(!pNetwork->Mask(pMask, imgWidth, iSliceHeight)) {
+            printL("TerrainSegmentation::ProcessImage mask fail");
+            cudaFree(u3Img);
+            return false;
+        }
+        if (ScanMask(pMask, imgWidth, iSliceHeight)) {
+            // We're starting at the top, which would be the furthest away.
+            //  So as soon as we find our target, then just stop scanning
+            bRet = true;
+            char sc[64];
+            sprintf(sc, "ScanMask Success slice %d", s);
+            logger.LogString(sc);
+            break;
+        }
+    }
+    cudaFree(u3Img);
+    
+    return bRet;
+}
+
 bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iWidth, int iHeight)
 {
     int size = iWidth * iHeight;
@@ -218,8 +234,8 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iWidth, int iHeight)
         return false;
     }
     // We've found the desired category
-    int maskWidth = iWidth / 4;
-    int maskHeight = iHeight / 4;
+    int maskWidth = iWidth / 2;
+    int maskHeight = iHeight / 2;
     float4* imgMask;
     if (!CUDA_FAILED(cudaHostAlloc(&imgMask, maskWidth*maskHeight*16, cudaHostAllocMapped))) {
         pNetwork->Mask(imgMask, maskWidth, maskHeight, segNet::FILTER_POINT);
