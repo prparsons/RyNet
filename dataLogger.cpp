@@ -153,7 +153,7 @@ void DataLogger::LogString(const char* scData)
     pTimeStruct = localtime(&timeNow);
     snprintf(scText,
             strlen(scData) + 31,
-            "%2d:%2d:%2d %s",
+            "%02d:%02d:%02d %s",
             pTimeStruct->tm_hour,
             pTimeStruct->tm_min,
             pTimeStruct->tm_sec,
