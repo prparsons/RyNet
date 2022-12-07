@@ -14,7 +14,7 @@ public:
 
     void run(void);
 
-    void LogImage(cv::Mat& im);
+    void LogImage(cv::Mat& im, std::string strIdSource);
     void LogMask(float4* pImg, int width, int height);
     void LogString(const char* scData);
 
@@ -30,4 +30,5 @@ private:
     cv::Mat image;
     cv::Mat mask;
     std::vector<char*> listStrings;
+    std::map<std::string, time_t> mapImageWriteTimes;
 };

@@ -5,6 +5,7 @@
 #include <fstream>
 
 using namespace std;
+const int SEC_BETWEEN_IMAGES = 3;
 
 //https://learnopencv.com/getting-started-opencv-cuda-module/
 
@@ -126,8 +127,13 @@ void DataLogger::run(void)
     delete pSigImage;
 }
 
-void DataLogger::LogImage(cv::Mat& im)
+void DataLogger::LogImage(cv::Mat& im, std::string strIdSource)
 {
+    time_t timeNow = time(nullptr);
+    time_t timeDifference = timeNow - mapImageWriteTimes[strIdSource];
+    mapImageWriteTimes[strIdSource] = timeNow;
+    if (timeDifference < SEC_BETWEEN_IMAGES) return;
+    
     mt.lock();
     image = im.clone();
     bWriteImg = true;

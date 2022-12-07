@@ -78,7 +78,6 @@ void ObjectDetection::run()
     printL("ObjectDetection::run");
     Signal* pSigRGB = new Signal(sigNewImage);
     image imgProcess;
-    time_t uLastImg = 0;
     while (!ss.shouldStop()) {
         pSigRGB->wait();
         mt.lock();
@@ -86,20 +85,13 @@ void ObjectDetection::run()
         mt.unlock();
         
         if (ProcessImage(imgProcess)) {
-            // This works, but at 2fps, this could still add up to way more than necessary.
-            // Need a rate limit 
-            if (time(nullptr) - uLastImg > 5) {
-                logger.LogImage(imgProcess);
-                uLastImg = time(nullptr);
-            }
+            logger.LogImage(imgProcess, "detect");
         }
     }
     delete pSigRGB;
 }
 
 // ** TerrainSegmentation
-
-#define NETWORK_PRINT_LABELS
 
 TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
 : bHabitatVisible(false)
@@ -154,7 +146,7 @@ void TerrainSegmentation::run()
         mt.unlock();
         
         if (ProcessImage(imgProcess)) {
-        //    logger.LogImage(imgProcess);
+            logger.LogImage(imgProcess, "segment");
             char sc[128];
             mt.lock();
             sprintf(sc, "Good Habitat Found %2.2f", fBestDirection);
