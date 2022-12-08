@@ -3,6 +3,7 @@
 #include <time.h>
 #include <stdio.h>
 #include <fstream>
+#include "planner.h"
 
 using namespace std;
 const int SEC_BETWEEN_IMAGES = 3;
@@ -129,13 +130,23 @@ void DataLogger::run(void)
 
 void DataLogger::LogImage(cv::Mat& im, std::string strIdSource)
 {
+    ImageLogData& data = mapImageData[strIdSource];
     time_t timeNow = time(nullptr);
-    time_t timeDifference = timeNow - mapImageWriteTimes[strIdSource];
-    mapImageWriteTimes[strIdSource] = timeNow;
+    time_t timeDifference = timeNow - data.timeLast;
+    data.timeLast = timeNow;
     if (timeDifference < SEC_BETWEEN_IMAGES) return;
+    
+    if (!FlightController::GetPosition(data.fLat, data.fLon)) {
+        data.fLat = 0;
+        data.fLon = 0;
+    }
+    if (!FlightController::GetHeading(data.fHeading)) {
+        data.fHeading = 999; // Obvious incorrect value
+    }
     
     mt.lock();
     image = im.clone();
+    imageData = data;
     bWriteImg = true;
     mt.unlock();
     sigNewData.signal();

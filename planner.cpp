@@ -3,6 +3,8 @@
 #include <string.h>
 #include <chrono>
 
+FlightController* pInstance = nullptr;
+
 FlightController::FlightController(DataLogger& _logger, CameraController& _camera)
 : logger(_logger)
 , camera(_camera)
@@ -12,10 +14,53 @@ FlightController::FlightController(DataLogger& _logger, CameraController& _camer
     memset(&addressMavLink, 0, sizeof(addressMavLink));
 }
 
+FlightController& FlightController::GetFlightController(DataLogger& logger, CameraController& camera)
+{
+    if (pInstance == nullptr) {
+        pInstance = new FlightController(logger, camera);
+    }
+    return *pInstance;
+}
+
+void FlightController::DestroyFlightController()
+{
+    if (pInstance != nullptr) {
+        delete pInstance;
+        pInstance = nullptr;
+    }
+}
+
 FlightController::~FlightController()
 {
     //thread
     //socket
+}
+
+bool FlightController::GetPosition(float fLat, float fLon, int iTimeoutMS)
+{
+    if (pInstance == nullptr) return false;
+    char* sc = pInstance->SendRecXML("<pos_retrieve />", iTimeoutMS);
+    if (sc == nullptr) return false;
+    int i;
+    // string is in format "LAT LON"
+    for (i = 0; i < strlen(sc); i++) {
+        if (sc[i] = ' ') break;
+    }
+    sc[i] = 0;
+    fLat = atof(sc);
+    fLon = atof(sc + i + 1);
+    delete[] sc;
+    return true;
+}
+
+bool FlightController::GetHeading(float fHeading, int iTimeoutMS)
+{
+    if (pInstance == nullptr) return false;
+    char* sc = pInstance->SendRecXML("<heading_retrieve />", iTimeoutMS);
+    if (sc == nullptr) return false;
+    fHeading = atof(sc);
+    delete[] sc;
+    return true;
 }
 
 void FlightController::SetDirection(float fHeadingOffsetDeg)
@@ -140,7 +185,7 @@ void FlightController::SendXML(const char* strMessage)
     #endif
 }
 
-char* FlightController::SendRecXML(const char* strMessage)
+char* FlightController::SendRecXML(const char* strMessage, int iTimeoutMS)
 {
     #ifdef FLIGHT_CONTROLLER_TCP
     //Send some data
@@ -166,7 +211,7 @@ char* FlightController::SendRecXML(const char* strMessage)
     int iLength = recv(socketDesc, scResponse, 511, MSG_DONTWAIT);
     if (iLength < 0) {
         // It failed, give it __msec then try one more time
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(iTimeoutMS));
         iLength = recv(socketDesc, scResponse, 511, MSG_DONTWAIT);
         if (iLength < 0) {
             // Still failed...give up

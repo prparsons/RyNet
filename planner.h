@@ -17,8 +17,13 @@
 
 class FlightController {
 public:
-    FlightController(DataLogger& logger, CameraController& camera);
     ~FlightController();
+
+    static FlightController& GetFlightController(DataLogger& logger, CameraController& camera);
+    static void DestroyFlightController();
+
+    static bool GetPosition(float fLat, float fLon, int iTimeoutMS = 100);
+    static bool GetHeading(float fHeading, int iTimeoutMS = 100);
 
     void SetDirection(float fHeadingOffsetDeg); // Store the currently programmed route, adjust heading
     void SetDestination(float fHeadingOffsetDeg, float fDistance); // Store route, adjust heading, after distance will automatically restore route
@@ -27,11 +32,12 @@ public:
     void RestoreRouteNaive();
     void RestoreRouteClean();
 
-
 private:
+    FlightController(DataLogger& logger, CameraController& camera);
+
     void SaveRoute();
     void SendXML(const char* sc);
-    char* SendRecXML(const char* sc);
+    char* SendRecXML(const char* sc, int iTimeoutMS = 100);
     void ConnectMavLink();
     void runDepth(); // Thread function to continuously send depth info for obstacle avoidance
 

@@ -19,8 +19,8 @@ int main( int argc, char** argv )
     }
     try {
         DataLogger logger;
-        CameraController* pCamera = CameraController::OpenCamera(CameraController_RGB | CameraController_Depth);
-        FlightController controller(logger, *pCamera);
+        CameraController* pCamera = CameraController::OpenCamera(CameraController_RGB /*| CameraController_Depth*/);
+        FlightController& controller = FlightController::GetFlightController(logger, *pCamera);
         Navigator nav(controller, logger, *pCamera);
         printL("Starting main loop");
         std::thread thrLogger(&DataLogger::run, &logger);
@@ -40,6 +40,7 @@ int main( int argc, char** argv )
         thrNav.join();
         if (bSendRTL) controller.SetRTL();
         thrLogger.join();
+        controller.DestroyFlightController();
     } catch (std::exception e) {
         std::cout << "Exception: " << e.what() << std::endl;
         std::cout << "Sending RTL";
