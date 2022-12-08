@@ -49,6 +49,7 @@ void DataLogger::run(void)
 
     cv::Mat imageWrite;
     bool bWriteImgLocal = false;
+    ImageLogData dataWrite;
 
     while (!ss.shouldStop()) {
         // Wait on signal
@@ -80,10 +81,12 @@ void DataLogger::run(void)
             bWriteImg = false;
             bWriteImgLocal = true;
             imageWrite = image;
+            dataWrite = dataImage;
         }
         mt.unlock();
         if (bWriteImgLocal) {
             bWriteImgLocal = false;
+            WriteImageData(imageWrite, dataImage);
             timeNow = time(nullptr);
             pTimeStruct = localtime(&timeNow);
             char scFileName[128];
@@ -146,7 +149,7 @@ void DataLogger::LogImage(cv::Mat& im, std::string strIdSource)
     
     mt.lock();
     image = im.clone();
-    imageData = data;
+    dataImage = data;
     bWriteImg = true;
     mt.unlock();
     sigNewData.signal();
@@ -180,4 +183,22 @@ void DataLogger::LogString(const char* scData)
     listStrings.insert(listStrings.begin(), scText);
     mt.unlock();
     sigNewData.signal();
+}
+
+void DataLogger::WriteImageData(cv::Mat& image, ImageLogData& imageData)
+{
+    cv::Mat imageLarger = cv::Mat::zeros(cv::Size(image.cols, image.rows + 55), CV_8UC3);
+    memcpy(imageLarger.data, image.data, image.cols * image.rows * 3);
+    // Now write stuff at the bottom, 2 rows, 5 pixel padding
+    double dFontSize = cv::getFontScaleFromHeight(cv::FONT_HERSHEY_SIMPLEX, 20, 1);
+    char sc[512];
+    snprintf(sc, 511, "Lat:%.7f Lon:%.7f Alt:%.1fm Head:%.2f Pit:%.2f",
+                imageData.fLat, imageData.fLon, 3.0, imageData.fHeading, imageData.fPitch);
+    cv::putText(imageLarger, 
+                sc,
+                cv::Point(5, image.rows + 25),
+                cv::FONT_HERSHEY_SIMPLEX,
+                dFontSize,
+                cv::Scalar(255, 255, 255));
+    image = imageLarger;
 }

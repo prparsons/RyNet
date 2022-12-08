@@ -20,8 +20,8 @@ int main( int argc, char** argv )
     try {
         DataLogger logger;
         CameraController* pCamera = CameraController::OpenCamera(CameraController_RGB /*| CameraController_Depth*/);
-        FlightController& controller = FlightController::GetFlightController(logger, *pCamera);
-        Navigator nav(controller, logger, *pCamera);
+        FlightController* pController = FlightController::GetFlightController(logger, *pCamera);
+        Navigator nav(*pController, logger, *pCamera);
         printL("Starting main loop");
         std::thread thrLogger(&DataLogger::run, &logger);
         pCamera->run(); // Camera starts all it's own threads
@@ -38,9 +38,11 @@ int main( int argc, char** argv )
             delete pss;
         } // else could have a set alititude option, climb a bit if no depth?
         thrNav.join();
-        if (bSendRTL) controller.SetRTL();
+        if (bSendRTL) pController->SetRTL();
         thrLogger.join();
-        controller.DestroyFlightController();
+        pController->DestroyFlightController();
+        pController = nullptr;
+        delete pCamera;
     } catch (std::exception e) {
         std::cout << "Exception: " << e.what() << std::endl;
         std::cout << "Sending RTL";

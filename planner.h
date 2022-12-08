@@ -19,7 +19,7 @@ class FlightController {
 public:
     ~FlightController();
 
-    static FlightController& GetFlightController(DataLogger& logger, CameraController& camera);
+    static FlightController* GetFlightController(DataLogger& logger, CameraController& camera);
     static void DestroyFlightController();
 
     static bool GetPosition(float fLat, float fLon, int iTimeoutMS = 100);

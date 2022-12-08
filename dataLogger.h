@@ -32,8 +32,7 @@ public:
     void LogString(const char* scData);
 
 private:
-    void WriteDetections(cv::Mat& image);
-    void WriteSpeed(cv::Mat& image);
+    void WriteImageData(cv::Mat& image, ImageLogData& imageData);
 
     bool bWriteImg;
     bool bWriteMask;
@@ -41,7 +40,7 @@ private:
     Signal sigNewData;
     StopSignal ss;
     cv::Mat image;
-    ImageLogData imageData;
+    ImageLogData dataImage;
     cv::Mat mask;
     std::vector<char*> listStrings;
     std::map<std::string, ImageLogData> mapImageData;

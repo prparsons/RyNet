@@ -14,12 +14,13 @@ FlightController::FlightController(DataLogger& _logger, CameraController& _camer
     memset(&addressMavLink, 0, sizeof(addressMavLink));
 }
 
-FlightController& FlightController::GetFlightController(DataLogger& logger, CameraController& camera)
+FlightController* FlightController::GetFlightController(DataLogger& logger, CameraController& camera)
 {
     if (pInstance == nullptr) {
         pInstance = new FlightController(logger, camera);
+        return pInstance;
     }
-    return *pInstance;
+    return nullptr;
 }
 
 void FlightController::DestroyFlightController()
