@@ -11,6 +11,8 @@ import selectors
 import argparse  
 
 """
+Command Documentation:
+
 <dir dist='200'>OFFSET_HEADING_DEGREES</dir>
     Sets mode to GUIDED, and then turns indicated amount
         dist -- distance to set waypoint in meters[default:1000]
@@ -49,6 +51,9 @@ import argparse
 <takeoff setauto='true'>ALTITUDE_METERS</takeoff>
     Will arm and take off (simple example from dronekit)
         setauto -- will change the vehicle mode to AUTO 3 sec after takeoff
+
+
+SITL Testing instructions:
 
 """
 
@@ -177,7 +182,7 @@ def mission_to_str(missionList):
         output+=commandline
     return output
 
-def mission_cleanStart(missionList, nextWaypoint, fLat, fLon):
+def mission_cleanSimple(missionList, nextWaypoint, fLat, fLon):
     missionListClean = []
     fDistClosest = 9999999999.0
     for cmd in missionList[nextWaypoint:]:
@@ -187,6 +192,42 @@ def mission_cleanStart(missionList, nextWaypoint, fLat, fLon):
             missionListClean = []
         missionListClean.append(cmd)
     return missionListClean
+
+class edge:
+    def __init__(self, start, end):
+        self.start = start
+        self.end = end
+        self.distance = hs.haversine(start, end)
+
+def createEdgeList(missionList):
+    edgeList = []
+    i = 0
+    while i < len(missionList) - 1:
+        start = (missionList[i].x, missionList[i].y)
+        end = (missionList[i+1].x, missionList[i+1].y)
+        edgeList.append(edge(start, end))
+        i += 2
+    return edgeList
+
+def mission_cleanBetter(missionList, nextWaypoint, fLat, fLon):
+    """
+    Assume the mission will be a grid search
+    So, this could be a traveling salesman problem I suppose.
+    One thing to consider is battery life: if you have just enough battery to finish your desired grid and
+    go off the grid search to follow something, you likely won't have enough battery to finish the original
+    route. So leave reserve (possibly not going as far as you could have), plan exactly enough and don't 
+    worry if you can't visit it all, or plan more than you could visit anyways knowing you can't visit it
+    all. 
+    If your target area would take multiple trips, then that last choice you maximize distance covered
+    while finding the best area first.
+    Avoid revisiting areas maximizes area covered...and we know the start point.
+    So it's a map, equally spaced waypoints. Weight the map by increasing each points values by how close it
+    is to each point visited. Points closest with highest value, points furthest with lower points. Then 
+    when we restore the route we always choose direction with lowest weight. Would keep us away from areas
+    we've already visited.
+
+    app will send 
+    """
 
 def parseXML(message, vehicle, UDPServerSocket, address):
     parser = ET.XMLPullParser()
