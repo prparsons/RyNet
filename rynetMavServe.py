@@ -54,7 +54,16 @@ Command Documentation:
 
 
 SITL Testing instructions:
+https://ardupilot.org/dev/docs/sitl-simulator-software-in-the-loop.html
 
+-Open Mission Planner
+-Go to the Simulation tab
+-Select Multi-Rotor
+    Mission Planner will download whatever it needs and startup the SITL
+    or you can check the Do not download checkbox
+-Mision Planner will start the SITL and automatically connect to it, bringing up its control interface. It will also
+ open a console window which should also tell you what other ports it's opened (likely 5762 and 5763).
+-If you're getting connect failures from dronekit, try increasing the timeout to 360
 """
 
 parser = argparse.ArgumentParser(description='UDP Dronekit server')
