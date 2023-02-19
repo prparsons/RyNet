@@ -1,0 +1,18 @@
+1. Connect radio to laptop
+2. Connect drone power
+3. Turn on RC radio controller
+4. Connect keyboard and monitor to Jetson
+5. Connect power to Jetson
+6. Hit reset button on MSP based UART converter box
+7. Open Mission Planner and connect to drone via radio
+8. Verify correct route is loaded in autopilot
+9. Start Jetson python script that communicates with drone
+10. In Mission Planner, use Ctrl + ___ to bring up menu
+      -Verify that Jetson is sending messages
+11. Start main program
+12. Disconnect monitor and keyboard from Jetson
+13. Place drone in takeoff location
+14. Takeoff
+      -Arm
+      -Manually takeoff
+      -Switch mode to auto
