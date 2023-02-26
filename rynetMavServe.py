@@ -57,6 +57,11 @@ Command Documentation:
 SITL Testing instructions:
 https://ardupilot.org/dev/docs/sitl-simulator-software-in-the-loop.html
 
+Jetson Xavier NX connection string UART:
+/dev/ttyTHS0
+
+Note: dronekit-sitl will not run on ARM (Jetson, pi, etc...)
+
 -Open Mission Planner
 -Go to the Simulation tab
 -Select Multi-Rotor
