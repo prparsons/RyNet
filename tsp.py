@@ -1,12 +1,5 @@
 import math
 
-cities = [['A',[0, 0]],
-          ['B',[30, 3]],
-          ['C',[60, 4]],
-          ['D',[2, 30]],
-          ['E',[30, 30]],
-          ['F',[5, 39]]]
-
 def tsgCreateRoute(missionList):
     route = []
     for cmd in missionList:
@@ -19,10 +12,6 @@ def tspGetDistance(route):
         segDist = math.sqrt((route[i][1][0] - route[i+1][1][0])**2 + (route[i][1][1] - route[i+1][1][1])**2)
         dist += segDist
     return dist
-    
-print('Current route')
-print(cities)
-print(tspGetDistance(cities))
 
 def tspSingle2opt(route):
     best_distance = tspGetDistance(route)
@@ -53,9 +42,3 @@ def tsp2opt(route):
         newDistance = tspGetDistance(newRoute)
     
     return route
-
-
-cities = tsp2opt(cities)
-print('New route')
-print(cities)
-print(tspGetDistance(cities))
