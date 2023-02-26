@@ -7,6 +7,12 @@ cities = [['A',[0, 0]],
           ['E',[30, 30]],
           ['F',[5, 39]]]
 
+def tsgCreateRoute(missionList):
+    route = []
+    for cmd in missionList:
+        route.append([[cmd.x, cmd.y], cmd])
+    return route
+
 def tspGetDistance(route):
     dist = 0
     for i in range(len(route)-1):
