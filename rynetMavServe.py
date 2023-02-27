@@ -14,6 +14,9 @@ from tsp import tsgCreateRoute
 """
 Command Documentation:
 
+<clean_dist>DISTANCE_M</clean_dist>
+    Sets the distance from visited point that is close enough to remove a waypoint from mission list.
+
 <dir dist='200'>OFFSET_HEADING_DEGREES</dir>
     Sets mode to GUIDED, and then turns indicated amount
         dist -- distance to set waypoint in meters[default:1000]
@@ -77,6 +80,7 @@ parser.add_argument('--connect',
                     help="Vehicle connection target string.\nMission Planner SITL example: 'tcp:127.0.0.1:5762'\nIf not specified, dronekit SITL used")
 parser.add_argument('--port', type=int, default=3636, help="Port to listen on [default:3636]")
 parser.add_argument('--livetest', default='False', help='If True, will only send <obs /> messages to the drone.')
+parser.add_argument('--clean_dist', type=int, default=50, help='Distance from visited point that is close enough to remove a waypoint from mission list.')
 args = parser.parse_args()
 
 def readmissionF(aFileName, vehicle):
@@ -208,6 +212,35 @@ def mission_cleanSimple(missionList, nextWaypoint, fLat, fLon):
         missionListClean.append(cmd)
     return missionListClean
 
+def mission_removeVisited(missionList, visitedList):
+    """
+    Best way to optimize this i've thought of so far, sort both lists. Then basically use a search algorithm for each point in
+    the missionList to see if it's been near a visited point.
+    """
+    #First, go over the visitedList and remove points that are too close to each other
+    pointLast = visitedList[0]
+    visitedReplace = [visitedList[0]]
+    for point in visitedList[1:]:
+        fDist = hs.haversine((pointLast[0], pointLast[1]), (point[0], point[1]))
+    if fDist > args.clean_dist:
+        visitedReplace.append(point)
+        pointLast = point
+    visitedList = visitedReplace
+    
+    #Now, go over missionList and remove any points close to one that we've visited while off the pre-programmed route
+    missionListClean = []
+    for cmd in missionList:
+        removePoint = False
+        for point in visitedList:
+            fDist = hs.haversine((point[0], point[1]), (cmd.x, cmd.y))
+            if fDist < args.clean_dist:
+                removePoint = True
+                break
+        if not removePoint:
+            missionListClean.append(cmd)
+
+    return missionListClean
+
 def mission_cleanBetter(missionList, nextWaypoint, fLat, fLon):
     """
     Assume the mission will be a grid search
@@ -227,6 +260,8 @@ def mission_cleanBetter(missionList, nextWaypoint, fLat, fLon):
     Avoid revisiting areas maximizes area covered...and we know the start point.
 
     """
+    #missionList = mission_removeVisited(missionList, visitedPoints)
+    #return tsp2opt(missionList)
 
 def parseXML(message, vehicle, UDPServerSocket, address):
     parser = ET.XMLPullParser()
@@ -329,6 +364,9 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
             print("Testing Cmd: " % element.tag)
         return
     
+    #if element.tag == 'clean_dist':
+        #NOT_IMPLEMENTED
+
     if element.tag == 'takeoff':
         cmdTakeoff(vehicle, element)
 
