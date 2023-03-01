@@ -9,9 +9,13 @@ import xml.etree.ElementTree as ET
 import haversine as hs
 import selectors
 import argparse  
+from tsp import *
 
 """
 Command Documentation:
+
+<clean_dist>DISTANCE_M</clean_dist>
+    Sets the distance from visited point that is close enough to remove a waypoint from mission list.
 
 <dir dist='200'>OFFSET_HEADING_DEGREES</dir>
     Sets mode to GUIDED, and then turns indicated amount
@@ -33,6 +37,7 @@ Command Documentation:
         loadsave -- if present and true, will load route from savedMission.txt[default:current mission]
         lat,lon -- if present, will be used as the current location in cleaning routine
         clean -- [simple] will find closest waypoint and remove everything prior to it
+                 [2opt] will remove visited waypoints and use 2opt to reconstruct route
         setauto -- if present and true, will set the autopilot's mode to auto after setting the route
 
 <route_retrieve />
@@ -56,6 +61,11 @@ Command Documentation:
 SITL Testing instructions:
 https://ardupilot.org/dev/docs/sitl-simulator-software-in-the-loop.html
 
+Jetson Xavier NX connection string UART:
+/dev/ttyTHS0
+
+Note: dronekit-sitl will not run on ARM (Jetson, pi, etc...)
+
 -Open Mission Planner
 -Go to the Simulation tab
 -Select Multi-Rotor
@@ -71,7 +81,13 @@ parser.add_argument('--connect',
                     help="Vehicle connection target string.\nMission Planner SITL example: 'tcp:127.0.0.1:5762'\nIf not specified, dronekit SITL used")
 parser.add_argument('--port', type=int, default=3636, help="Port to listen on [default:3636]")
 parser.add_argument('--livetest', default='False', help='If True, will only send <obs /> messages to the drone.')
-args = parser.parse_args()
+parser.add_argument('--clean_dist_visit', type=int, default=10, help='Distance between visited points that is close enough to consider them duplicates.')
+parser.add_argument('--clean_dist_way', type=int, default=50, help='Distance from visited point that is close enough to remove a waypoint from mission list.')
+
+#args = parser.parse_args()
+#Testing without command line, use below
+args = parser.parse_args("--port 3636 --connect tcp:127.0.0.1:5762".split())
+visitedList = []
 
 def readmissionF(aFileName, vehicle):
     print("\nReading mission from file: %s" % aFileName)
@@ -164,6 +180,7 @@ def download_mission(vehicle):
     cmds = vehicle.commands
     cmds.download()
     cmds.wait_ready()
+    #from docs, https://dronekit-python.readthedocs.io/en/stable/automodule.html, cmds.next will return the index of current waypoint
     for cmd in cmds:
         missionlist.append(cmd)
     return missionlist
@@ -195,11 +212,45 @@ def mission_cleanSimple(missionList, nextWaypoint, fLat, fLon):
     missionListClean = []
     fDistClosest = 9999999999.0
     for cmd in missionList[nextWaypoint:]:
-        fDist = hs.haversine((fLat, fLon), (cmd.x, cmd.y)) * 0.00001 #returns km, we want cm
+        fDist = hs.haversine((fLat, fLon), (cmd.x, cmd.y)) * 0.00001 #returns km, we want cm ???uh...km*.000001 isn't cm...
         if fDist < fDistClosest:
             fDistClosest = fDist
             missionListClean = []
         missionListClean.append(cmd)
+    return missionListClean
+
+def mission_removeVisited(missionList):
+    global visitedList
+    """
+    Best way to optimize this i've thought of so far, sort both lists. Then basically use a search algorithm for each point in
+    the missionList to see if it's been near a visited point.
+    """
+    #First, go over the visitedList and remove points that are too close to each other
+    pointLast = visitedList[0]
+    visitedReplace = [visitedList[0]]
+    for point in visitedList[1:]:
+        fDist = hs.haversine((pointLast[0], pointLast[1]), (point[0], point[1])) * 1000
+        if fDist > args.clean_dist_visited:
+            visitedReplace.append(point)
+            pointLast = point
+    visitedList = visitedReplace
+    
+    #Now, go over missionList and remove any points close to one that we've visited while off the pre-programmed route
+    missionListClean = []
+    for cmd in missionList:
+        removePoint = False
+        #Only check waypoints...but we need to get rid of takeoff, and all the waypoints we've
+        #visited while following the route before we went off Auto. so visitedList is a bad
+        #way to do this as currently implemented
+        if cmd.command == 16:
+            for point in visitedList:
+                fDist = hs.haversine((point[0], point[1]), (cmd.x, cmd.y)) * 1000
+                if fDist < args.clean_dist_way:
+                    removePoint = True
+                    break
+        if not removePoint:
+            missionListClean.append(cmd)
+
     return missionListClean
 
 def mission_cleanBetter(missionList, nextWaypoint, fLat, fLon):
@@ -221,6 +272,8 @@ def mission_cleanBetter(missionList, nextWaypoint, fLat, fLon):
     Avoid revisiting areas maximizes area covered...and we know the start point.
 
     """
+    missionList = mission_removeVisited(missionList)
+    return tsp2opt(missionList)
 
 def parseXML(message, vehicle, UDPServerSocket, address):
     parser = ET.XMLPullParser()
@@ -298,7 +351,10 @@ def cmdRouteRestore(vehicle, element):
         fLon = vehicle.location.global_frame.lon
     if 'clean' in element.attrib:
         if element.attrib['clean'] == 'simple':
-            missionList = mission_cleanStart(missionList, vehicle.commands.next, fLat, fLon)
+            missionList = mission_cleanSimple(missionList, vehicle.commands.next, fLat, fLon)
+        elif element.attrib['clean'] == '2opt':
+            missionList = mission_cleanBetter(missionList, vehicle.commands.next, fLat, fLon)
+
     upload_mission(missionList, vehicle)
     if 'setauto' in element.attrib:
         if element.attrib['setauto'] == 'true':
@@ -316,6 +372,7 @@ def cmdPosRetrieve(vehicle, UDPServerSocket, address):
     UDPServerSocket.sendto(str.encode(strReply), address)
 
 def handleCommand(element, vehicle, UDPServerSocket, address):
+    global visitedList
     if args.livetest == 'True':
         if element.tag == 'obs':
             cmdObs(vehicle, element)
@@ -323,11 +380,16 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
             print("Testing Cmd: " % element.tag)
         return
     
+    #if element.tag == 'clean_dist':
+        #NOT_IMPLEMENTED
+
     if element.tag == 'takeoff':
         cmdTakeoff(vehicle, element)
 
     elif element.tag == 'dir':
         cmdDir(vehicle, element)
+        #Reset the visited point list so we only have points visited while in Guided mode
+        visitedList = []
 
     elif element.tag == 'obs':
         cmdObs(vehicle, element)
@@ -346,6 +408,7 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
 
     elif element.tag == 'pos_retrieve':
         cmdPosRetrieve(vehicle, UDPServerSocket, address)
+        visitedList.append([vehicle.location.global_frame.lat, vehicle.location.global_frame.lon])
 
     #elif element.tag == 'altitude_set':
         #need to read through the whole route and set each one
@@ -407,7 +470,7 @@ if not connection_string:
     connection_string = sitl.connection_string()
 # Connect to the Vehicle
 print('Connecting to vehicle on: %s' % connection_string)
-vehicle = connect(connection_string, wait_ready=True)
+vehicle = connect(connection_string, wait_ready=True, timeout=360)
 # Check that vehicle is armable. 
 # This ensures home_location is set (needed when saving WP file)
 while not vehicle.is_armable:
@@ -437,3 +500,5 @@ vehicle.close()
 # Shut down simulator if it was started.
 if sitl is not None:
     sitl.stop()
+
+# %%
