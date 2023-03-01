@@ -9,7 +9,7 @@ import xml.etree.ElementTree as ET
 import haversine as hs
 import selectors
 import argparse  
-from tsp import tsgCreateRoute
+from tsp import *
 
 """
 Command Documentation:
@@ -81,7 +81,8 @@ parser.add_argument('--connect',
                     help="Vehicle connection target string.\nMission Planner SITL example: 'tcp:127.0.0.1:5762'\nIf not specified, dronekit SITL used")
 parser.add_argument('--port', type=int, default=3636, help="Port to listen on [default:3636]")
 parser.add_argument('--livetest', default='False', help='If True, will only send <obs /> messages to the drone.')
-parser.add_argument('--clean_dist', type=int, default=50, help='Distance from visited point that is close enough to remove a waypoint from mission list.')
+parser.add_argument('--clean_dist_visit', type=int, default=10, help='Distance between visited points that is close enough to consider them duplicates.')
+parser.add_argument('--clean_dist_way', type=int, default=50, help='Distance from visited point that is close enough to remove a waypoint from mission list.')
 
 #args = parser.parse_args()
 #Testing without command line, use below
@@ -179,6 +180,7 @@ def download_mission(vehicle):
     cmds = vehicle.commands
     cmds.download()
     cmds.wait_ready()
+    #from docs, https://dronekit-python.readthedocs.io/en/stable/automodule.html, cmds.next will return the index of current waypoint
     for cmd in cmds:
         missionlist.append(cmd)
     return missionlist
@@ -228,7 +230,7 @@ def mission_removeVisited(missionList):
     visitedReplace = [visitedList[0]]
     for point in visitedList[1:]:
         fDist = hs.haversine((pointLast[0], pointLast[1]), (point[0], point[1])) * 1000
-        if fDist > args.clean_dist:
+        if fDist > args.clean_dist_visited:
             visitedReplace.append(point)
             pointLast = point
     visitedList = visitedReplace
@@ -242,10 +244,8 @@ def mission_removeVisited(missionList):
         #way to do this as currently implemented
         if cmd.command == 16:
             for point in visitedList:
-                print(cmd.x)
-                print(cmd.y)
                 fDist = hs.haversine((point[0], point[1]), (cmd.x, cmd.y)) * 1000
-                if fDist < args.clean_dist:
+                if fDist < args.clean_dist_way:
                     removePoint = True
                     break
         if not removePoint:
@@ -500,3 +500,5 @@ vehicle.close()
 # Shut down simulator if it was started.
 if sitl is not None:
     sitl.stop()
+
+# %%
