@@ -82,7 +82,7 @@ parser.add_argument('--connect',
 parser.add_argument('--port', type=int, default=3636, help="Port to listen on [default:3636]")
 parser.add_argument('--livetest', default='False', help='If True, will only send <obs /> messages to the drone.')
 parser.add_argument('--clean_dist_visit', type=int, default=10, help='Distance between visited points that is close enough to consider them duplicates.')
-parser.add_argument('--clean_dist_way', type=int, default=50, help='Distance from visited point that is close enough to remove a waypoint from mission list.')
+parser.add_argument('--clean_dist_way', type=int, default=100, help='Distance from visited point that is close enough to remove a waypoint from mission list.')
 
 #args = parser.parse_args()
 #Testing without command line, use below
@@ -212,7 +212,7 @@ def mission_cleanSimple(missionList, nextWaypoint, fLat, fLon):
     missionListClean = []
     fDistClosest = 9999999999.0
     for cmd in missionList[nextWaypoint:]:
-        fDist = hs.haversine((fLat, fLon), (cmd.x, cmd.y)) * 0.00001 #returns km, we want cm ???uh...km*.000001 isn't cm...
+        fDist = hs.haversine((fLat, fLon), (cmd.x, cmd.y), unit=hs.Unit.METERS)
         if fDist < fDistClosest:
             fDistClosest = fDist
             missionListClean = []
@@ -229,7 +229,7 @@ def mission_removeVisited(missionList):
     pointLast = visitedList[0]
     visitedReplace = [visitedList[0]]
     for point in visitedList[1:]:
-        fDist = hs.haversine((pointLast[0], pointLast[1]), (point[0], point[1])) * 1000
+        fDist = hs.haversine((pointLast[0], pointLast[1]), (point[0], point[1]), unit=hs.Unit.METERS)
         if fDist > args.clean_dist_visited:
             visitedReplace.append(point)
             pointLast = point
@@ -244,7 +244,7 @@ def mission_removeVisited(missionList):
         #way to do this as currently implemented
         if cmd.command == 16:
             for point in visitedList:
-                fDist = hs.haversine((point[0], point[1]), (cmd.x, cmd.y)) * 1000
+                fDist = hs.haversine((point[0], point[1]), (cmd.x, cmd.y), unit=hs.Unit.METERS)
                 if fDist < args.clean_dist_way:
                     removePoint = True
                     break
