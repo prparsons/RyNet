@@ -259,21 +259,24 @@ def mission_sortVisted(visitedList):
         xTrunc = int(point[0] * 10000) * 0.0001
         yTrunc = int(point[1] * 10000) * 0.0001
         newPoint = [(xTrunc, yTrunc), point]
+        inserted = False
         for i in range(len(sortedList)):
-            if newPoint[0][0] > sortedList[i][0]:
-                stopX = sortedList[i][0]
-                inserted = False
-                while i < len(sortedList) and sortedList[i][0] == stopX:
-                    if newPoint[0][1] > sortedList[i][1]:
+            if newPoint[0][0] >= sortedList[i][0][0]:
+                stopX = sortedList[i][0][0]
+                while i < len(sortedList) and newPoint[0][0] == stopX:
+                    if newPoint[0][1] > sortedList[i][0][1]:
                         inserted = True
                         sortedList.insert(i, newPoint)
                         break
                     i += 1
                 if inserted is False:
                     sortedList.insert(i, newPoint)
+                    inserted = True
                 break
+        if inserted is False:
+            sortedList.append(newPoint)
     return sortedList
-
+    
 def mission_cleanBetter(missionList, nextWaypoint, fLat, fLon):
     """
     Assume the mission will be a grid search
