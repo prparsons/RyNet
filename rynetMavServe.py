@@ -219,6 +219,48 @@ def mission_cleanSimple(missionList, nextWaypoint, fLat, fLon):
         missionListClean.append(cmd)
     return missionListClean
 
+
+class reducedPoint:
+    def __init__(self, pt):
+        self.Xt = int(pt[0] * 10000) * 0.0001
+        self.Yt = int(pt[1] * 10000) * 0.0001
+        self.pt = pt
+
+    def __str__(self):
+        return "(%f, %f)" % (self.Xt, self.Yt)
+
+    def __repr__(self):
+        return "(%f, %f)" % (self.Xt, self.Yt)
+
+def mission_sortVisted(visitedList):
+    sortedList = []
+    for point in visitedList:
+        newPoint = reducedPoint(point)
+        inserted = False
+        for i in range(len(sortedList)):
+            if newPoint.Xt >= sortedList[i][0].Xt:
+                j = 0
+                if newPoint.Xt == sortedList[i][0].Xt:
+                    while j < len(sortedList[i]):
+                        if newPoint.Yt > sortedList[i][j].Yt:
+                            inserted = True
+                            sortedList[i].insert(j, newPoint)
+                            break
+                        j += 1
+                else:
+                    #insert new sublist in sortedList
+                    inserted = True
+                    sortedList.insert(i, [newPoint])
+
+                if inserted is False:
+                    # If we make it here, it needs to go the end of the sublist [i]
+                    sortedList[i].append(newPoint)
+                    inserted = True
+                break
+        if inserted is False:
+            sortedList.append([newPoint])
+    return sortedList
+
 def mission_removeVisited(missionList):
     global visitedList
     """
@@ -234,49 +276,56 @@ def mission_removeVisited(missionList):
             visitedReplace.append(point)
             pointLast = point
     visitedList = visitedReplace
+
+    testOptim = False
     
     #Now, go over missionList and remove any points close to one that we've visited while off the pre-programmed route
     missionListClean = []
-    for cmd in missionList:
-        removePoint = False
-        #Only check waypoints...but we need to get rid of takeoff, and all the waypoints we've
-        #visited while following the route before we went off Auto. so visitedList is a bad
-        #way to do this as currently implemented
-        if cmd.command == 16:
-            for point in visitedList:
-                fDist = hs.haversine((point[0], point[1]), (cmd.x, cmd.y), unit=hs.Unit.METERS)
-                if fDist < args.clean_dist_way:
-                    removePoint = True
-                    break
-        if not removePoint:
-            missionListClean.append(cmd)
+
+    if testOptim:
+        for cmd in missionList:
+            removePoint = False
+            #Only check waypoints...but we need to get rid of takeoff, and all the waypoints we've
+            #visited while following the route before we went off Auto. so visitedList is a bad
+            #way to do this as currently implemented
+            if cmd.command == 16:
+                for point in visitedList:
+                    fDist = hs.haversine((point[0], point[1]), (cmd.x, cmd.y), unit=hs.Unit.METERS)
+                    if fDist < args.clean_dist_way:
+                        removePoint = True
+                        break
+            if not removePoint:
+                missionListClean.append(cmd)
+    else:
+        ##this part isn't tested yet
+        visitedSortedList = mission_sortVisted(visitedList)
+        lenMin1 = len(visitedSortedList) - 1
+        for cmd in missionList:
+            removePoint = False
+            #Only check waypoints...but we need to get rid of takeoff, and all the waypoints we've
+            #visited while following the route before we went off Auto. so visitedList is a bad
+            #way to do this as currently implemented
+            if cmd.command == 16:
+                deltaToX = abs(cmd.x - visitedSortedList[0][0].Xt)
+                for i in range(lenMin1):
+                    newDelta = abs(cmd.x - visitedSortedList[i+1][0].Xt)
+                    if newDelta >= deltaToX:
+                        deltaToY = abs(cmd.y - visitedSortedList[i+1][0].Yt)
+                        for j in range(len(visitedSortedList[i+1])):
+                            newDelta = abs(cmd.y - visitedSortedList[i+1][j+1].Yt)
+                            if newDelta >= deltaToY:
+                                #check the distance
+                                removePoint = True
+                                break
+
+                            deltaToY = newDelta
+                        break 
+                    deltaToX = newDelta
+            if not removePoint:
+                missionListClean.append(cmd)
 
     return missionListClean
 
-def mission_sortVisted(visitedList):
-    sortedList = []
-    for point in visitedList:
-        xTrunc = int(point[0] * 10000) * 0.0001
-        yTrunc = int(point[1] * 10000) * 0.0001
-        newPoint = [(xTrunc, yTrunc), point]
-        inserted = False
-        for i in range(len(sortedList)):
-            if newPoint[0][0] >= sortedList[i][0][0]:
-                stopX = sortedList[i][0][0]
-                while i < len(sortedList) and newPoint[0][0] == stopX:
-                    if newPoint[0][1] > sortedList[i][0][1]:
-                        inserted = True
-                        sortedList.insert(i, newPoint)
-                        break
-                    i += 1
-                if inserted is False:
-                    sortedList.insert(i, newPoint)
-                    inserted = True
-                break
-        if inserted is False:
-            sortedList.append(newPoint)
-    return sortedList
-    
 def mission_cleanBetter(missionList, nextWaypoint, fLat, fLon):
     """
     Assume the mission will be a grid search
