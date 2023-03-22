@@ -174,15 +174,21 @@ def upload_mission(missionlist, vehicle):
     vehicle.commands.upload()
 
 # Download current mission and return it in a list
-def download_mission(vehicle):
+def download_mission(vehicle, skipVisited=False):
     print(" Download mission from vehicle")
     missionlist=[]
     cmds = vehicle.commands
     cmds.download()
     cmds.wait_ready()
     #from docs, https://dronekit-python.readthedocs.io/en/stable/automodule.html, cmds.next will return the index of current waypoint
+    i = 0
     for cmd in cmds:
-        missionlist.append(cmd)
+        if skipVisited:
+            if i >= cmds.next:
+                missionlist.append(cmd)
+            i += 1
+        else:
+            missionlist.append(cmd)
     return missionlist
 
 def save_missionF(aFileName, vehicle):
