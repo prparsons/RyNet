@@ -234,6 +234,9 @@ class reducedPoint:
 
 def mission_sortVisted(visitedList):
     sortedList = []
+    # Create a list of lists...reduce precision so that close latitude points will
+    #   be grouped in the same list, which is then sorted by longitude in the same
+    #   way.
     for point in visitedList:
         newPoint = reducedPoint(point)
         inserted = False
@@ -248,7 +251,7 @@ def mission_sortVisted(visitedList):
                             break
                         j += 1
                 else:
-                    #insert new sublist in sortedList
+                    #Insert new sublist in sortedList
                     inserted = True
                     sortedList.insert(i, [newPoint])
 
@@ -262,6 +265,11 @@ def mission_sortVisted(visitedList):
     return sortedList
 
 def sortLat(visitedList, point, clean_dist_way):
+    # VisitedList is the sublist of points that share the same reduced precision latitude.
+    #   Now search the sub list for the thing with the closest longitude to point. Once 
+    #   that is found, it should be the closest visited point to point, so then check the
+    #   distance of that and compare it to clean_dist_way, returning True if it's closer 
+    #   than that and should be removed
     deltaToY = abs(point.y - visitedList[0].Yt)
     bSearched = False
     removePoint = False
@@ -285,7 +293,7 @@ def sortLat(visitedList, point, clean_dist_way):
     return removePoint
 
 def sort(visitedList, missionList, clean_dist_way):
-    ##this part isn't tested yet
+    # First, sort the mission list
     visitedSortedList = mission_sortVisted(visitedList)
     missionListClean = []
     lenMin1 = len(visitedSortedList) - 1
@@ -295,6 +303,8 @@ def sort(visitedList, missionList, clean_dist_way):
         #visited while following the route before we went off Auto. so visitedList is a bad
         #way to do this as currently implemented
         if cmd.command == 16:
+            # Look for the points with the closest latitude, then we'll search that sublist
+            #   for things with the closest longitude
             deltaToX = abs(cmd.x - visitedSortedList[0][0].Xt)
             bSearched1 = False
             for i in range(lenMin1):
