@@ -223,7 +223,7 @@ class reducedPoint:
     def __init__(self, pt):
         self.Xt = int(pt[0] * 10000) * 0.0001
         self.Yt = int(pt[1] * 10000) * 0.0001
-        self.pt = pt
+        self.pt = (pt[0], pt[1])
 
     def __str__(self):
         return "(%f, %f)" % (self.Xt, self.Yt)
@@ -265,7 +265,8 @@ def sortLat(visitedList, point, clean_dist_way):
     deltaToY = abs(point.y - visitedList[0].Yt)
     bSearched = False
     removePoint = False
-    for j in range(len(visitedList)):
+    lenMin1 = len(visitedList) - 1
+    for j in range(lenMin1):
         newDelta = abs(point.y - visitedList[j+1].Yt)
         if newDelta >= deltaToY:
             #check the distance
@@ -277,7 +278,7 @@ def sortLat(visitedList, point, clean_dist_way):
 
         deltaToY = newDelta
     if not bSearched:
-        fDist = hs.haversine(visitedList[len(visitedList)-1].pt, (clean_dist_way.x, clean_dist_way.y), unit=hs.Unit.METERS)
+        fDist = hs.haversine(visitedList[lenMin1].pt, (point.x, point.y), unit=hs.Unit.METERS)
         if fDist < clean_dist_way:
             removePoint = True
     
@@ -308,6 +309,8 @@ def sort(visitedList, missionList, clean_dist_way):
                 
         if not removePoint:
             missionListClean.append(cmd)
+    
+    return missionListClean
 
 def mission_removeVisited(missionList):
     global visitedList
