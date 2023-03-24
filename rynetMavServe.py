@@ -456,7 +456,7 @@ def cmdRouteRestore(vehicle, element):
         if element.attrib['loadsaved'] == 'true':
             missionList = readmissionF('savedMission.txt', vehicle)
     else:
-        missionList = missionList = download_mission(vehicle)
+        missionList = missionList = download_mission(vehicle, skipVisited=True)
         
     if 'lat' in element.attrib:
         fLat = float(element.attrib['lat'])
@@ -504,7 +504,6 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
     elif element.tag == 'dir':
         cmdDir(vehicle, element)
         #Reset the visited point list so we only have points visited while in Guided mode
-        visitedList = []
 
     elif element.tag == 'obs':
         cmdObs(vehicle, element)
@@ -533,6 +532,7 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
         
     elif element.tag == 'route_restore':
         cmdRouteRestore(vehicle, element)
+        visitedList = []
 
     else:
         print("Unknown command")
