@@ -173,11 +173,12 @@ void FlightController::runPointLogger()
     StopSignal ss(ssPtLog);
     bool bGuided = false;
     std::vector<coord> vecVisitedPoints;
+    coord currentPosition;
     while (!ss.shouldStop()) {
         if (bGuided) {
-            char* scPosition = SendRecXML("<pos_retrieve />");
-            // Lat\nLon
-            vecVisitedPoints.push_back(scPosition);
+            if (GetPosition(currentPosition.fLatitude, currentPosition.fLongitude)) {
+                vecVisitedPoints.push_back(currentPosition);
+            }
             // See if we're in guided or auto
             if (!bGuided) {
                 // switched back to auto, ...nothing to do?
@@ -207,8 +208,10 @@ void FlightController::SendXML(const char* strMessage)
         }
     }
     #else
+    mtXML.lock();
     if (socketDesc < 0) ConnectMavLink();
     sendto(socketDesc, strMessage, strlen(strMessage), MSG_CONFIRM, (const struct sockaddr*) &addressMavLink, sizeof(addressMavLink));
+    mtXML.unlock();
     #endif
 }
 
@@ -232,6 +235,7 @@ char* FlightController::SendRecXML(const char* strMessage, int iTimeoutMS)
     scResponse[iLength] = 0;
     return scResponse;
     #else
+    mtXML.lock();
     if (socketDesc < 0) ConnectMavLink();
     sendto(socketDesc, strMessage, strlen(strMessage), MSG_CONFIRM, (const struct sockaddr*)&addressMavLink, sizeof(addressMavLink));
     char* scResponse = new char[512];
@@ -243,10 +247,12 @@ char* FlightController::SendRecXML(const char* strMessage, int iTimeoutMS)
         if (iLength < 0) {
             // Still failed...give up
             delete[] scResponse;
+            mtXML.unlock();
             return nullptr;
         }
     }
     scResponse[iLength] = 0;
+    mtXML.unlock();
     return scResponse;
     #endif
 }

@@ -16,14 +16,14 @@ typedef cv::Mat image;
 
 class coord {
 public:
-    coord(const char* scPos);
+    coord();
     coord(const coord& other);
 
     float fLatitude;
     float fLongitude;
 };
 
-inline coord::coord(const char* scPos)
+inline coord::coord()
 {
     fLatitude = 0;
     fLongitude = 0;

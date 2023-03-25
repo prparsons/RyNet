@@ -47,6 +47,7 @@ private:
     std::thread* pThreadDepth;
     StopSignal ss;
     StopSignal ssPtLog;
+    ThreadMutex mtXML;
 
     struct sockaddr_in addressMavLink;
     int socketDesc;
