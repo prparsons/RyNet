@@ -37,12 +37,13 @@ public:
 #define CameraController_IR 0x02
 #define CameraController_Depth 0x04
 #define CameraController_DownsampleDepth 0x08
+#define CameraController_RGBSimulation 0x10
 
 class CameraController {
 public:
     ~CameraController();
 
-    static CameraController* OpenCamera(uint32_t features);
+    static CameraController* OpenCamera(uint32_t features, const char* scSimulationFile = nullptr);
 
     // Must delete returned pointers
     cameraFrame_depth* GetFrameDepth();
@@ -57,9 +58,10 @@ public:
     void JoinDepth();
 
 protected:
-    CameraController(uint32_t);
+    CameraController(uint32_t features, const char* scSimulationFile);
     void run_RS();
     void run_CV(const char* scGStream, cv::Mat* pFrameCurrent, Signal* pSig, StopSignal* pss);
+    void run_simulation();
 
 private:
     cameraFrame_depth* pFrameCurrentDepth;
@@ -70,6 +72,7 @@ private:
 
     camera_RS* pCameraRS;
     uint32_t features;
+    char scSimulationFile[512];
 
     std::thread* pthrCamera[3];
     StopSignal ss[3];
