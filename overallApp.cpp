@@ -13,9 +13,14 @@ int main( int argc, char** argv )
 {
     bool bStopNavOnDepthFail = true;
     bool bSendRTL = false;
+    bool bStartDepth = false;
+    bool bStartPointLogger = false;
+
     for (int i = 0; i < argc; i++) {
         if (strcmp("--continue", argv[i]) == 0) bStopNavOnDepthFail = false;
-        else if (strcmp("--rtlfinish", argv[i])) bSendRTL = true;
+        else if (strcmp("--rtlfinish", argv[i]) == 0) bSendRTL = true;
+        else if (strcmp("--run_depth", argv[i]) == 0) bStartDepth = true;
+        else if (strcmp("--log_visited", argv[i]) == 0) bStartPointLogger = true;
     }
     try {
         DataLogger logger;
@@ -26,6 +31,7 @@ int main( int argc, char** argv )
         std::thread thrLogger(&DataLogger::run, &logger);
         pCamera->run(); // Camera starts all it's own threads
         std::thread thrNav(&Navigator::runNavigator, &nav);
+        pController->Start(bStartDepth, bStartPointLogger);
         // std::system_error if the thread could not be started.
         printL("Threads Started, waiting on camera");        
         pCamera->JoinDepth();

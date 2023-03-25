@@ -9,6 +9,7 @@ FlightController::FlightController(DataLogger& _logger, CameraController& _camer
 : logger(_logger)
 , camera(_camera)
 , pThreadDepth(nullptr)
+, pThreadPoint(nullptr)
 , socketDesc(-1)
 {
     memset(&addressMavLink, 0, sizeof(addressMavLink));
@@ -31,9 +32,28 @@ void FlightController::DestroyFlightController()
     }
 }
 
+void FlightController::Start(bool bStartDepth, bool bStartPointLogger)
+{
+    printL("FlightController::Start");
+    if (bStartPointLogger) {
+        pThreadPoint = new std::thread(&FlightController::runDepth, this);
+    }
+    if (bStartDepth) {
+        pThreadDepth = new std::thread(&FlightController::runPointLogger, this);
+    }
+}
+
 FlightController::~FlightController()
 {
-    //thread
+    if (pThreadDepth != nullptr) {
+        ssDepth.stop();
+        delete pThreadDepth;
+    }
+    if (pThreadPoint != nullptr) {
+        ssPtLog.stop();
+        delete pThreadPoint;
+    }
+
     //socket
 }
 
@@ -132,7 +152,7 @@ void FlightController::runDepth()
 {
     printL("FlightController::runDepth");
     Signal* pSig = camera.GetSignalDepth();
-    while (!ss.shouldStop()) {
+    while (!ssDepth.shouldStop()) {
         pSig->wait();
         
         cameraFrame_depth* pFrameDepth = camera.GetFrameDepth();
@@ -179,12 +199,13 @@ void FlightController::runDepth()
 
 void FlightController::runPointLogger()
 {
+    printL("FlightController::runPointLogger");
     StopSignal ss(ssPtLog);
     bool bGuided = false;
     std::vector<coord> vecVisitedPoints;
     coord currentPosition;
     char scMode[32];
-    while (!ss.shouldStop()) {
+    while (!ssPtLog.shouldStop()) {
         if (bGuided) { // In GUIDED
             // Get the current position, add it to the list of visited points
             if (GetPosition(currentPosition.fLatitude, currentPosition.fLongitude)) {

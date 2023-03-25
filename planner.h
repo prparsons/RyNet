@@ -22,6 +22,8 @@ public:
     static FlightController* GetFlightController(DataLogger& logger, CameraController& camera);
     static void DestroyFlightController();
 
+    void Start(bool bStartDepth, bool bStartPointLogger);
+
     static bool GetPosition(float fLat, float fLon, int iTimeoutMS = 100);
     static bool GetHeading(float fHeading, int iTimeoutMS = 100);
     bool GetMode(char* scMode, int iStrLen);
@@ -46,7 +48,8 @@ private:
     DataLogger& logger;
     CameraController& camera;
     std::thread* pThreadDepth;
-    StopSignal ss;
+    std::thread* pThreadPoint;
+    StopSignal ssDepth;
     StopSignal ssPtLog;
     ThreadMutex mtXML;
 
