@@ -40,11 +40,13 @@ private:
     char* SendRecXML(const char* sc, int iTimeoutMS = 100);
     void ConnectMavLink();
     void runDepth(); // Thread function to continuously send depth info for obstacle avoidance
+    void runPointLogger(); // Thread function to continuously retrieve and store visited points when in guided mode
 
     DataLogger& logger;
     CameraController& camera;
     std::thread* pThreadDepth;
     StopSignal ss;
+    StopSignal ssPtLog;
 
     struct sockaddr_in addressMavLink;
     int socketDesc;

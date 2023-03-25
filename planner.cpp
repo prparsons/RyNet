@@ -168,6 +168,32 @@ void FlightController::runDepth()
     }
 }
 
+void FlightController::runPointLogger()
+{
+    StopSignal ss(ssPtLog);
+    bool bGuided = false;
+    std::vector<coord> vecVisitedPoints;
+    while (!ss.shouldStop()) {
+        if (bGuided) {
+            char* scPosition = SendRecXML("<pos_retrieve />");
+            // Lat\nLon
+            vecVisitedPoints.push_back(scPosition);
+            // See if we're in guided or auto
+            if (!bGuided) {
+                // switched back to auto, ...nothing to do?
+            }
+        } else {
+            // Not in guided, we'll keep the poll rate low, say 1hz
+            //sleep(1second)
+            
+            // See if we're in guided or auto
+            if (bGuided) {
+                // Just switched to guided from auto, so start over with visited points
+                vecVisitedPoints.clear();
+            }
+        }
+    }
+}
 
 void FlightController::SendXML(const char* strMessage)
 {
