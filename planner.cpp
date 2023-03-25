@@ -64,6 +64,15 @@ bool FlightController::GetHeading(float fHeading, int iTimeoutMS)
     return true;
 }
 
+bool FlightController::GetMode(char* scMode, int iStrLen)
+{
+    char* sc = SendRecXML("<route_retrieve />");
+    if (sc == nullptr) return false;
+    strncpy(scMode, sc, iStrLen);
+    delete sc;
+    return true;
+}
+
 void FlightController::SetDirection(float fHeadingOffsetDeg)
 {
     char sc[128];
@@ -174,25 +183,28 @@ void FlightController::runPointLogger()
     bool bGuided = false;
     std::vector<coord> vecVisitedPoints;
     coord currentPosition;
+    char scMode[32];
     while (!ss.shouldStop()) {
-        if (bGuided) {
+        if (bGuided) { // In GUIDED
+            // Get the current position, add it to the list of visited points
             if (GetPosition(currentPosition.fLatitude, currentPosition.fLongitude)) {
                 vecVisitedPoints.push_back(currentPosition);
             }
             // See if we're in guided or auto
-            if (!bGuided) {
-                // switched back to auto, ...nothing to do?
+            if (GetMode(scMode, 32)) {
+                bGuided = strcmp(scMode, "GUIDED") == 0;
             }
-        } else {
-            // Not in guided, we'll keep the poll rate low, say 1hz
-            //sleep(1second)
-            
-            // See if we're in guided or auto
-            if (bGuided) {
-                // Just switched to guided from auto, so start over with visited points
+            if (!bGuided) {
+                // Just switched to guided from auto, so clear visited points
                 vecVisitedPoints.clear();
             }
+        } else { // in AUTO            
+            // See if we're in guided or auto
+            if (GetMode(scMode, 32)) {
+                bGuided = strcmp(scMode, "GUIDED") == 0;
+            }
         }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
 }
 

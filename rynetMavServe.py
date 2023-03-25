@@ -21,6 +21,9 @@ Command Documentation:
     Sets mode to GUIDED, and then turns indicated amount
         dist -- distance to set waypoint in meters[default:1000]
 
+<mode_retrieve />
+    Retrieves the current mode and returns it to the client as a string ("AUTO", "GUIDED")
+
 <obs dir='30'>DISTANCE_CM</obs>
     Sends obstacle distance sensor message
         dir -- direction the sensor is facing
@@ -427,6 +430,10 @@ def cmdDir(vehicle, element):
     locationNew = LocationGlobal(latNew, lonNew, vehicle.location.global_frame.alt)
     vehicle.simple_goto(locationNew)
 
+def cmdModeRetrieve(vehicle, UDPServerSocket, address):
+    strReply = vehicle.mode.name
+    UDPServerSocket.sendto(str.encode(strReply), address)
+
 def cmdObs(vehicle, element): 
     if 'dir' in element.attrib:
         print("dir found")
@@ -505,6 +512,9 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
         cmdDir(vehicle, element)
         #Reset the visited point list so we only have points visited while in Guided mode
         visitedList = []
+
+    elif element.tag == 'mode_retrieve':
+        cmdModeRetrieve(vehicle, UDPServerSocket, address)
 
     elif element.tag == 'obs':
         cmdObs(vehicle, element)
