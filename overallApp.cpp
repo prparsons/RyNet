@@ -9,24 +9,50 @@
 #include "navigation.h"
 #include "dataLogger.h"
 
+enum OptionArgument {
+    SIMULATE_VIDEO = 0,
+    UDP_SERVER_ADDRESS,
+    OPTION_NONE
+};
+
+void printHelp();
+
 int main( int argc, char** argv )
 {
     bool bOptionArgument = false;
     bool bStopNavOnDepthFail = true;
     bool bSendRTL = false;
     bool bSimulateVideo = false;
+    bool bManualServerAddress = false;
+    OptionArgument OptionArgumentSelection = OPTION_NONE;
     char scVideoSimPath[512];
+    char scServerAddress[32];
     for (int i = 0; i < argc; i++) {
         if (bOptionArgument) {
             // For now, only thing is read possible video filename
             bOptionArgument = false;
-            strncpy(scVideoSimPath, argv[i], 512);
+            switch (OptionArgumentSelection) {
+                case SIMULATE_VIDEO: strncpy(scVideoSimPath, argv[i], 512); break;
+                case UDP_SERVER_ADDRESS: strncpy(scServerAddress, argv[i], 32); break;
+                default:
+                    printL("OptionAgumentSelection Invalid");
+                    return -1;
+            }
         } else {
             if (strcmp("--continue", argv[i]) == 0) bStopNavOnDepthFail = false;
             else if (strcmp("--rtlfinish", argv[i]) == 0) bSendRTL = true;
             else if (strcmp("--simulate_video", argv[i]) == 0) {
                 bSimulateVideo = true;
                 bOptionArgument = true;
+            } else if (strcmp("--server_address", argv[i]) == 0) {
+                bManualServerAddress = true;
+                bOptionArgument = true;
+            } else {
+                if (strcmp("--help", argv[i]) != 0) {
+                    printL("Invalid option");
+                    printHelp();
+                    return 0;
+                }
             }
         }
     }
@@ -36,6 +62,7 @@ int main( int argc, char** argv )
         if (bSimulateVideo) pCamera = CameraController::OpenCamera(CameraController_RGBSimulation, scVideoSimPath);
         else pCamera = CameraController::OpenCamera(CameraController_RGB /*| CameraController_Depth*/);
         FlightController* pController = FlightController::GetFlightController(logger, *pCamera);
+        if (bManualServerAddress) pController->SetServerAddress(scServerAddress);
         Navigator nav(*pController, logger, *pCamera);
         printL("Starting main loop");
         std::thread thrLogger(&DataLogger::run, &logger);
@@ -72,4 +99,22 @@ int main( int argc, char** argv )
         sendto(socketDesc, "<rtl />", 7, MSG_CONFIRM, (const struct sockaddr*) &addressMavLink, sizeof(addressMavLink));
     }
     return 0;
+}
+
+void printHelp()
+{
+    printL("Command line options:");
+    printL(" --continue");
+    printL("    Program will not stop if the depth camera fails. Otherwise, if the depth");
+    printL("    camera fails, navigation will stop and the program will exit.\n");
+    printL(" --rtlfinish");
+    printL("    Drone will ReturnToLaunch after finishing navigation. Otherwise, it will");
+    printL("    only execute the last mission command.\n");
+    printL(" --simulate_video [VIDEO_FILE]");
+    printL("    Program will open the specified VIDEO_FILE and use that imagery instead");
+    printL("    starting the RGB camera. Failure to open video file will cause an ");
+    printL("    exception.\n");
+    printL(" --server_address [XXX.XXX.XXX.XXX]");
+    printL("    Specified ip address will be used as the Mavlink UDP server. If not");
+    printL("    provided, 127.0.0.1 will be used as a default");
 }
