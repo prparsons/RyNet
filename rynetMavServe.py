@@ -388,6 +388,21 @@ def mission_cleanBetter(missionList, nextWaypoint, fLat, fLon):
 
     """
     missionList = mission_removeVisited(missionList)
+    cmdCurrent = Command(missionList[0].target_system,
+                         missionList[0].target_component,
+                         missionList[0].seq,
+                         missionList[0].frame,
+                         missionList[0].command,
+                         0,
+                         0,
+                         missionList[0].param1,
+                         missionList[0].param2,
+                         missionList[0].param3,
+                         missionList[0].param4,
+                         vehicle.location.global_frame.lat,
+                         vehicle.location.global_frame.lon,
+                         100)#this needs to be a parameter
+    missionList.insert(0, cmdCurrent)
     return tsp2opt(missionList)
 
 def parseXML(message, vehicle, UDPServerSocket, address):
