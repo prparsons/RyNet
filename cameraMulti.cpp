@@ -329,7 +329,6 @@ void CameraController::run_simulation(cv::Mat* pFrameCurrent, Signal* pSig, Stop
         m.unlock();
 
         pSig->signal();
- 
         std::this_thread::sleep_for(std::chrono::milliseconds(iSimulationFrameDelay));
     }
 }
