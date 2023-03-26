@@ -110,7 +110,7 @@ CameraController::CameraController(uint32_t _features, const char* _scSimulation
 {
     printL("CameraController::CameraController");
 
-    if (scSimulationFile != nullptr) {
+    if (_scSimulationFile != nullptr) {
         strncpy(scSimulationFile, _scSimulationFile, 512);
     } else {
         scSimulationFile[0] = 0;

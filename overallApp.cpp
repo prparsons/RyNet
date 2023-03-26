@@ -27,7 +27,7 @@ int main( int argc, char** argv )
     OptionArgument OptionArgumentSelection = OPTION_NONE;
     char scVideoSimPath[512];
     char scServerAddress[32];
-    for (int i = 0; i < argc; i++) {
+    for (int i = 1; i < argc; i++) {
         if (bOptionArgument) {
             // For now, only thing is read possible video filename
             bOptionArgument = false;
@@ -49,24 +49,29 @@ int main( int argc, char** argv )
                 bOptionArgument = true;
             } else {
                 if (strcmp("--help", argv[i]) != 0) {
-                    printL("Invalid option");
-                    printHelp();
-                    return 0;
+                    printf("Invalid option [%s]\n", argv[i]);
                 }
+                printHelp();
+                return 0;
             }
         }
     }
     try {
         DataLogger logger;
         CameraController* pCamera;
+        printL(">Opening Camera");
         if (bSimulateVideo) pCamera = CameraController::OpenCamera(CameraController_RGBSimulation, scVideoSimPath);
         else pCamera = CameraController::OpenCamera(CameraController_RGB /*| CameraController_Depth*/);
+        printL(">Getting Flight Controller");
         FlightController* pController = FlightController::GetFlightController(logger, *pCamera);
         if (bManualServerAddress) pController->SetServerAddress(scServerAddress);
+        printL(">Creating Navigator");
         Navigator nav(*pController, logger, *pCamera);
-        printL("Starting main loop");
+        printL(">Starting DataLogger");
         std::thread thrLogger(&DataLogger::run, &logger);
+        printL(">Starting Camera");
         pCamera->run(); // Camera starts all it's own threads
+        printL(">Starting Navigator");
         std::thread thrNav(&Navigator::runNavigator, &nav);
         // std::system_error if the thread could not be started.
         printL("Threads Started, waiting on camera");        
@@ -80,8 +85,10 @@ int main( int argc, char** argv )
             delete pss;
         } // else could have a set alititude option, climb a bit if no depth?
         thrNav.join();
+        printL(">Navigator Stopped");
         if (bSendRTL) pController->SetRTL();
         thrLogger.join();
+        printL(">Datalogger Stopped");
         pController->DestroyFlightController();
         pController = nullptr;
         delete pCamera;
