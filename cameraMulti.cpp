@@ -295,7 +295,7 @@ void CameraController::run_CV(const char* scGStream, Mat* pFrameCurrent, Signal*
     delete pCap;
 }
 
-void CameraController::run_simulation(Mat* pFrameCurrent, Signal* pSig, StopSignal* pss)
+void CameraController::run_simulation(cv::Mat* pFrameCurrent, Signal* pSig, StopSignal* pss)
 {
     cv::VideoCapture cap(scSimulationFile);
     if (!cap.isOpened()) {
