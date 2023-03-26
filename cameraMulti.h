@@ -61,7 +61,7 @@ protected:
     CameraController(uint32_t features, const char* scSimulationFile);
     void run_RS();
     void run_CV(const char* scGStream, cv::Mat* pFrameCurrent, Signal* pSig, StopSignal* pss);
-    void run_simulation();
+    void run_simulation(Mat* pFrameCurrent, Signal* pSig, StopSignal* pss);
 
 private:
     cameraFrame_depth* pFrameCurrentDepth;
@@ -73,6 +73,7 @@ private:
     camera_RS* pCameraRS;
     uint32_t features;
     char scSimulationFile[512];
+    int iSimulationFrameDelay;
 
     std::thread* pthrCamera[3];
     StopSignal ss[3];
