@@ -15,18 +15,24 @@ enum OptionArgument {
     OPTION_NONE
 };
 
+// Command line help (display and explain options)
 void printHelp();
 
 int main( int argc, char** argv )
 {
+    // Bools for the various command line options
     bool bOptionArgument = false;
     bool bStopNavOnDepthFail = true;
     bool bSendRTL = false;
     bool bSimulateVideo = false;
     bool bManualServerAddress = false;
+    bool bRunRGB = true;
+    bool bRunDepth = true;
+    // Command line arguments
     OptionArgument OptionArgumentSelection = OPTION_NONE;
     char scVideoSimPath[512];
     char scServerAddress[32];
+    // Read all the command line arguments and options (--option argument)
     for (int i = 1; i < argc; i++) {
         if (bOptionArgument) {
             // For now, only thing is read possible video filename
@@ -42,6 +48,8 @@ int main( int argc, char** argv )
         } else {
             if (strcmp("--continue", argv[i]) == 0) bStopNavOnDepthFail = false;
             else if (strcmp("--rtlfinish", argv[i]) == 0) bSendRTL = true;
+            else if (strcmp("--no_rgb", argv[i]) == 0) bRunRGB = false;
+            else if (strcmp("--no_depth"), argv[i]) == 0) bRunDepth = false;
             else if (strcmp("--simulate_video", argv[i]) == 0) {
                 bSimulateVideo = true;
                 bOptionArgument = true;
@@ -64,8 +72,11 @@ int main( int argc, char** argv )
 
         CameraController* pCamera;
         printL(">>>Opening Camera");
-        if (bSimulateVideo) pCamera = CameraController::OpenCamera(CameraController_RGBSimulation, scVideoSimPath);
-        else pCamera = CameraController::OpenCamera(CameraController_RGB /*| CameraController_Depth*/);
+        uint32_t uCameraFeatures = 0;
+        if (bSimulateVideo) uCameraFeatures += CameraController_RGBSimulation;
+        else if (bRunRGB) uCameraFeatures += CameraController_RGB;
+        if (bRunDepth) uCameraFeatures += CameraController_Depth;)
+        pCamera = CameraController::OpenCamera(uCameraFeatures);
 
         printL(">>>Getting Flight Controller");
         FlightController* pController = FlightController::GetFlightController(logger, *pCamera);
@@ -132,5 +143,9 @@ void printHelp()
     printL("    exception.\n");
     printL(" --server_address [XXX.XXX.XXX.XXX]");
     printL("    Specified ip address will be used as the Mavlink UDP server. If not");
-    printL("    provided, 127.0.0.1 will be used as a default");
+    printL("    provided, 127.0.0.1 will be used as a default.\n");
+    printL(" --no_rgb");
+    printL("    Do not start the RGB camera.\n")
+    printL(" --no_depth");
+    printL("    Do not start the depth camera.\n");
 }
