@@ -35,18 +35,21 @@ int main( int argc, char** argv )
                 case SIMULATE_VIDEO: strncpy(scVideoSimPath, argv[i], 512); break;
                 case UDP_SERVER_ADDRESS: strncpy(scServerAddress, argv[i], 32); break;
                 default:
-                    printL("OptionAgumentSelection Invalid");
+                    printL("OptionAgurmentSelection Invalid");
                     return -1;
             }
+            OptionArgumentSelection = OPTION_NONE;
         } else {
             if (strcmp("--continue", argv[i]) == 0) bStopNavOnDepthFail = false;
             else if (strcmp("--rtlfinish", argv[i]) == 0) bSendRTL = true;
             else if (strcmp("--simulate_video", argv[i]) == 0) {
                 bSimulateVideo = true;
                 bOptionArgument = true;
+                OptionArgumentSelection = SIMULATE_VIDEO;
             } else if (strcmp("--server_address", argv[i]) == 0) {
                 bManualServerAddress = true;
                 bOptionArgument = true;
+                OptionArgumentSelection = UDP_SERVER_ADDRESS;
             } else {
                 if (strcmp("--help", argv[i]) != 0) {
                     printf("Invalid option [%s]\n", argv[i]);
@@ -58,23 +61,29 @@ int main( int argc, char** argv )
     }
     try {
         DataLogger logger;
+
         CameraController* pCamera;
-        printL(">Opening Camera");
+        printL(">>>Opening Camera");
         if (bSimulateVideo) pCamera = CameraController::OpenCamera(CameraController_RGBSimulation, scVideoSimPath);
         else pCamera = CameraController::OpenCamera(CameraController_RGB /*| CameraController_Depth*/);
-        printL(">Getting Flight Controller");
+
+        printL(">>>Getting Flight Controller");
         FlightController* pController = FlightController::GetFlightController(logger, *pCamera);
         if (bManualServerAddress) pController->SetServerAddress(scServerAddress);
-        printL(">Creating Navigator");
+
+        printL(">>>Creating Navigator");
         Navigator nav(*pController, logger, *pCamera);
-        printL(">Starting DataLogger");
+
+        printL(">>>Starting DataLogger");
         std::thread thrLogger(&DataLogger::run, &logger);
-        printL(">Starting Camera");
+        printL(">>>Starting Camera");
         pCamera->run(); // Camera starts all it's own threads
-        printL(">Starting Navigator");
+        printL(">>>Starting Navigator");
         std::thread thrNav(&Navigator::runNavigator, &nav);
+
         // std::system_error if the thread could not be started.
-        printL("Threads Started, waiting on camera");        
+        //**I think there might be issues with shutdown of stuff...need to trace through it all and double check
+        printL(">>>Threads Started, waiting on camera.join()");        
         pCamera->JoinDepth();
         printL("Camera Depth joined");
         // If we get here, depth failed 
@@ -82,13 +91,13 @@ int main( int argc, char** argv )
             printL("Getting stop signal to stop Nav");
             StopSignal* pss = nav.GetStopSignal();
             pss->stop();
-            delete pss;
+            delete pss; //**I got a seg fault once without --continue, I wonder if it's something to do with this?
         } // else could have a set alititude option, climb a bit if no depth?
         thrNav.join();
-        printL(">Navigator Stopped");
+        printL(">>>Navigator Stopped");
         if (bSendRTL) pController->SetRTL();
         thrLogger.join();
-        printL(">Datalogger Stopped");
+        printL(">>>Datalogger Stopped");
         pController->DestroyFlightController();
         pController = nullptr;
         delete pCamera;
