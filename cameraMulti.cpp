@@ -41,9 +41,9 @@ void cameraFrame_depth::applyDecimationFilter()
 // ***********
 // CameraController
 
-CameraController* CameraController::OpenCamera(uint32_t features)
+CameraController* CameraController::OpenCamera(uint32_t features, const char* scSimulationFile)
 {
-    CameraController* pReturn = new CameraController(features);
+    CameraController* pReturn = new CameraController(features, scSimulationFile);
     return pReturn;
 }
 
@@ -102,21 +102,34 @@ Signal* CameraController::GetSignalIR()
     return new Signal(sigIR);
 }
 
-CameraController::CameraController(uint32_t _features)
+CameraController::CameraController(uint32_t _features, const char* _scSimulationFile)
 : pFrameCurrentDepth(nullptr)
 , pCameraRS(nullptr)
 , features(_features)
+, iSimulationFrameDelay(500)
 {
     printL("CameraController::CameraController");
+
+    if (_scSimulationFile != nullptr) {
+        strncpy(scSimulationFile, _scSimulationFile, 512);
+    } else {
+        scSimulationFile[0] = 0;
+    }
     
     if (features & CameraController_Depth) {
         pCameraRS = new camera_RS;
         pCameraRS->cfg.enable_stream(RS2_STREAM_DEPTH, 1280, 720);
         pCameraRS->cfg.enable_stream(RS2_STREAM_ACCEL);
     }
-    if (features & CameraController_RGB) {
+    if (features & CameraController_RGBSimulation) {
+        // not anything to do here...or copy file path?
+        if (scSimulationFile[0] == 0) {
+            throw std::invalid_argument("No Video file provided");
+        }
+    } else if (features & CameraController_RGB) {
         // Set up anything here? resolution, framerate, exposure, white balance?
     }
+
     pthrCamera[0] = nullptr;
     pthrCamera[1] = nullptr;
     pthrCamera[2] = nullptr;
@@ -146,7 +159,15 @@ void CameraController::run()
             printL("CameraController::run realsense already started");
         }
     }
-    if (features & CameraController_RGB) {
+
+    if (features & CameraController_RGBSimulation) {
+        printf("CameraController::run starting simulation using file: %s", scSimulationFile);
+        if (pthrCamera[1] == nullptr) {
+            pthrCamera[1] = new std::thread(&CameraController::run_simulation, this, &FrameCurrentRGB, &sigRGB, &ss[1]);
+        } else {
+            printL("CameraController::run pthrCamera[1] already started");
+        }
+    } else if (features & CameraController_RGB) { // Can't run actual RGB camera if the simulation is enabled
         printL("CameraController::run starting RGB");
         if (pthrCamera[1] == nullptr) {
             pthrCamera[1] = new std::thread(&CameraController::run_CV, this, scGStream_RGB, &FrameCurrentRGB, &sigRGB, &ss[1]);
@@ -154,6 +175,7 @@ void CameraController::run()
             printL("CameraController::run cv1 already started");
         }
     }
+
     if (features & CameraController_IR) {
         if (pthrCamera[2] == nullptr) {
             pthrCamera[2] = new std::thread(&CameraController::run_CV, this, scGStream_IR, &FrameCurrentIR, &sigIR, &ss[2]);
@@ -221,12 +243,24 @@ void CameraController::run_RS()
 void CameraController::run_CV(const char* scGStream, Mat* pFrameCurrent, Signal* pSig, StopSignal* pss)
 {
     printL("CameraController::run_CV");
-    printL(scGStream);
     if (pFrameCurrent == nullptr) {
-        printL("run_CV no current frame");
+        printL("CameraController::run_CV current fame nullptr");
+        return;
+    }
+    if (pSig == nullptr) {
+        printL("CameraController::run_CV Signal nullptr");
+        return;
+    }
+    if (pss == nullptr) {
+        printL("CameraController::run_CV StopSignal nullptr");
+        return;
+    }
+    if (scGStream == nullptr) {
+        printL("CameraController::run_CV scGStream is null");
         return;
     }
 
+    printL(scGStream);
     VideoCapture* pCap = new VideoCapture(scGStream, cv::CAP_GSTREAMER);
     
     if (!pCap->isOpened()) {
@@ -259,4 +293,42 @@ void CameraController::run_CV(const char* scGStream, Mat* pFrameCurrent, Signal*
     }
     // According to opencv: the camera will be deinitialized automatically in VideoCapture destructor
     delete pCap;
+}
+
+void CameraController::run_simulation(cv::Mat* pFrameCurrent, Signal* pSig, StopSignal* pss)
+{
+    cv::VideoCapture cap(scSimulationFile);
+    if (!cap.isOpened()) {
+        printL("CameraController::run_simulation failed to open file");
+        throw std::invalid_argument("cv::VideoCapture failed");
+        return;
+    }
+    if (pFrameCurrent == nullptr) {
+        printL("CameraController::run_simulation current fame nullptr");
+        return;
+    }
+    if (pSig == nullptr) {
+        printL("CameraController::run_simulation Signal nullptr");
+        return;
+    }
+    if (pss == nullptr) {
+        printL("CameraController::run_simulation StopSignal nullptr");
+        return;
+    }
+    while (!pss->shouldStop()) {
+        cv::Mat frame;
+        cap >> frame;
+  
+        if (frame.empty()) {
+            printL("CameraController::run_simulation no more frames");
+            break;
+        }
+        
+        m.lock();
+        frame.copyTo(*pFrameCurrent);
+        m.unlock();
+
+        pSig->signal();
+        std::this_thread::sleep_for(std::chrono::milliseconds(iSimulationFrameDelay));
+    }
 }
