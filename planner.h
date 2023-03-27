@@ -35,6 +35,8 @@ public:
     void RestoreRouteNaive();
     void RestoreRouteClean();
 
+    void SetServerAddress(const char* scServerAddress);
+
 private:
     FlightController(DataLogger& logger, CameraController& camera);
 
@@ -55,7 +57,7 @@ private:
 
     struct sockaddr_in addressMavLink;
     int socketDesc;
-    const char* scMavLinkAddress = "127.0.0.1";
+    char scMavLinkAddress[32];
     const int iMavlinkPort = 3636;
 };
 

@@ -12,6 +12,7 @@ FlightController::FlightController(DataLogger& _logger, CameraController& _camer
 , pThreadPoint(nullptr)
 , socketDesc(-1)
 {
+    strcpy(scMavLinkAddress, "127.0.0.1");
     memset(&addressMavLink, 0, sizeof(addressMavLink));
 }
 
@@ -139,6 +140,11 @@ void FlightController::RestoreRouteClean()
     // Simple version: search list for closest point in waypoint list, make that first by
     //  deleting everything before it
     SendXML("<route_restore clean='simple' />");
+}
+
+void FlightController::SetServerAddress(const char* scServerAddress)
+{
+    strncpy(scMavLinkAddress, scServerAddress, 32);
 }
 
 void FlightController::SaveRoute()

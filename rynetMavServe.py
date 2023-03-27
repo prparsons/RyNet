@@ -391,6 +391,21 @@ def mission_cleanBetter(missionList, nextWaypoint, fLat, fLon):
 
     """
     missionList = mission_removeVisited(missionList)
+    cmdCurrent = Command(missionList[0].target_system,
+                         missionList[0].target_component,
+                         missionList[0].seq,
+                         missionList[0].frame,
+                         missionList[0].command,
+                         0,
+                         0,
+                         missionList[0].param1,
+                         missionList[0].param2,
+                         missionList[0].param3,
+                         missionList[0].param4,
+                         vehicle.location.global_frame.lat,
+                         vehicle.location.global_frame.lon,
+                         100)#this needs to be a parameter
+    missionList.insert(0, cmdCurrent)
     return tsp2opt(missionList)
 
 def parseXML(message, vehicle, UDPServerSocket, address):
@@ -463,7 +478,7 @@ def cmdRouteRestore(vehicle, element):
         if element.attrib['loadsaved'] == 'true':
             missionList = readmissionF('savedMission.txt', vehicle)
     else:
-        missionList = missionList = download_mission(vehicle)
+        missionList = missionList = download_mission(vehicle, skipVisited=True)
         
     if 'lat' in element.attrib:
         fLat = float(element.attrib['lat'])
@@ -511,7 +526,6 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
     elif element.tag == 'dir':
         cmdDir(vehicle, element)
         #Reset the visited point list so we only have points visited while in Guided mode
-        visitedList = []
 
     elif element.tag == 'mode_retrieve':
         cmdModeRetrieve(vehicle, UDPServerSocket, address)
@@ -543,6 +557,7 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
         
     elif element.tag == 'route_restore':
         cmdRouteRestore(vehicle, element)
+        visitedList = []
 
     else:
         print("Unknown command")
