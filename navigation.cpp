@@ -267,7 +267,7 @@ void Navigator::runNavigator()
         pSigRGB->wait();
         cv::Mat Frame;
         if (!camera.GetFrameRGB(Frame)) {
-            printL("runNavigator frame was valid");
+            printL("runNavigator frame was not valid");
             continue;
         }
         detector.SetNewImage(Frame);
