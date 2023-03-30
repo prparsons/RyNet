@@ -5,10 +5,12 @@ from datetime import datetime
    
 #Open log file
 fileLog = open("logUDP.txt", "w")
+lat = 35.0
+lon = 110.0
 
 try:
     # Now set up everything for the UDP server
-    localIP = "127.0.0.1" #need to use argument or something...needs to spell out actual IP to listen to other addresses
+    localIP = "127.0.0.1"
     localPort = 3636
     # Create a datagram socket
     UDPServerSocket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
@@ -29,7 +31,12 @@ try:
         strMessStamped = "[%s]  %s\n" % (date_time, message)
         print(message)
         fileLog.write(strMessStamped)
-
+        
+        if message == "<pos_retrieve />":
+            strReply = "%f\n%f\n" % (lat, lon)
+            lat += 0.001
+            lon += 0.001
+            UDPServerSocket.sendto(str.encode(strReply), address)
 except:
     print("done")
     fileLog.close()
