@@ -152,4 +152,6 @@ void printHelp()
     printL("    Do not start the RGB camera.\n");
     printL(" --no_depth");
     printL("    Do not start the depth camera.\n");
+    printL(" --log_visited");
+    printL("    Will log visited points.\n");
 }
