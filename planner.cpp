@@ -31,16 +31,26 @@ void FlightController::DestroyFlightController()
         delete pInstance;
         pInstance = nullptr;
     }
+    if (pThreadDepth != nullptr) {
+        ssDepth.stop();
+        pThreadDepth->join();
+        delete pThreadDepth;
+    }
+    if (bStartPointLogger) {
+        ssPtLog.stop();
+        pThreadPoint->join();
+        delete pThreadPoint;
+    }
 }
 
 void FlightController::Start(bool bStartDepth, bool bStartPointLogger)
 {
     printL("FlightController::Start");
     if (bStartDepth) {
-        pThreadPoint = new std::thread(&FlightController::runDepth, this);
+        pThreadDepth = new std::thread(&FlightController::runDepth, this);
     }
     if (bStartPointLogger) {
-        pThreadDepth = new std::thread(&FlightController::runPointLogger, this);
+        pThreadPoint = new std::thread(&FlightController::runPointLogger, this);
     }
 }
 

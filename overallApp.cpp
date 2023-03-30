@@ -106,7 +106,7 @@ int main( int argc, char** argv )
             printL("Getting stop signal to stop Nav");
             StopSignal* pss = nav.GetStopSignal();
             pss->stop();
-            delete pss; //**I got a seg fault once without --continue, I wonder if it's something to do with this?
+            delete pss; //**I got a seg fault once without --continue, I wonder if it's something to do with this? (datalogger wasn't cleaning up threads...)
         } // else could have a set alititude option, climb a bit if no depth?
         thrNav.join();
         printL(">>>Navigator Stopped");
