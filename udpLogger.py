@@ -8,9 +8,8 @@ fileLog = open("logUDP.txt", "w")
 
 try:
     # Now set up everything for the UDP server
-    localIP = "192.168.2.40"#"127.0.0.1"
+    localIP = "127.0.0.1" #need to use argument or something...needs to spell out actual IP to listen to other addresses
     localPort = 3636
-    #bytesToSend = str.encode("ack")
     # Create a datagram socket
     UDPServerSocket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
     # Bind to address and ip
@@ -30,9 +29,7 @@ try:
         strMessStamped = "[%s]  %s\n" % (date_time, message)
         print(message)
         fileLog.write(strMessStamped)
-        
-        # Sending a reply to client
-        #UDPServerSocket.sendto(bytesToSend, address)
+
 except:
     print("done")
     fileLog.close()
