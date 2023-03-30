@@ -247,10 +247,40 @@ Navigator::Navigator(FlightController& _control, DataLogger& _logger, CameraCont
 , control(_control)
 , logger(_logger)
 , camera(_camera)
+, pThread(nullptr)
 , detector(logger)
 , segmenter(logger)
 {
 
+}
+
+Navigator::~Navigator()
+{
+    Stop();
+}
+    
+void Navigator::Start()
+{
+    pThread = new std::thread(&Navigator::runNavigator, this);
+}
+
+void Navigator::Join()
+{
+    if (pThread != nullptr) {
+        pThread->join();
+        delete pThread;
+        pThread = nullptr;
+    }
+}
+
+void Navigator::Stop()
+{
+    if (pThread != nullptr) {
+        ssMain.stop();
+        pThread->join();
+        delete pThread;
+        pThread = nullptr;
+    }
 }
 
 void Navigator::runNavigator()

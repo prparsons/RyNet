@@ -29,7 +29,7 @@ DataLogger::~DataLogger()
 
 void DataLogger::Start()
 {
-    pThread = new std::thread thrLogger(&DataLogger::run, this);
+    pThread = new std::thread(&DataLogger::run, this);
 }
 
 void DataLogger::Stop()

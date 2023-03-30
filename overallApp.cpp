@@ -94,22 +94,22 @@ int main( int argc, char** argv )
         printL(">>>Starting Camera");
         pCamera->run(); // Camera starts all it's own threads
         printL(">>>Starting Navigator");
-        std::thread thrNav(&Navigator::runNavigator, &nav);
+        nav.Start();
+        printL(">>>Starting Flight Controller");
         pController->Start(bRunDepth, bStartPointLogger);
 
         // std::system_error if the thread could not be started.
         //**I think there might be issues with shutdown of stuff...need to trace through it all and double check
         printL(">>>Threads Started, waiting on camera.join()");        
         pCamera->JoinDepth();
-        printL("Camera Depth joined");
+        printL(">>>Camera Depth joined");
         // If we get here, depth failed 
         if (bStopNavOnDepthFail) {
-            printL("Getting stop signal to stop Nav");
-            StopSignal* pss = nav.GetStopSignal();
-            pss->stop();
-            delete pss; //**I got a seg fault once without --continue, I wonder if it's something to do with this? (datalogger wasn't cleaning up threads...)
+            printL(">>>Sending stop signal to stop Nav");
+            nav.Stop();
+            ///***this has changed a bit since -> //**I got a seg fault once without --continue, I wonder if it's something to do with this? (datalogger wasn't cleaning up threads...)
         } // else could have a set alititude option, climb a bit if no depth?
-        thrNav.join();
+        nav.Join();
         printL(">>>Navigator Stopped");
         if (bSendRTL) pController->SetRTL();
         logger.Stop();

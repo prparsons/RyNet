@@ -67,17 +67,22 @@ private:
 class Navigator {
 public:
     Navigator(FlightController& control, DataLogger& logger, CameraController& camera);
-
-    void runNavigator();
-    StopSignal* GetStopSignal() { return new StopSignal(ssMain); }
+    ~Navigator();
+    
+    void Start();
+    void Join();
+    void Stop();
 
 private:
+    void runNavigator();
+
     time_t tLastChange;
     time_t tMinTimeBetweenChanges;
     FlightController& control;
     DataLogger& logger;
     CameraController& camera;
     StopSignal ssMain;
+    std::thread* pThread;
     ObjectDetection detector;
     TerrainSegmentation segmenter;
 };
