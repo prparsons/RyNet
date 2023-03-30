@@ -36,10 +36,10 @@ void FlightController::DestroyFlightController()
 void FlightController::Start(bool bStartDepth, bool bStartPointLogger)
 {
     printL("FlightController::Start");
-    if (bStartPointLogger) {
+    if (bStartDepth) {
         pThreadPoint = new std::thread(&FlightController::runDepth, this);
     }
-    if (bStartDepth) {
+    if (bStartPointLogger) {
         pThreadDepth = new std::thread(&FlightController::runPointLogger, this);
     }
 }

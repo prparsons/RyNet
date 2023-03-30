@@ -32,6 +32,7 @@ int main( int argc, char** argv )
     // Command line arguments
     OptionArgument OptionArgumentSelection = OPTION_NONE;
     char scVideoSimPath[512];
+    scVideoSimPath[0] = 0;
     char scServerAddress[32];
     // Read all the command line arguments and options (--option argument)
     for (int i = 1; i < argc; i++) {
@@ -50,7 +51,7 @@ int main( int argc, char** argv )
             if (strcmp("--continue", argv[i]) == 0) bStopNavOnDepthFail = false;
             else if (strcmp("--rtlfinish", argv[i]) == 0) bSendRTL = true;
             else if (strcmp("--no_rgb", argv[i]) == 0) bRunRGB = false;
-            else if (strcmp("--no_depth"), argv[i]) == 0) bRunDepth = false;
+            else if (strcmp("--no_depth", argv[i]) == 0) bRunDepth = false;
             else if (strcmp("--log_visited", argv[i]) == 0) bStartPointLogger = true;
             else if (strcmp("--simulate_video", argv[i]) == 0) {
                 bSimulateVideo = true;
@@ -77,8 +78,8 @@ int main( int argc, char** argv )
         uint32_t uCameraFeatures = 0;
         if (bSimulateVideo) uCameraFeatures += CameraController_RGBSimulation;
         else if (bRunRGB) uCameraFeatures += CameraController_RGB;
-        if (bRunDepth) uCameraFeatures += CameraController_Depth;)
-        pCamera = CameraController::OpenCamera(uCameraFeatures);
+        if (bRunDepth) uCameraFeatures += CameraController_Depth;
+        pCamera = CameraController::OpenCamera(uCameraFeatures, scVideoSimPath);
 
         printL(">>>Getting Flight Controller");
         FlightController* pController = FlightController::GetFlightController(logger, *pCamera);
@@ -148,7 +149,7 @@ void printHelp()
     printL("    Specified ip address will be used as the Mavlink UDP server. If not");
     printL("    provided, 127.0.0.1 will be used as a default.\n");
     printL(" --no_rgb");
-    printL("    Do not start the RGB camera.\n")
+    printL("    Do not start the RGB camera.\n");
     printL(" --no_depth");
     printL("    Do not start the depth camera.\n");
 }
