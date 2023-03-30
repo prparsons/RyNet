@@ -79,7 +79,8 @@ int main( int argc, char** argv )
         if (bSimulateVideo) uCameraFeatures += CameraController_RGBSimulation;
         else if (bRunRGB) uCameraFeatures += CameraController_RGB;
         if (bRunDepth) uCameraFeatures += CameraController_Depth;
-        pCamera = CameraController::OpenCamera(uCameraFeatures, scVideoSimPath);
+        if (bSimulateVideo) pCamera = CameraController::OpenCamera(uCameraFeatures, scVideoSimPath);
+        else pCamera = CameraController::OpenCamera(uCameraFeatures);
 
         printL(">>>Getting Flight Controller");
         FlightController* pController = FlightController::GetFlightController(logger, *pCamera);
@@ -89,7 +90,7 @@ int main( int argc, char** argv )
         Navigator nav(*pController, logger, *pCamera);
 
         printL(">>>Starting DataLogger");
-        std::thread thrLogger(&DataLogger::run, &logger);
+        logger.Start();
         printL(">>>Starting Camera");
         pCamera->run(); // Camera starts all it's own threads
         printL(">>>Starting Navigator");
@@ -111,7 +112,7 @@ int main( int argc, char** argv )
         thrNav.join();
         printL(">>>Navigator Stopped");
         if (bSendRTL) pController->SetRTL();
-        thrLogger.join();
+        logger.Stop();
         printL(">>>Datalogger Stopped");
         pController->DestroyFlightController();
         pController = nullptr;

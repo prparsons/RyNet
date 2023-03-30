@@ -35,11 +35,13 @@ void FlightController::DestroyFlightController()
         ssDepth.stop();
         pThreadDepth->join();
         delete pThreadDepth;
+        pThreadDepth = nullptr;
     }
     if (bStartPointLogger) {
         ssPtLog.stop();
         pThreadPoint->join();
         delete pThreadPoint;
+        pThreadPoint = nullptr;
     }
 }
 
@@ -221,7 +223,8 @@ void FlightController::runPointLogger()
     std::vector<coord> vecVisitedPoints;
     coord currentPosition;
     char scMode[32];
-    while (!ssPtLog.shouldStop()) {
+
+    while (!ss.shouldStop()) {
         if (bGuided) { // In GUIDED
             // Get the current position, add it to the list of visited points
             if (GetPosition(currentPosition.fLatitude, currentPosition.fLongitude)) {

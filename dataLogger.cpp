@@ -18,12 +18,30 @@ void printL(const char* sc)
 DataLogger::DataLogger()
 : bWriteImg(false)
 , bWriteMask(false)
+, pThread(nullptr)
 {
 }
 
 DataLogger::~DataLogger()
 {
+    Stop();
 }
+
+void DataLogger::Start()
+{
+    pThread = new std::thread thrLogger(&DataLogger::run, this);
+}
+
+void DataLogger::Stop()
+{
+    if (pThread != nullptr) {
+        ss.stop();
+        pThread->join();
+        delete pThread;
+        pThread = nullptr;
+    }
+}
+
 
 void DataLogger::run(void)
 {

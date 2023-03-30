@@ -25,20 +25,25 @@ public:
     DataLogger();
     ~DataLogger();
 
-    void run(void);
+    void Start();
+    void Stop();
 
     void LogImage(cv::Mat& im, std::string strIdSource);
     void LogMask(float4* pImg, int width, int height);
     void LogString(const char* scData);
 
 private:
+    void run(void);
     void WriteImageData(cv::Mat& image, ImageLogData& imageData);
 
     bool bWriteImg;
     bool bWriteMask;
+
     ThreadMutex mt;
     Signal sigNewData;
     StopSignal ss;
+    std::thread* pThread;
+
     cv::Mat image;
     ImageLogData dataImage;
     cv::Mat mask;
