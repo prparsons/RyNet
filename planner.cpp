@@ -27,21 +27,23 @@ FlightController* FlightController::GetFlightController(DataLogger& logger, Came
 
 void FlightController::DestroyFlightController()
 {
+    if (pInstance == nullptr) return;
+
+    if (pInstance->pThreadDepth != nullptr) {
+        pInstance->ssDepth.stop();
+        pInstance->pThreadDepth->join();
+        delete pInstance->pThreadDepth;
+        pInstance->pThreadDepth = nullptr;
+    }
+    if (pInstance->pThreadPoint != nullptr) {
+        pInstance->ssPtLog.stop();
+        pInstance->pThreadPoint->join();
+        delete pInstance->pThreadPoint;
+        pInstance->pThreadPoint = nullptr;
+    }
     if (pInstance != nullptr) {
         delete pInstance;
         pInstance = nullptr;
-    }
-    if (pThreadDepth != nullptr) {
-        ssDepth.stop();
-        pThreadDepth->join();
-        delete pThreadDepth;
-        pThreadDepth = nullptr;
-    }
-    if (bStartPointLogger) {
-        ssPtLog.stop();
-        pThreadPoint->join();
-        delete pThreadPoint;
-        pThreadPoint = nullptr;
     }
 }
 
