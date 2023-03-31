@@ -152,7 +152,7 @@ CameraController::~CameraController()
 
 void CameraController::run()
 {
-    printf("CameraController::run features=%u", features);
+    printf("CameraController::run features=%u\n", features);
     if (features & CameraController_Depth) {
         printL("CameraController::run starting depth");
         if (pthrCamera[0] == nullptr) {
@@ -163,7 +163,7 @@ void CameraController::run()
     }
 
     if (features & CameraController_RGBSimulation) {
-        printf("CameraController::run starting simulation using file: %s", scSimulationFile);
+        printf("CameraController::run starting simulation using file: %s\n", scSimulationFile);
         if (pthrCamera[1] == nullptr) {
             pthrCamera[1] = new std::thread(&CameraController::run_simulation, this, &FrameCurrentRGB, &sigRGB, &ss[1]);
         } else {
@@ -220,7 +220,7 @@ void CameraController::run_RS()
                 bFrameRetrieved = true;
             }
             // Verify that we got the correct number of frames
-            if (localFeatures & (CameraController_Depth + CameraController_Accel)) {
+            if ((localFeatures & CameraController_Depth) && (localFeatures & CameraController_Accel)) {
                 if (data.size() != 2) {
                     printL("CameraController::run_RS did not have 2 frames");
                     return;
