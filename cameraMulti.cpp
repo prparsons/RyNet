@@ -119,7 +119,7 @@ CameraController::CameraController(uint32_t _features, const char* _scSimulation
     if (features & CameraController_Depth) {
         pCameraRS = new camera_RS;
         pCameraRS->cfg.enable_stream(RS2_STREAM_DEPTH, 1280, 720);
-        pCameraRS->cfg.enable_stream(RS2_STREAM_ACCEL);
+        //pCameraRS->cfg.enable_stream(RS2_STREAM_ACCEL);
     }
     if (features & CameraController_RGBSimulation) {
         // not anything to do here...or copy file path?
@@ -195,7 +195,7 @@ void CameraController::run_RS()
 {
     printL("CameraController::run_RS");
     try {
-        bool bFrameRetrieved = false;
+    //    bool bFrameRetrieved = false;
         rs2::colorizer color_map(2); // 2 should give us a white to black color map
         rs2::pipeline_profile pipelineInfo = pCameraRS->pipe.start(pCameraRS->cfg);
         if (!pipelineInfo) {
@@ -207,7 +207,7 @@ void CameraController::run_RS()
             if (!pCameraRS->pipe.try_wait_for_frames(&data)) {
                 printL("CameraController::run_RS cam fail");
                 return;
-            } else if (bFrameRetrieved) {
+            } else {//if (bFrameRetrieved) {
                 printL("CameraController::run_RS frames have been retrieved");
             }
 
@@ -219,6 +219,7 @@ void CameraController::run_RS()
             }
 
             if (data.size() >= 2) {
+               printL("Trying to do something with accel");
                 rs2_vector frameAccel;
                 if (data[0].get_profile().stream_type() == RS2_STREAM_ACCEL) frameAccel = data[0].as<rs2::motion_frame>().get_motion_data();
                 else frameAccel = data[1].as<rs2::motion_frame>().get_motion_data();
