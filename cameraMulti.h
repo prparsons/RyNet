@@ -38,6 +38,7 @@ public:
 #define CameraController_Depth 0x04
 #define CameraController_DownsampleDepth 0x08
 #define CameraController_RGBSimulation 0x10
+#define CameraController_Accel 0x20
 
 class CameraController {
 public:

@@ -119,7 +119,9 @@ CameraController::CameraController(uint32_t _features, const char* _scSimulation
     if (features & CameraController_Depth) {
         pCameraRS = new camera_RS;
         pCameraRS->cfg.enable_stream(RS2_STREAM_DEPTH, 1280, 720);
-        //pCameraRS->cfg.enable_stream(RS2_STREAM_ACCEL);
+        if (features & CameraController_Accel) pCameraRS->cfg.enable_stream(RS2_STREAM_ACCEL);
+    } else if (features & CameraController_Accel) {
+        throw std::invalid_argument("No Accel without Depth camera enabled");
     }
     if (features & CameraController_RGBSimulation) {
         // not anything to do here...or copy file path?
@@ -194,8 +196,12 @@ void CameraController::JoinDepth()
 void CameraController::run_RS()
 {
     printL("CameraController::run_RS");
+    m.lock();
+    uint32_t localFeatures = features;
+    m.unlock();
+
     try {
-    //    bool bFrameRetrieved = false;
+        bool bFrameRetrieved = false;
         rs2::colorizer color_map(2); // 2 should give us a white to black color map
         rs2::pipeline_profile pipelineInfo = pCameraRS->pipe.start(pCameraRS->cfg);
         if (!pipelineInfo) {
@@ -207,30 +213,46 @@ void CameraController::run_RS()
             if (!pCameraRS->pipe.try_wait_for_frames(&data)) {
                 printL("CameraController::run_RS cam fail");
                 return;
-            } else {//if (bFrameRetrieved) {
+            }
+            // Verify that we got frames
+            if (!bFrameRetrieved) {
                 printL("CameraController::run_RS frames have been retrieved");
+                bFrameRetrieved = true;
+            }
+            // Verify that we got the correct number of frames
+            if (localFeatures & (CameraController_Depth + CameraController_Accel)) {
+                if (data.size() != 2) {
+                    printL("CameraController::run_RS did not have 2 frames");
+                    return;
+                }
+            } else {
+                if (data.size() != 1) {
+                    printL("CameraController::run_RS did not have 1 frame");
+                    return;
+                }
             }
 
             // Save the raw depth. If applying the decimation filter, before/after color map makes a difference in 
             //      how big the image is
             cameraFrame_depth* pDepthRaw = new cameraFrame_depth(data.get_depth_frame());
-            if (features & CameraController_DownsampleDepth) {
+            if (localFeatures & CameraController_DownsampleDepth) {
                 pDepthRaw->applyDecimationFilter();
             }
-
-            if (data.size() >= 2) {
-               printL("Trying to do something with accel");
+            // Handle the frames retrieved by type
+            if (localFeatures & CameraController_Accel) {
                 rs2_vector frameAccel;
                 if (data[0].get_profile().stream_type() == RS2_STREAM_ACCEL) frameAccel = data[0].as<rs2::motion_frame>().get_motion_data();
                 else frameAccel = data[1].as<rs2::motion_frame>().get_motion_data();
                 m.lock();
                 FrameCurrentAccel = frameAccel;
-            } else {            
+                m.unlock();
+            } 
+            if (localFeatures & CameraController_Depth) {            
                 m.lock();
+                if (pFrameCurrentDepth != nullptr) delete pFrameCurrentDepth;
+                pFrameCurrentDepth = pDepthRaw;
+                m.unlock();
             }
-            if (pFrameCurrentDepth != nullptr) delete pFrameCurrentDepth;
-            pFrameCurrentDepth = pDepthRaw;
-            m.unlock();
 
             sigDepth.signal();
         } while (!ss[0].shouldStop());

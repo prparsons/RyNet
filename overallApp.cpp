@@ -29,6 +29,8 @@ int main( int argc, char** argv )
     bool bManualServerAddress = false;
     bool bRunRGB = true;
     bool bRunDepth = true;
+    bool bRunAccel = false;
+    bool bDownsampleDepth = false;
     // Command line arguments
     OptionArgument OptionArgumentSelection = OPTION_NONE;
     char scVideoSimPath[512];
@@ -53,6 +55,8 @@ int main( int argc, char** argv )
             else if (strcmp("--no_rgb", argv[i]) == 0) bRunRGB = false;
             else if (strcmp("--no_depth", argv[i]) == 0) bRunDepth = false;
             else if (strcmp("--log_visited", argv[i]) == 0) bStartPointLogger = true;
+            else if (strcmp("--downsample_depth", argv[i]) == 0) bDownsampleDepth = true;
+            else if (strcmp("--run_accel", argv[i]) == 0) bRunAccel = true;
             else if (strcmp("--simulate_video", argv[i]) == 0) {
                 bSimulateVideo = true;
                 bOptionArgument = true;
@@ -79,6 +83,8 @@ int main( int argc, char** argv )
         if (bSimulateVideo) uCameraFeatures += CameraController_RGBSimulation;
         else if (bRunRGB) uCameraFeatures += CameraController_RGB;
         if (bRunDepth) uCameraFeatures += CameraController_Depth;
+        if (bRunAccel) uCameraFeatures += CameraController_Accel;
+        if (bDownsampleDepth) uCameraFeatures += CameraController_DownsampleDepth;
         if (bSimulateVideo) pCamera = CameraController::OpenCamera(uCameraFeatures, scVideoSimPath);
         else pCamera = CameraController::OpenCamera(uCameraFeatures);
 
@@ -155,4 +161,8 @@ void printHelp()
     printL("    Do not start the depth camera.\n");
     printL(" --log_visited");
     printL("    Will log visited points.\n");
+    printL(" --downsample_depth");
+    printL("    Enable decimation filter that will downsample the depth frames.\n");
+    printL(" --run_accel");
+    printL("    Enable the depth camera's accelerometer.\n");
 }
