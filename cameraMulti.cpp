@@ -119,9 +119,12 @@ CameraController::CameraController(uint32_t _features, const char* _scSimulation
     if (features & CameraController_Depth) {
         pCameraRS = new camera_RS;
         pCameraRS->cfg.enable_stream(RS2_STREAM_DEPTH, 1280, 720);
-        if (features & CameraController_Accel) pCameraRS->cfg.enable_stream(RS2_STREAM_ACCEL);
-    } else if (features & CameraController_Accel) {
-        throw std::invalid_argument("No Accel without Depth camera enabled");
+    }
+    if (features & CameraController_Accel) {
+        if (pCameraRS == nullptr) {
+            pCameraRS = new camera_RS;
+        }
+        pCameraRS->cfg.enable_stream(RS2_STREAM_ACCEL); 
     }
     if (features & CameraController_RGBSimulation) {
         // not anything to do here...or copy file path?
@@ -153,7 +156,7 @@ CameraController::~CameraController()
 void CameraController::run()
 {
     printf("CameraController::run features=%u\n", features);
-    if (features & CameraController_Depth) {
+    if (features & (CameraController_Accel + CameraController_Depth)) {
         printL("CameraController::run starting depth");
         if (pthrCamera[0] == nullptr) {
             pthrCamera[0] = new std::thread(&CameraController::run_RS, this);
