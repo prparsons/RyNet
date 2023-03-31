@@ -133,7 +133,7 @@ int main( int argc, char** argv )
         if (socketDesc < 0) return 1;
         addressMavLink.sin_family = AF_INET; 
         addressMavLink.sin_port = htons(3636); 
-        addressMavLink.sin_addr.s_addr = INADDR_ANY;
+        addressMavLink.sin_addr.s_addr = inet_addr("192.168.2.40");//INADDR_ANY;
         sendto(socketDesc, "<rtl />", 7, MSG_CONFIRM, (const struct sockaddr*) &addressMavLink, sizeof(addressMavLink));
     }
     return 0;

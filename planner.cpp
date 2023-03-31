@@ -313,6 +313,8 @@ char* FlightController::SendRecXML(const char* strMessage, int iTimeoutMS)
 
 void FlightController::ConnectMavLink()
 {
+    printf("FlightController::ConnectMavLink address[%s] port[%d]\n",  scMavLinkAddress, iMavlinkPort);
+
     #ifdef FLIGHT_CONTROLLER_TCP
     socketDesc = socket(AF_INET, SOCK_STREAM, 0);
     if (socketDesc < 0) {
@@ -337,6 +339,6 @@ void FlightController::ConnectMavLink()
 
     addressMavLink.sin_family = AF_INET; 
     addressMavLink.sin_port = htons(iMavlinkPort); 
-    addressMavLink.sin_addr.s_addr = INADDR_ANY;
+    addressMavLink.sin_addr.s_addr = inet_addr(scMavLinkAddress);//INADDR_ANY;
     #endif
 }
