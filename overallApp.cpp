@@ -27,7 +27,7 @@ void handle_segfault(int iSigNum);
 int main( int argc, char** argv )
 {
     // Handle signals
-    signal(SIGINT, handle_interrupt);
+    //signal(SIGINT, handle_interrupt); This will cause a segfault when it exits...so do I really want to handle this?
     signal(SIGSEGV, handle_segfault);
 
     // Bools for the various command line options
