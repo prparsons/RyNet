@@ -339,6 +339,6 @@ void FlightController::ConnectMavLink()
 
     addressMavLink.sin_family = AF_INET; 
     addressMavLink.sin_port = htons(iMavlinkPort); 
-    addressMavLink.sin_addr.s_addr = inet_addr(scMavLinkAddress);//INADDR_ANY;
+    addressMavLink.sin_addr.s_addr = inet_addr(scMavLinkAddress);
     #endif
 }

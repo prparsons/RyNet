@@ -34,7 +34,9 @@ cameraFrame_depth::~cameraFrame_depth()
 
 void cameraFrame_depth::applyDecimationFilter()
 {
-    pDownsample = new rs2::decimation_filter(8);
+    if (pDownsample == nullptr) {
+        pDownsample = new rs2::decimation_filter(8);
+    }
     *this = apply_filter(*pDownsample).as<rs2::depth_frame>();
 }
 
@@ -142,42 +144,36 @@ CameraController::CameraController(uint32_t _features, const char* _scSimulation
 
 CameraController::~CameraController()
 {
+    Stop();
     if (pFrameCurrentDepth != nullptr) delete pFrameCurrentDepth;
     if (pCameraRS != nullptr) delete pCameraRS;
-    for (int i = 0; i < 3; i++) {
-        if (pthrCamera[i] != nullptr) {
-            ss[i].stop();
-            pthrCamera[i]->join();
-            delete pthrCamera[i];
-        }
-    }
 }
 
-void CameraController::run()
+void CameraController::Start()
 {
-    printf("CameraController::run features=%u\n", features);
+    printf("CameraController::Start features=%u\n", features);
     if (features & (CameraController_Accel + CameraController_Depth)) {
-        printL("CameraController::run starting depth");
+        printL("CameraController::Start starting depth");
         if (pthrCamera[0] == nullptr) {
             pthrCamera[0] = new std::thread(&CameraController::run_RS, this);
         } else {
-            printL("CameraController::run realsense already started");
+            printL("CameraController::Start realsense already started");
         }
     }
 
     if (features & CameraController_RGBSimulation) {
-        printf("CameraController::run starting simulation using file: %s\n", scSimulationFile);
+        printf("CameraController::Start starting simulation using file: %s\n", scSimulationFile);
         if (pthrCamera[1] == nullptr) {
             pthrCamera[1] = new std::thread(&CameraController::run_simulation, this, &FrameCurrentRGB, &sigRGB, &ss[1]);
         } else {
-            printL("CameraController::run pthrCamera[1] already started");
+            printL("CameraController::Start pthrCamera[1] already started");
         }
     } else if (features & CameraController_RGB) { // Can't run actual RGB camera if the simulation is enabled
-        printL("CameraController::run starting RGB");
+        printL("CameraController::Start starting RGB");
         if (pthrCamera[1] == nullptr) {
             pthrCamera[1] = new std::thread(&CameraController::run_CV, this, scGStream_RGB, &FrameCurrentRGB, &sigRGB, &ss[1]);
         } else {
-            printL("CameraController::run cv1 already started");
+            printL("CameraController::Start cv1 already started");
         }
     }
 
@@ -185,7 +181,19 @@ void CameraController::run()
         if (pthrCamera[2] == nullptr) {
             pthrCamera[2] = new std::thread(&CameraController::run_CV, this, scGStream_IR, &FrameCurrentIR, &sigIR, &ss[2]);
         } else {
-            printL("CameraController::run cv2 already started");
+            printL("CameraController::Start cv2 already started");
+        }
+    }
+}
+
+void CameraController::Stop()
+{
+    for (int i = 0; i < NUM_CAMERA_THREADS; i++) {
+        if (pthrCamera[i] != nullptr) {
+            ss[i].stop();
+            pthrCamera[i]->join();
+            delete pthrCamera[i];
+            pthrCamera[i] = nullptr;
         }
     }
 }

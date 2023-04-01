@@ -55,7 +55,8 @@ public:
     Signal* GetSignalRGB();
     Signal* GetSignalIR();
 
-    void run();
+    void Start();
+    void Stop();
     void JoinDepth();
 
 protected:
@@ -76,8 +77,9 @@ private:
     char scSimulationFile[512];
     int iSimulationFrameDelay;
 
-    std::thread* pthrCamera[3];
-    StopSignal ss[3];
+    static const int NUM_CAMERA_THREADS = 3;
+    std::thread* pthrCamera[NUM_CAMERA_THREADS];
+    StopSignal ss[NUM_CAMERA_THREADS];
     Signal sigDepth;
     Signal sigRGB;
     Signal sigIR;

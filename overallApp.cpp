@@ -2,6 +2,8 @@
 #include <jetson-inference/detectNet.h>
 #include <jetson-utils/loadImage.h>
 #include <sys/socket.h>
+#include <stdlib.h>
+#include <signal.h>
 
 #include <string.h>
 #include <thread>
@@ -17,9 +19,17 @@ enum OptionArgument {
 
 // Command line help (display and explain options)
 void printHelp();
+// Failure cleanup
+void cleanupFailure();
+void handle_interrupt();
+void handle_segfault();
 
 int main( int argc, char** argv )
 {
+    // Handle signals
+    signal(SIGINT, handle_interrupt);
+    signal(SIGSEGV, handle_segfault);
+
     // Bools for the various command line options
     bool bOptionArgument = false;
     bool bStopNavOnDepthFail = true;
@@ -98,7 +108,7 @@ int main( int argc, char** argv )
         printL(">>>Starting DataLogger");
         logger.Start();
         printL(">>>Starting Camera");
-        pCamera->run(); // Camera starts all it's own threads
+        pCamera->Start(); // Camera starts all it's own threads
         printL(">>>Starting Navigator");
         nav.Start();
         printL(">>>Starting Flight Controller");
@@ -126,21 +136,17 @@ int main( int argc, char** argv )
     } catch (std::exception e) {
         std::cout << "Exception: " << e.what() << std::endl;
         std::cout << "Sending RTL";
-        // What it we exec a script that just sends a RTL to the server script?
-        struct sockaddr_in addressMavLink;
-        int socketDesc;
-        socketDesc = socket(AF_INET, SOCK_DGRAM, 0);
-        if (socketDesc < 0) return 1;
-        addressMavLink.sin_family = AF_INET; 
-        addressMavLink.sin_port = htons(3636); 
-        addressMavLink.sin_addr.s_addr = inet_addr("192.168.2.40");//INADDR_ANY;
-        sendto(socketDesc, "<rtl />", 7, MSG_CONFIRM, (const struct sockaddr*) &addressMavLink, sizeof(addressMavLink));
+        cleanupFailure();
     }
     return 0;
 }
 
 void printHelp()
 {
+    printL("Environment Variables");
+    printL(" SERVER_ADDRESS");
+    printL("    In the event of failure (seg fault, unhandled exception, etc.) an RTL will");
+    printL("    be sent to this address. If empty, 127.0.0.1 will be used instead.\n\n");
     printL("Command line options:");
     printL(" --continue");
     printL("    Program will not stop if the depth camera fails. Otherwise, if the depth");
@@ -165,4 +171,30 @@ void printHelp()
     printL("    Enable decimation filter that will downsample the depth frames.\n");
     printL(" --run_accel");
     printL("    Enable the depth camera's accelerometer.\n");
+}
+
+void cleanupFailure()
+{
+    char* scServerAddress = getenv("SERVER_ADDRESS");
+    if (scServerAddress == nullptr) scServerAddress = "127.0.0.1";
+    // What if we exec a script that just sends a RTL to the server script?
+    struct sockaddr_in addressMavLink;
+    int socketDesc;
+    socketDesc = socket(AF_INET, SOCK_DGRAM, 0);
+    if (socketDesc < 0) return 1;
+    addressMavLink.sin_family = AF_INET; 
+    addressMavLink.sin_port = htons(3636); 
+    addressMavLink.sin_addr.s_addr = inet_addr(scServerAddress);
+    sendto(socketDesc, "<rtl />", 7, MSG_CONFIRM, (const struct sockaddr*) &addressMavLink, sizeof(addressMavLink));
+}
+
+void handle_interrupt()
+{
+    printL("Handling Interrupt");
+}
+
+void handle_segfault()
+{
+    printL("Handling Segmentation Fault");
+    cleanupFailure();
 }
