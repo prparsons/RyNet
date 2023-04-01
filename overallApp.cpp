@@ -21,8 +21,8 @@ enum OptionArgument {
 void printHelp();
 // Failure cleanup
 void cleanupFailure();
-void handle_interrupt();
-void handle_segfault();
+void handle_interrupt(int iSigNum);
+void handle_segfault(int iSigNum);
 
 int main( int argc, char** argv )
 {
@@ -175,26 +175,28 @@ void printHelp()
 
 void cleanupFailure()
 {
-    char* scServerAddress = getenv("SERVER_ADDRESS");
+    const char* scServerAddress = getenv("SERVER_ADDRESS");
     if (scServerAddress == nullptr) scServerAddress = "127.0.0.1";
     // What if we exec a script that just sends a RTL to the server script?
     struct sockaddr_in addressMavLink;
     int socketDesc;
     socketDesc = socket(AF_INET, SOCK_DGRAM, 0);
-    if (socketDesc < 0) return 1;
+    if (socketDesc < 0) return;
     addressMavLink.sin_family = AF_INET; 
     addressMavLink.sin_port = htons(3636); 
     addressMavLink.sin_addr.s_addr = inet_addr(scServerAddress);
     sendto(socketDesc, "<rtl />", 7, MSG_CONFIRM, (const struct sockaddr*) &addressMavLink, sizeof(addressMavLink));
 }
 
-void handle_interrupt()
+void handle_interrupt(int iSigNum)
 {
     printL("Handling Interrupt");
+    exit(iSigNum);
 }
 
-void handle_segfault()
+void handle_segfault(int iSigNum)
 {
     printL("Handling Segmentation Fault");
     cleanupFailure();
+    exit(iSigNum);
 }
