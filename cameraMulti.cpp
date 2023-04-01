@@ -126,7 +126,9 @@ CameraController::CameraController(uint32_t _features, const char* _scSimulation
         if (pCameraRS == nullptr) {
             pCameraRS = new camera_RS;
         }
-        pCameraRS->cfg.enable_stream(RS2_STREAM_ACCEL); 
+        pCameraRS->cfg.enable_stream(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_XYZ32F); 
+        // enable_stream(RS2_STREAM_GYRO, RS2_FORMAT_MOTION_XYZ32F);
+        // Should be able to get gyro value too, more info: https://dev.intelrealsense.com/docs/rs-motion
     }
     if (features & CameraController_RGBSimulation) {
         // not anything to do here...or copy file path?
