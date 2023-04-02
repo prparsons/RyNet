@@ -214,6 +214,7 @@ void FlightController::runDepth()
         SendXML(sc);
         sprintf(sc, "<obs dir='l'>%5f</obs>", fResultL);
         SendXML(sc);
+        delete pFrameDepth;
     }
 }
 
