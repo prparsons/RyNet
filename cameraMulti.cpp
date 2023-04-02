@@ -225,7 +225,7 @@ void CameraController::run_RS()
             rs2::frameset data;
             if (!pCameraRS->pipe.try_wait_for_frames(&data)) {
                 printL("CameraController::run_RS cam fail");
-                pCameraRS->stop();
+                pCameraRS->pipe.stop();
                 return;
             }
             // Verify that we got frames
@@ -237,13 +237,13 @@ void CameraController::run_RS()
             if ((localFeatures & CameraController_Depth) && (localFeatures & CameraController_Accel)) {
                 if (data.size() != 2) {
                     printL("CameraController::run_RS did not have 2 frames");
-                    pCameraRS->stop();
+                    pCameraRS->pipe.stop();
                     return;
                 }
             } else {
                 if (data.size() != 1) {
                     printL("CameraController::run_RS did not have 1 frame");
-                    pCameraRS->stop();
+                    pCameraRS->pipe.stop();
                     return;
                 }
             }
@@ -272,7 +272,7 @@ void CameraController::run_RS()
 
             sigDepth.signal();
         } while (!ss[0].shouldStop());
-        pCameraRS->stop();
+        pCameraRS->pipe.stop();
     } catch (rs2::error e) {
         printL("run_RS failed");
         // If we get an exception, we aren't getting the camera working again (at least I've never
