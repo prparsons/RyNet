@@ -23,16 +23,22 @@ void printHelp();
 void cleanupFailure();
 void handle_interrupt(int iSigNum);
 void handle_segfault(int iSigNum);
+// If we want to stop the main application with a Ctrl+c signal, then we need to stop the camera and the Navigator.
+// Simplest way I can think of at the moment is signal for depth to stop, let the main thread finishing joining
+// it, then we'll have a pointer to bStopNavOnDepthFail that the interrupt can set to True.
+CameraController* pSignal_pCamera = nullptr;
+bool* pSignal_bStopNavOnDepthFail = nullptr;
 
 int main( int argc, char** argv )
 {
     // Handle signals
-    //signal(SIGINT, handle_interrupt); This will cause a segfault when it exits...so do I really want to handle this?
+    signal(SIGINT, handle_interrupt);
     signal(SIGSEGV, handle_segfault);
 
     // Bools for the various command line options
     bool bOptionArgument = false;
     bool bStopNavOnDepthFail = true;
+    pSignal_bStopNavOnDepthFail = &bStopNavOnDepthFail;
     bool bSendRTL = false;
     bool bStartPointLogger = false;
     bool bSimulateVideo = false;
@@ -97,6 +103,7 @@ int main( int argc, char** argv )
         if (bDownsampleDepth) uCameraFeatures += CameraController_DownsampleDepth;
         if (bSimulateVideo) pCamera = CameraController::OpenCamera(uCameraFeatures, scVideoSimPath);
         else pCamera = CameraController::OpenCamera(uCameraFeatures);
+        pSignal_pCamera = pCamera;
 
         printL(">>>Getting Flight Controller");
         FlightController* pController = FlightController::GetFlightController(logger, *pCamera);
@@ -191,7 +198,16 @@ void cleanupFailure()
 void handle_interrupt(int iSigNum)
 {
     printL("Handling Interrupt");
-    exit(iSigNum);
+    if (pSignal_bStopNavOnDepthFail == nullptr) {
+        printL("interrupt bStopNavOnDepthFail not set, unable to close program gracefully.");
+        exit(iSigNum);
+    }
+    if (pSignal_pCamera == nullptr) {
+        printL("interrupt pCamera not set, unable to close program gracefully.");
+        exit(iSigNum);
+    }
+    *pSignal_bStopNavOnDepthFail = true;
+    pSignal_pCamera->SignalDepthStop();
 }
 
 void handle_segfault(int iSigNum)

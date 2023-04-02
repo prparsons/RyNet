@@ -200,6 +200,11 @@ void CameraController::Stop()
     }
 }
 
+void CameraController::SignalDepthStop()
+{
+    ss[0].stop();
+}
+
 void CameraController::JoinDepth()
 {
     if (pthrCamera[0] != nullptr) pthrCamera[0]->join();

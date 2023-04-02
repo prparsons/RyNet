@@ -57,6 +57,8 @@ public:
 
     void Start();
     void Stop();
+
+    void SignalDepthStop();
     void JoinDepth();
 
 protected:
