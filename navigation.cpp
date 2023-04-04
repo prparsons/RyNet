@@ -91,6 +91,14 @@ void ObjectDetection::run()
     delete pSigRGB;
 }
 
+void ObjectDetection::SendStopSignal()
+{
+    ss.stop();
+    // If the camera has stopped, or isn't running, then we need to signal or else it won't ever
+    //  get to the ss.shouldStop check.
+    sigNewImage.signal();
+}
+
 // ** TerrainSegmentation
 
 TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
@@ -155,6 +163,14 @@ void TerrainSegmentation::run()
         }
     }
     delete pSigRGB;
+}
+
+void TerrainSegmentation::SendStopSignal()
+{
+    ss.stop();
+    // If the camera has stopped, or isn't running, then we need to signal or else it won't ever
+    //  get to the ss.shouldStop check.
+    sigNewImage.signal();
 }
 
 bool TerrainSegmentation::ProcessImage(image& imgRGB)
@@ -277,7 +293,12 @@ void Navigator::Stop()
 {
     if (pThread != nullptr) {
         ssMain.stop();
+        // If there's nothing coming from the camera, we need to signal it or else the thread
+        //  will never get to the ss.shouldStop().
+        Signal* pSigRGB = camera.GetSignalRGB();
+        pSigRGB->signal();
         pThread->join();
+        delete pSigRGB;
         delete pThread;
         pThread = nullptr;
     }
@@ -349,14 +370,10 @@ void Navigator::runNavigator()
 
     printL("Navigator::runNavigator loop done, stopping segmenter and detector");
     // Handle all the cleanup
-    StopSignal* pss = detector.GetStopSignal();
-    pss->stop();
-    delete pss;
-    pss = segmenter.GetStopSignal();
-    pss->stop();
-    delete pss;
+    detector.SendStopSignal();
+    segmenter.SendStopSignal();
     delete pSigRGB;
-    // Do we really need to join them?
+    // Wait until the threads actually stop (don't want to delete the object while thread is running).
     thrObject.join();
     thrSegment.join();
 }

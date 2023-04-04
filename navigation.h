@@ -16,7 +16,7 @@ public:
 
     void SetNewImage(image& img);
     void run();
-    StopSignal* GetStopSignal() { return new StopSignal(ss); }
+    void SendStopSignal();
 
 private:
     bool ProcessImage(image& img);
@@ -38,7 +38,7 @@ public:
     float GetHabitatDirection();
     void SetNewImage(image& img);
     void run();
-    StopSignal* GetStopSignal() { return new StopSignal(ss); }
+    void SendStopSignal();
 
     enum Classes {
         SKY = 0,
