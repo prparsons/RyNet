@@ -83,7 +83,8 @@ void ObjectDetection::run()
         mt.lock();
         imgProcess = imgRecent;
         mt.unlock();
-        
+        if (imgProcess.empty()) continue;
+
         if (ProcessImage(imgProcess)) {
             logger.LogImage(imgProcess, "detect");
         }
@@ -152,7 +153,8 @@ void TerrainSegmentation::run()
         mt.lock();
         imgProcess = imgRecent;
         mt.unlock();
-        
+        if (imgProcess.empty()) continue;
+
         if (ProcessImage(imgProcess)) {
             logger.LogImage(imgProcess, "segment");
             char sc[128];

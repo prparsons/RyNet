@@ -131,8 +131,9 @@ int main( int argc, char** argv )
             printL(">>>Sending stop signal to stop Nav");
             nav.Stop();
             ///***this has changed a bit since -> //**I got a seg fault once without --continue, I wonder if it's something to do with this? (datalogger wasn't cleaning up threads...)
-        } // else could have a set alititude option, climb a bit if no depth?
-        nav.Join();
+        } else {
+            nav.Join();
+        }// else could have a set alititude option, climb a bit if no depth?
         printL(">>>Navigator Stopped");
         if (bSendRTL) pController->SetRTL();
         logger.Stop();

@@ -36,6 +36,7 @@ void DataLogger::Stop()
 {
     if (pThread != nullptr) {
         ss.stop();
+        sigNewData.signal();
         pThread->join();
         delete pThread;
         pThread = nullptr;
