@@ -31,7 +31,10 @@ void FlightController::DestroyFlightController()
 
     if (pInstance->pThreadDepth != nullptr) {
         pInstance->ssDepth.stop();
+        Signal* pSig = camera.GetSignalDepth();
+        pSig->signal();
         pInstance->pThreadDepth->join();
+        delete pSig;
         delete pInstance->pThreadDepth;
         pInstance->pThreadDepth = nullptr;
     }
