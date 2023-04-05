@@ -210,8 +210,12 @@ void CameraController::SignalDepthStop()
 
 void CameraController::JoinDepth()
 {
-    if (pthrCamera[0] != nullptr) pthrCamera[0]->join();
-    else printL("CameraController::JoinDepth depth thread was not started");
+    printL("CameraController::JoinDepth");
+    if (pthrCamera[0] != nullptr) {
+        pthrCamera[0]->join();
+        delete pthrCamera[0];
+        pthrCamera[0] = nullptr;
+    } else printL("CameraController::JoinDepth depth thread was not started");
 }
 
 void CameraController::run_RS()
