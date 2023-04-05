@@ -7,8 +7,8 @@
 7. Open Mission Planner and connect to drone via radio
 8. Verify correct route is loaded in autopilot
 9. Start Jetson python script that communicates with drone
-10. In Mission Planner, use Ctrl + ___ to bring up menu
-      -Verify that Jetson is sending messages
+10. In Mission Planner, use Ctrl + f to bring up menu
+      -Verify that Jetson is sending messages (MAVLink Inspector)
 11. Start main program
 12. Disconnect monitor and keyboard from Jetson
 13. Place drone in takeoff location
