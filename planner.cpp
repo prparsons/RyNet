@@ -66,11 +66,15 @@ FlightController::~FlightController()
 {
     printL("FlightController::~FlightController");
     if (pThreadDepth != nullptr) {
+        printL("FlightController::~FlightController Depth should have been stopped already");
         ssDepth.stop();
+        pThreadDepth->join();
         delete pThreadDepth;
     }
     if (pThreadPoint != nullptr) {
+        printL("FlightController::~FlightController Point logger should have been stopped already");
         ssPtLog.stop();
+        pThreadPoint->join();
         delete pThreadPoint;
     }
 
