@@ -30,8 +30,9 @@ void FlightController::DestroyFlightController()
     if (pInstance == nullptr) return;
 
     if (pInstance->pThreadDepth != nullptr) {
+        printL("FlightController::DestroyFlightController Stopping depths");
         pInstance->ssDepth.stop();
-        Signal* pSig = camera.GetSignalDepth();
+        Signal* pSig = pInstance->camera.GetSignalDepth();
         pSig->signal();
         pInstance->pThreadDepth->join();
         delete pSig;
@@ -39,15 +40,15 @@ void FlightController::DestroyFlightController()
         pInstance->pThreadDepth = nullptr;
     }
     if (pInstance->pThreadPoint != nullptr) {
+        printL("FlightController::DestroyFlightController Stopping point logger");
         pInstance->ssPtLog.stop();
         pInstance->pThreadPoint->join();
         delete pInstance->pThreadPoint;
         pInstance->pThreadPoint = nullptr;
     }
-    if (pInstance != nullptr) {
-        delete pInstance;
-        pInstance = nullptr;
-    }
+    printL("FlightController::DestroyFlightController Deleting flight controller");
+    delete pInstance;
+    pInstance = nullptr;
 }
 
 void FlightController::Start(bool bStartDepth, bool bStartPointLogger)
@@ -63,6 +64,7 @@ void FlightController::Start(bool bStartDepth, bool bStartPointLogger)
 
 FlightController::~FlightController()
 {
+    printL("FlightController::~FlightController");
     if (pThreadDepth != nullptr) {
         ssDepth.stop();
         delete pThreadDepth;
