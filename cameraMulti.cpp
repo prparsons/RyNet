@@ -146,6 +146,7 @@ CameraController::CameraController(uint32_t _features, const char* _scSimulation
 
 CameraController::~CameraController()
 {
+    printL("CameraController::~CameraController");
     Stop();
     if (pFrameCurrentDepth != nullptr) delete pFrameCurrentDepth;
     if (pCameraRS != nullptr) delete pCameraRS;
@@ -190,8 +191,10 @@ void CameraController::Start()
 
 void CameraController::Stop()
 {
+    printL("CameraController::Stop");
     for (int i = 0; i < NUM_CAMERA_THREADS; i++) {
         if (pthrCamera[i] != nullptr) {
+            printf("CameraController::Stop Stopping thread %d\n", i);
             ss[i].stop();
             pthrCamera[i]->join();
             delete pthrCamera[i];

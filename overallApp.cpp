@@ -140,6 +140,7 @@ int main( int argc, char** argv )
         printL(">>>Datalogger Stopped");
         pController->DestroyFlightController();
         pController = nullptr;
+        printL(">>>Flight Controller destroyed");
         delete pCamera;
     } catch (std::exception e) {
         std::cout << "Exception: " << e.what() << std::endl;
