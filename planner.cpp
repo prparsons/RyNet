@@ -219,18 +219,18 @@ void FlightController::runDepth()
         SendXML(sc);
         delete pFrameDepth;
     }
+    delete pSig;
 }
 
 void FlightController::runPointLogger()
 {
     printL("FlightController::runPointLogger");
-    StopSignal ss(ssPtLog);
     bool bGuided = false;
     std::vector<coord> vecVisitedPoints;
     coord currentPosition;
     char scMode[32];
 
-    while (!ss.shouldStop()) {
+    while (!ssPtLog.shouldStop()) {
         if (bGuided) { // In GUIDED
             // Get the current position, add it to the list of visited points
             if (GetPosition(currentPosition.fLatitude, currentPosition.fLongitude)) {
