@@ -29,7 +29,7 @@ public:
     void Stop();
 
     void LogImage(cv::Mat& im, std::string strIdSource);
-    void LogImageIr(cv::Mat& im)
+    void LogImageIr(cv::Mat& im);
     void LogMask(float4* pImg, int width, int height);
     void LogString(const char* scData);
 

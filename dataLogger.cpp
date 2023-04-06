@@ -250,8 +250,8 @@ void DataLogger::WriteImageData(cv::Mat& image, ImageLogData& imageData)
 void DataLogger::SaveImage(std::string strPrefix, cv::Mat& image, ImageLogData& imageData)
 {
     WriteImageData(image, imageData);
-    timeNow = time(nullptr);
-    pTimeStruct = localtime(&timeNow);
+    time_t timeNow = time(nullptr);
+    struct tm* pTimeStruct = localtime(&timeNow);
     char scFileName[128];
     snprintf(scFileName, 
             127, 
@@ -263,5 +263,5 @@ void DataLogger::SaveImage(std::string strPrefix, cv::Mat& image, ImageLogData& 
             pTimeStruct->tm_hour,
             pTimeStruct->tm_min,
             pTimeStruct->tm_sec);
-    cv::imwrite(scFileName, imageWrite);
+    cv::imwrite(scFileName, image);
 }
