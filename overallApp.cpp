@@ -122,7 +122,7 @@ int main( int argc, char** argv )
         printL(">>>Starting Navigator");
         nav.Start();
         printL(">>>Starting Flight Controller");
-        pController->Start(bRunDepth, bStartPointLogger);
+        pController->Start(bRunDepth, bStartPointLogger, bRunFlir);
 
         // std::system_error if the thread could not be started.
         //**I think there might be issues with shutdown of stuff...need to trace through it all and double check

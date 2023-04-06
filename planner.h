@@ -22,7 +22,7 @@ public:
     static FlightController* GetFlightController(DataLogger& logger, CameraController& camera);
     static void DestroyFlightController();
 
-    void Start(bool bStartDepth, bool bStartPointLogger);
+    void Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr);
 
     static bool GetPosition(float fLat, float fLon, int iTimeoutMS = 100);
     static bool GetHeading(float fHeading, int iTimeoutMS = 100);
@@ -46,13 +46,16 @@ private:
     void ConnectMavLink();
     void runDepth(); // Thread function to continuously send depth info for obstacle avoidance
     void runPointLogger(); // Thread function to continuously retrieve and store visited points when in guided mode
+    void runIr();
 
     DataLogger& logger;
     CameraController& camera;
     std::thread* pThreadDepth;
     std::thread* pThreadPoint;
+    std::thread* pThreadIr;
     StopSignal ssDepth;
     StopSignal ssPtLog;
+    StopSignal ssIr;
     ThreadMutex mtXML;
 
     struct sockaddr_in addressMavLink;

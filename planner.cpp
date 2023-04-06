@@ -10,6 +10,7 @@ FlightController::FlightController(DataLogger& _logger, CameraController& _camer
 , camera(_camera)
 , pThreadDepth(nullptr)
 , pThreadPoint(nullptr)
+, pThreadIr(nullptr)
 , socketDesc(-1)
 {
     strcpy(scMavLinkAddress, "127.0.0.1");
@@ -46,12 +47,19 @@ void FlightController::DestroyFlightController()
         delete pInstance->pThreadPoint;
         pInstance->pThreadPoint = nullptr;
     }
+    if (pInstance->pThreadIr != nullptr) {
+        printL("FlightController::DestroyFlightController Stopping thermal camera");
+        pInstance->ssIr.stop();
+        pInstance->pThreadIr->join();
+        delete pInstance->pThreadIr;
+        pInstance->pThreadIr = nullptr;
+    }
     printL("FlightController::DestroyFlightController Deleting flight controller");
     delete pInstance;
     pInstance = nullptr;
 }
 
-void FlightController::Start(bool bStartDepth, bool bStartPointLogger)
+void FlightController::Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr)
 {
     printL("FlightController::Start");
     if (bStartDepth) {
@@ -59,6 +67,9 @@ void FlightController::Start(bool bStartDepth, bool bStartPointLogger)
     }
     if (bStartPointLogger) {
         pThreadPoint = new std::thread(&FlightController::runPointLogger, this);
+    }
+    if (bStartIr) {
+        pThreadIr = new std::thread(&FlightController::runIr, this);
     }
 }
 
@@ -76,6 +87,12 @@ FlightController::~FlightController()
         ssPtLog.stop();
         pThreadPoint->join();
         delete pThreadPoint;
+    }
+    if (pThreadIr != nullptr) {
+        printL("FlightController::~FlightController Thermal should have been stopped already");
+        ssIr.stop();
+        pThreadIr->join();
+        delete pThreadIr;
     }
 
     //socket
@@ -257,6 +274,19 @@ void FlightController::runPointLogger()
             }
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    }
+}
+
+void FlightController::runIr()
+{
+    printL("FlightController::runIr");
+    Signal* pSig = camera.GetSignalIR();
+    cv::Mat imageIr;
+    while (!ssIr.shouldStop()) {
+        pSig->wait();
+        camera.GetFrameIR(imageIr);
+        if (imageIr.empty()) continue;
+        logger.LogImageIr(imageIr);
     }
 }
 
