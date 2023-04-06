@@ -14,7 +14,8 @@
 //  other hand do we want slower than 2fps?
 const char* scGStream_RGB = "nvarguscamerasrc sensor-id=0 gainrange=\"4 16\" ispdigitalgainrange=\"1 1\" ! video/x-raw(memory:NVMM),width=1920,height=1080,framerate=30/1 ! nvvidconv flip-method=1 ! video/x-raw,format=BGRx ! videoconvert ! videorate ! video/x-raw,framerate=1/1 ! appsink";
 const char* scGStream_RGB_F = "nvarguscamerasrc sensor-id=0 wbmode=%d gainrange=\"%d %d\" ispdigitalgainrange=\"1 1\" exposuretimerange=\"%d %d\" aelock=true ! video/x-raw(memory:NVMM),width=3840,height=2560,framerate=30/1 ! nvvidconv ! video/x-raw,format=BGRx ! videoconvert ! videorate ! video/x-raw,framerate=2/1 ! appsink";
-const char* scGStream_IR = "v4l2src device=/dev/video4 ! 'video/x-raw' ! nvvidconv ! 'video/x-raw(memory:NVMM)' ! omxh264enc ! 'video/x-h264,stream-format=byte-stream' ! h264parse ! qtmux ! filesinklocation=testFlir.mp4";
+const char* scGStream_IR_file = "v4l2src device=/dev/video4 ! 'video/x-raw' ! nvvidconv ! 'video/x-raw(memory:NVMM)' ! omxh264enc ! 'video/x-h264,stream-format=byte-stream' ! h264parse ! qtmux ! filesinklocation=testFlir.mp4";
+const char* scGStream_IR = "v4l2src device=/dev/video4 ! 'video/x-raw' ! nvvidconv ! 'video/x-raw(memory:NVMM)' ! nvvidconv ! video/x-raw,format=BGRx ! videoconvert ! videorate ! video/x-raw,framerate=2/1 ! appsink";
 
 using namespace cv;
 

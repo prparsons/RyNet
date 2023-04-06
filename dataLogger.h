@@ -29,14 +29,17 @@ public:
     void Stop();
 
     void LogImage(cv::Mat& im, std::string strIdSource);
+    void LogImageIr(cv::Mat& im)
     void LogMask(float4* pImg, int width, int height);
     void LogString(const char* scData);
 
 private:
     void run(void);
     void WriteImageData(cv::Mat& image, ImageLogData& imageData);
+    void SaveImage(std::string strPrefix, cv::Mat& image, ImageLogData& imageData);
 
     bool bWriteImg;
+    bool bWriteImgIr;
     bool bWriteMask;
 
     ThreadMutex mt;
@@ -45,7 +48,9 @@ private:
     std::thread* pThread;
 
     cv::Mat image;
+    cv::Mat imageIr;
     ImageLogData dataImage;
+    ImageLogData dataImageIr;
     cv::Mat mask;
     std::vector<char*> listStrings;
     std::map<std::string, ImageLogData> mapImageData;

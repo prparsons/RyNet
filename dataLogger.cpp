@@ -17,6 +17,7 @@ void printL(const char* sc)
 
 DataLogger::DataLogger()
 : bWriteImg(false)
+, bWriteImgIr(false)
 , bWriteMask(false)
 , pThread(nullptr)
 {
@@ -174,6 +175,30 @@ void DataLogger::LogImage(cv::Mat& im, std::string strIdSource)
     sigNewData.signal();
 }
 
+void DataLogger::LogImageIr(cv::Mat& im)
+{
+    ImageLogData& data = mapImageData["IR"];
+    time_t timeNow = time(nullptr);
+    time_t timeDifference = timeNow - data.timeLast;
+    data.timeLast = timeNow;
+    if (timeDifference < SEC_BETWEEN_IMAGES) return;
+    
+    if (!FlightController::GetPosition(data.fLat, data.fLon)) {
+        data.fLat = 0;
+        data.fLon = 0;
+    }
+    if (!FlightController::GetHeading(data.fHeading)) {
+        data.fHeading = 999; // Obvious incorrect value
+    }
+    
+    mt.lock();
+    imageIr = im.clone();
+    dataImageIr = data;
+    bWriteImgIr = true;
+    mt.unlock();
+    sigNewData.signal();
+}
+
 void DataLogger::LogMask(float4* pImg, int width, int height)
 {
     cv::Mat tempMat(height, width, CV_32FC4, (void*)pImg);
@@ -220,4 +245,23 @@ void DataLogger::WriteImageData(cv::Mat& image, ImageLogData& imageData)
                 dFontSize,
                 cv::Scalar(255, 255, 255));
     image = imageLarger;
+}
+
+void DataLogger::SaveImage(std::string strPrefix, cv::Mat& image, ImageLogData& imageData)
+{
+    WriteImageData(image, imageData);
+    timeNow = time(nullptr);
+    pTimeStruct = localtime(&timeNow);
+    char scFileName[128];
+    snprintf(scFileName, 
+            127, 
+            "images/%s_%d_%d_%d_%d_%d_%d.jpg",
+            strPrefix.c_str(),
+            pTimeStruct->tm_year + 1900, 
+            pTimeStruct->tm_mon + 1,
+            pTimeStruct->tm_mday,
+            pTimeStruct->tm_hour,
+            pTimeStruct->tm_min,
+            pTimeStruct->tm_sec);
+    cv::imwrite(scFileName, imageWrite);
 }

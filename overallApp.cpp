@@ -46,6 +46,7 @@ int main( int argc, char** argv )
     bool bRunRGB = true;
     bool bRunDepth = true;
     bool bRunAccel = false;
+    bool bRunFlir = false;
     bool bDownsampleDepth = false;
     // Command line arguments
     OptionArgument OptionArgumentSelection = OPTION_NONE;
@@ -73,6 +74,7 @@ int main( int argc, char** argv )
             else if (strcmp("--log_visited", argv[i]) == 0) bStartPointLogger = true;
             else if (strcmp("--downsample_depth", argv[i]) == 0) bDownsampleDepth = true;
             else if (strcmp("--run_accel", argv[i]) == 0) bRunAccel = true;
+            else if (strcmp("--run_flir", argv[i]) == 0) bRunFlir = true;
             else if (strcmp("--simulate_video", argv[i]) == 0) {
                 bSimulateVideo = true;
                 bOptionArgument = true;
@@ -101,6 +103,7 @@ int main( int argc, char** argv )
         if (bRunDepth) uCameraFeatures += CameraController_Depth;
         if (bRunAccel) uCameraFeatures += CameraController_Accel;
         if (bDownsampleDepth) uCameraFeatures += CameraController_DownsampleDepth;
+        if (bRunFlir) uCameraFeatures += CameraController_IR;
         if (bSimulateVideo) pCamera = CameraController::OpenCamera(uCameraFeatures, scVideoSimPath);
         else pCamera = CameraController::OpenCamera(uCameraFeatures);
         pSignal_pCamera = pCamera;
@@ -180,6 +183,8 @@ void printHelp()
     printL("    Enable decimation filter that will downsample the depth frames.\n");
     printL(" --run_accel");
     printL("    Enable the depth camera's accelerometer.\n");
+    printL(" --run_flir");
+    printL("    Enable the flir thermal camera on /dev/video4.\n");
 }
 
 void cleanupFailure()
