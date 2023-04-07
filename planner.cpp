@@ -199,22 +199,27 @@ void FlightController::runDepth()
         int iRow;
         // https://developer.arm.com/architectures/instruction-sets/intrinsics/
         uint16_t uMax = 64000;
+        uint16_t uUnderflow = 1;
+        uint16x4_t u4Underflow = vld1_dup_u16(&uUnderflow);
         uint16x4_t u4Min = vld1_dup_u16(&uMax);
         uint16x4_t u4;
         // Scan each row, loading the first 8 depths and keeping the min of them
         //***^...only loading 4 depths below...
         for (iRow = 0; iRow < 30; iRow++, pData += width) {
             u4 = vld1_u16(pData); // Load 4 float
+            u4 = vsub_u16(u4, u4Underflow);
             u4Min = vmin_u16(u4, u4Min); // Compares corresponding element in each, returns the min of each
         }
         uint16_t uResultR = vminv_u16(u4Min); // Sums across the vector and returns single float
         for (; iRow < 60; iRow++, pData += width) {
             u4 = vld1_u16(pData);
+            u4 = vsub_u16(u4, u4Underflow);
             u4Min = vmin_u16(u4, u4Min);
         }
         uint16_t uResultM = vminv_u16(u4Min);
         for (; iRow < 90; iRow++, pData += width) {
             u4 = vld1_u16(pData);
+            u4 = vsub_u16(u4, u4Underflow);
             u4Min = vmin_u16(u4, u4Min);
         }
         uint16_t uResultL = vminv_u16(u4Min);
