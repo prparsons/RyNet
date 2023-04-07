@@ -120,7 +120,7 @@ CameraController::CameraController(uint32_t _features, const char* _scSimulation
     
     if (features & CameraController_Depth) {
         pCameraRS = new camera_RS;
-        pCameraRS->cfg.enable_stream(RS2_STREAM_DEPTH, 1280, 720, RS2_FORMAT_Z16);
+        pCameraRS->cfg.enable_stream(RS2_STREAM_DEPTH, 1280, 720, RS2_FORMAT_Z16, 30);
     }
     if (features & CameraController_Accel) {
         if (pCameraRS == nullptr) {

@@ -182,6 +182,11 @@ void FlightController::runDepth()
     printL("FlightController::runDepth");
     Signal* pSig = camera.GetSignalDepth();
 
+    // https://developer.arm.com/architectures/instruction-sets/intrinsics/
+    const uint16_t uMax = 65535;
+    const uint16_t uUnderflow = 1;
+    const uint16x8_t u8Underflow = vld1q_dup_u16(&uUnderflow);
+
     while (!ssDepth.shouldStop()) {
         pSig->wait();
         
@@ -191,46 +196,90 @@ void FlightController::runDepth()
         }
         cameraFrame_depth& frameDepth = *pFrameDepth;
         
+        // The image is in portrait orientation, left side is the top. So for forward distance, we're
+        //  looking at the first 4 elements in each row.
         //1280x720 /8 = 160x90 (original resolution / decimation filter = final resolution)
-        int width = frameDepth.getWidth();
-        int height = frameDepth.getHeight();
+        const int width = frameDepth.getWidth();
+        const int height = frameDepth.getHeight();
+        const int boundaryRight = height / 3;
+        const int boundaryMiddle = boundaryRight + boundaryRight;
+        const int boundaryLeft = boundaryMiddle + boundaryRight;
         const uint16_t* pData = frameDepth.getData();
+        uint16x8_t u8;
 
+        // Scan each row, loading the first 4 depths and keeping the min of them
         int iRow;
-        // https://developer.arm.com/architectures/instruction-sets/intrinsics/
-        uint16_t uMax = 64000;
-        uint16_t uUnderflow = 1;
-        uint16x4_t u4Underflow = vld1_dup_u16(&uUnderflow);
-        uint16x4_t u4Min = vld1_dup_u16(&uMax);
-        uint16x4_t u4;
-        // Scan each row, loading the first 8 depths and keeping the min of them
-        //***^...only loading 4 depths below...
-        for (iRow = 0; iRow < 30; iRow++, pData += width) {
-            u4 = vld1_u16(pData); // Load 4 float
-            u4 = vsub_u16(u4, u4Underflow);
-            u4Min = vmin_u16(u4, u4Min); // Compares corresponding element in each, returns the min of each
+        uint16x8_t u8Min = vld1q_dup_u16(&uMax);
+        for (iRow = 0; iRow < boundaryRight; iRow++, pData += width) {
+            // 0 - 7
+            u8 = vld1q_u16(pData);
+            u8 = vsubq_u16(u8, u8Underflow); // Subtract 1 from each element. Invalid values are 0, so this will underflow them and make them max_uint16
+            u8Min = vminq_u16(u8, u8Min); // Compares corresponding element in each, returns the min of each
+            // 8-15
+            u8 = vld1q_u16(pData + 8);
+            u8 = vsubq_u16(u8, u8Underflow);
+            u8Min = vminq_u16(u8, u8Min); // Compares corresponding element in each, returns the min of each
+            // 16-23
+            u8 = vld1q_u16(pData + 16);
+            u8 = vsubq_u16(u8, u8Underflow);
+            u8Min = vminq_u16(u8, u8Min); // Compares corresponding element in each, returns the min of each
+            // 24-31
+            u8 = vld1q_u16(pData + 24);
+            u8 = vsubq_u16(u8, u8Underflow);
+            u8Min = vminq_u16(u8, u8Min); // Compares corresponding element in each, returns the min of each
         }
-        uint16_t uResultR = vminv_u16(u4Min); // Sums across the vector and returns single float
-        for (; iRow < 60; iRow++, pData += width) {
-            u4 = vld1_u16(pData);
-            u4 = vsub_u16(u4, u4Underflow);
-            u4Min = vmin_u16(u4, u4Min);
+        uint16_t uResultRight = vminvq_u16(u8Min); // Returns the smallest element in the vector
+        u8Min = vld1q_dup_u16(&uMax);
+        // Do the same for the middle 30 rows (the center...directly ahead)
+        for (; iRow < boundaryMiddle; iRow++, pData += width) {
+            // 0 - 7
+            u8 = vld1q_u16(pData);
+            u8 = vsubq_u16(u8, u8Underflow);
+            u8Min = vminq_u16(u8, u8Min);
+            // 8-15
+            u8 = vld1q_u16(pData + 8);
+            u8 = vsubq_u16(u8, u8Underflow);
+            u8Min = vminq_u16(u8, u8Min);
+            // 16-23
+            u8 = vld1q_u16(pData + 16);
+            u8 = vsubq_u16(u8, u8Underflow);
+            u8Min = vminq_u16(u8, u8Min);
+            // 24-31
+            u8 = vld1q_u16(pData + 24);
+            u8 = vsubq_u16(u8, u8Underflow);
+            u8Min = vminq_u16(u8, u8Min); // Compares corresponding element in each, returns the min of each
         }
-        uint16_t uResultM = vminv_u16(u4Min);
-        for (; iRow < 90; iRow++, pData += width) {
-            u4 = vld1_u16(pData);
-            u4 = vsub_u16(u4, u4Underflow);
-            u4Min = vmin_u16(u4, u4Min);
+        uint16_t uResultMiddle = vminvq_u16(u8Min);
+        u8Min = vld1q_dup_u16(&uMax);
+        // Finally the last 30 rows (left of direction of travel)
+        for (; iRow < boundaryLeft; iRow++, pData += width) {
+            // 0 - 7
+            u8 = vld1q_u16(pData);
+            u8 = vsubq_u16(u8, u8Underflow);
+            u8Min = vminq_u16(u8, u8Min);
+            // 8-15
+            u8 = vld1q_u16(pData + 8);
+            u8 = vsubq_u16(u8, u8Underflow);
+            u8Min = vminq_u16(u8, u8Min);
+            // 16-23
+            u8 = vld1q_u16(pData + 16);
+            u8 = vsubq_u16(u8, u8Underflow);
+            u8Min = vminq_u16(u8, u8Min);
+            // 24-31
+            u8 = vld1q_u16(pData + 24);
+            u8 = vsubq_u16(u8, u8Underflow);
+            u8Min = vminq_u16(u8, u8Min); // Compares corresponding element in each, returns the min of each
         }
-        uint16_t uResultL = vminv_u16(u4Min);
-
+        uint16_t uResultLeft = vminvq_u16(u8Min);
+        // Send each message (use the rs2 provided float to convert to meters * 100cm/m)
         char sc[128];
-        sprintf(sc, "<obs dir='r'>%5f</obs>", uResultR * frameDepth.getMetersPerUnit());
+        sprintf(sc, "<obs dir='r'>%5f</obs>", uResultRight * frameDepth.getMetersPerUnit() * 100);
         SendXML(sc);
-        sprintf(sc, "<obs dir='m'>%5f</obs>", uResultM * frameDepth.getMetersPerUnit());
+        sprintf(sc, "<obs dir='m'>%5f</obs>", uResultMiddle * frameDepth.getMetersPerUnit() * 100);
         SendXML(sc);
-        sprintf(sc, "<obs dir='l'>%5f</obs>", uResultL * frameDepth.getMetersPerUnit());
+        sprintf(sc, "<obs dir='l'>%5f</obs>", uResultLeft * frameDepth.getMetersPerUnit() * 100);
         SendXML(sc);
+
         delete pFrameDepth;
     }
     delete pSig;

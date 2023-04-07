@@ -11,7 +11,7 @@
 
 class CameraController;
 
-class cameraFrame_depth:protected rs2::depth_frame {
+class cameraFrame_depth:public rs2::depth_frame {
 public:
     cameraFrame_depth(const rs2::depth_frame& _frame);
     ~cameraFrame_depth();
