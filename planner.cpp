@@ -181,6 +181,7 @@ void FlightController::runDepth()
 {
     printL("FlightController::runDepth");
     Signal* pSig = camera.GetSignalDepth();
+
     while (!ssDepth.shouldStop()) {
         pSig->wait();
         
@@ -189,39 +190,41 @@ void FlightController::runDepth()
             continue;
         }
         cameraFrame_depth& frameDepth = *pFrameDepth;
-        frameDepth.applyDecimationFilter();
         
         //1280x720 /8 = 160x90 (original resolution / decimation filter = final resolution)
         int width = frameDepth.getWidth();
         int height = frameDepth.getHeight();
+        const uint16_t* pData = frameDepth.getData();
+
         int iRow;
-        const float* pData = frameDepth.getData();
         // https://developer.arm.com/architectures/instruction-sets/intrinsics/
-        float32x4_t f4Min = vmovq_n_f32(999999);
-        float32x4_t f4;
+        uint16_t uMax = 64000;
+        uint16x4_t u4Min = vld1_dup_u16(&uMax);
+        uint16x4_t u4;
         // Scan each row, loading the first 8 depths and keeping the min of them
+        //***^...only loading 4 depths below...
         for (iRow = 0; iRow < 30; iRow++, pData += width) {
-            f4 = vld1q_f32(pData); // Load 4 float
-            f4Min = vminq_f32(f4, f4Min); // Compares corresponding element in each, returns the min of each
+            u4 = vld1_u16(pData); // Load 4 float
+            u4Min = vmin_u16(u4, u4Min); // Compares corresponding element in each, returns the min of each
         }
-        float32_t fResultR = vminvq_f32(f4Min); // Sums across the vector and returns single float
+        uint16_t uResultR = vminv_u16(u4Min); // Sums across the vector and returns single float
         for (; iRow < 60; iRow++, pData += width) {
-            f4 = vld1q_f32(pData);
-            f4Min = vminq_f32(f4, f4Min);
+            u4 = vld1_u16(pData);
+            u4Min = vmin_u16(u4, u4Min);
         }
-        float32_t fResultM = vminvq_f32(f4Min);
+        uint16_t uResultM = vminv_u16(u4Min);
         for (; iRow < 90; iRow++, pData += width) {
-            f4 = vld1q_f32(pData);
-            f4Min = vminq_f32(f4, f4Min);
+            u4 = vld1_u16(pData);
+            u4Min = vmin_u16(u4, u4Min);
         }
-        float32_t fResultL = vminvq_f32(f4Min);
+        uint16_t uResultL = vminv_u16(u4Min);
 
         char sc[128];
-        sprintf(sc, "<obs dir='r'>%5f</obs>", fResultR);
+        sprintf(sc, "<obs dir='r'>%5f</obs>", uResultR * frameDepth.getMetersPerUnit());
         SendXML(sc);
-        sprintf(sc, "<obs dir='m'>%5f</obs>", fResultM);
+        sprintf(sc, "<obs dir='m'>%5f</obs>", uResultM * frameDepth.getMetersPerUnit());
         SendXML(sc);
-        sprintf(sc, "<obs dir='l'>%5f</obs>", fResultL);
+        sprintf(sc, "<obs dir='l'>%5f</obs>", uResultL * frameDepth.getMetersPerUnit());
         SendXML(sc);
         delete pFrameDepth;
     }

@@ -120,7 +120,7 @@ CameraController::CameraController(uint32_t _features, const char* _scSimulation
     
     if (features & CameraController_Depth) {
         pCameraRS = new camera_RS;
-        pCameraRS->cfg.enable_stream(RS2_STREAM_DEPTH, 1280, 720);
+        pCameraRS->cfg.enable_stream(RS2_STREAM_DEPTH, 1280, 720, RS2_FORMAT_Z16);
     }
     if (features & CameraController_Accel) {
         if (pCameraRS == nullptr) {
@@ -227,7 +227,8 @@ void CameraController::run_RS()
 
     try {
         bool bFrameRetrieved = false;
-        rs2::colorizer color_map(2); // 2 should give us a white to black color map
+        //rs2::colorizer color_map(2); // 2 should give us a white to black color map
+        rs2::decimation_filter filterDec(8);
         rs2::pipeline_profile pipelineInfo = pCameraRS->pipe.start(pCameraRS->cfg);
         if (!pipelineInfo) {
             printL("CameraController::run_RS error");
@@ -262,9 +263,12 @@ void CameraController::run_RS()
 
             // Save the raw depth. If applying the decimation filter, before/after color map makes a difference in 
             //      how big the image is
-            cameraFrame_depth* pDepthRaw = new cameraFrame_depth(data.get_depth_frame());
+            cameraFrame_depth* pDepthRaw;
             if (localFeatures & CameraController_DownsampleDepth) {
-                pDepthRaw->applyDecimationFilter();
+                rs2::frame depthFrame = data.get_depth_frame();
+                pDepthRaw = new cameraFrame_depth(filterDec.process(depthFrame));
+            } else {
+                pDepthRaw = new cameraFrame_depth(data.get_depth_frame());
             }
             // Handle the frames retrieved by type
             if (localFeatures & CameraController_Accel) {
