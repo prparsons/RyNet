@@ -228,6 +228,7 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iWidth, int iHeight)
     float fAngleAvgSum = 0;
     int iAngleAvgCount = 0;
     uint8_t pixel;
+    // Should be able to SIMD this
     for (int i = 0; i < size; i++) {
         pixel = pMask[i];
         if (pixel == HABITAT) {

@@ -198,6 +198,12 @@ void FlightController::runDepth()
 {
     printL("FlightController::runDepth");
     Signal* pSig = camera.GetSignalDepth();
+
+    // https://developer.arm.com/architectures/instruction-sets/intrinsics/
+    const uint16_t uMax = 65535;
+    const uint16_t uUnderflow = 1;
+    const uint16x8_t u8Underflow = vld1q_dup_u16(&uUnderflow);
+
     while (!ssDepth.shouldStop()) {
         pSig->wait();
         
@@ -206,40 +212,91 @@ void FlightController::runDepth()
             continue;
         }
         cameraFrame_depth& frameDepth = *pFrameDepth;
-        frameDepth.applyDecimationFilter();
         
+        // The image is in portrait orientation, left side is the top. So for forward distance, we're
+        //  looking at the first 4 elements in each row.
         //1280x720 /8 = 160x90 (original resolution / decimation filter = final resolution)
-        int width = frameDepth.getWidth();
-        int height = frameDepth.getHeight();
-        int iRow;
-        const float* pData = frameDepth.getData();
-        // https://developer.arm.com/architectures/instruction-sets/intrinsics/
-        float32x4_t f4Min = vmovq_n_f32(999999);
-        float32x4_t f4;
-        // Scan each row, loading the first 8 depths and keeping the min of them
-        for (iRow = 0; iRow < 30; iRow++, pData += width) {
-            f4 = vld1q_f32(pData); // Load 4 float
-            f4Min = vminq_f32(f4, f4Min); // Compares corresponding element in each, returns the min of each
-        }
-        float32_t fResultR = vminvq_f32(f4Min); // Sums across the vector and returns single float
-        for (; iRow < 60; iRow++, pData += width) {
-            f4 = vld1q_f32(pData);
-            f4Min = vminq_f32(f4, f4Min);
-        }
-        float32_t fResultM = vminvq_f32(f4Min);
-        for (; iRow < 90; iRow++, pData += width) {
-            f4 = vld1q_f32(pData);
-            f4Min = vminq_f32(f4, f4Min);
-        }
-        float32_t fResultL = vminvq_f32(f4Min);
+        const int width = frameDepth.getWidth();
+        const int height = frameDepth.getHeight();
+        const int boundaryRight = height / 3;
+        const int boundaryMiddle = boundaryRight + boundaryRight;
+        const int boundaryLeft = boundaryMiddle + boundaryRight;
+        const uint16_t* pData = frameDepth.getData();
+        uint16x8_t u8;
 
+        // Scan each row, loading the first 4 depths and keeping the min of them
+        int iRow;
+        uint16x8_t u8Min = vld1q_dup_u16(&uMax); // Loads a single value into all 8 of a uint16x8_t
+        for (iRow = 0; iRow < boundaryRight; iRow++, pData += width) {
+            // 0 - 7
+            u8 = vld1q_u16(pData); // Loads 8 values from pData[] into a uint16x8_t
+            u8 = vsubq_u16(u8, u8Underflow); // Subtract 1 from each element. Invalid values are 0, so this will underflow them and make them max_uint16
+            u8Min = vminq_u16(u8, u8Min); // Compares corresponding element in each, returns the min
+            // 8-15
+            u8 = vld1q_u16(pData + 8);
+            u8 = vsubq_u16(u8, u8Underflow);
+            u8Min = vminq_u16(u8, u8Min); // Compares corresponding element in each, returns the min
+            // 16-23
+            u8 = vld1q_u16(pData + 16);
+            u8 = vsubq_u16(u8, u8Underflow);
+            u8Min = vminq_u16(u8, u8Min); // Compares corresponding element in each, returns the min
+            // 24-31
+            u8 = vld1q_u16(pData + 24);
+            u8 = vsubq_u16(u8, u8Underflow);
+            u8Min = vminq_u16(u8, u8Min); // Compares corresponding element in each, returns the min
+        }
+        uint16_t uResultRight = vminvq_u16(u8Min); // Compares all 8 values and returns the min into a uint16_t
+        u8Min = vld1q_dup_u16(&uMax);
+        // Do the same for the middle 30 rows (the center...directly ahead)
+        for (; iRow < boundaryMiddle; iRow++, pData += width) {
+            // 0 - 7
+            u8 = vld1q_u16(pData);
+            u8 = vsubq_u16(u8, u8Underflow);
+            u8Min = vminq_u16(u8, u8Min);
+            // 8-15
+            u8 = vld1q_u16(pData + 8);
+            u8 = vsubq_u16(u8, u8Underflow);
+            u8Min = vminq_u16(u8, u8Min);
+            // 16-23
+            u8 = vld1q_u16(pData + 16);
+            u8 = vsubq_u16(u8, u8Underflow);
+            u8Min = vminq_u16(u8, u8Min);
+            // 24-31
+            u8 = vld1q_u16(pData + 24);
+            u8 = vsubq_u16(u8, u8Underflow);
+            u8Min = vminq_u16(u8, u8Min); // Compares corresponding element in each, returns the min
+        }
+        uint16_t uResultMiddle = vminvq_u16(u8Min);
+        u8Min = vld1q_dup_u16(&uMax);
+        // Finally the last 30 rows (left of direction of travel)
+        for (; iRow < boundaryLeft; iRow++, pData += width) {
+            // 0 - 7
+            u8 = vld1q_u16(pData);
+            u8 = vsubq_u16(u8, u8Underflow);
+            u8Min = vminq_u16(u8, u8Min);
+            // 8-15
+            u8 = vld1q_u16(pData + 8);
+            u8 = vsubq_u16(u8, u8Underflow);
+            u8Min = vminq_u16(u8, u8Min);
+            // 16-23
+            u8 = vld1q_u16(pData + 16);
+            u8 = vsubq_u16(u8, u8Underflow);
+            u8Min = vminq_u16(u8, u8Min);
+            // 24-31
+            u8 = vld1q_u16(pData + 24);
+            u8 = vsubq_u16(u8, u8Underflow);
+            u8Min = vminq_u16(u8, u8Min); // Compares corresponding element in each, returns the min
+        }
+        uint16_t uResultLeft = vminvq_u16(u8Min);
+        // Send each message (use the rs2 provided float to convert to meters * 100cm/m)
         char sc[128];
-        sprintf(sc, "<obs dir='r'>%5f</obs>", fResultR);
+        sprintf(sc, "<obs dir='r'>%5f</obs>", uResultRight * frameDepth.getMetersPerUnit() * 100);
         SendXML(sc);
-        sprintf(sc, "<obs dir='m'>%5f</obs>", fResultM);
+        sprintf(sc, "<obs dir='m'>%5f</obs>", uResultMiddle * frameDepth.getMetersPerUnit() * 100);
         SendXML(sc);
-        sprintf(sc, "<obs dir='l'>%5f</obs>", fResultL);
+        sprintf(sc, "<obs dir='l'>%5f</obs>", uResultLeft * frameDepth.getMetersPerUnit() * 100);
         SendXML(sc);
+
         delete pFrameDepth;
     }
     delete pSig;

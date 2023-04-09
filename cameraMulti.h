@@ -16,11 +16,11 @@ public:
     cameraFrame_depth(const rs2::depth_frame& _frame);
     ~cameraFrame_depth();
 
-    int getMetersPerUnit() const { return get_units(); }
+    float getMetersPerUnit() const { return get_units(); }
 
     int getWidth() const { return get_width(); }
     int getHeight() const { return get_height(); }
-    const float* getData() const { return (const float*)get_data(); }
+    const uint16_t* getData() const { return (const uint16_t*)get_data(); }
     void applyDecimationFilter();
 
 private:
