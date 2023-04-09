@@ -209,26 +209,26 @@ void FlightController::runDepth()
 
         // Scan each row, loading the first 4 depths and keeping the min of them
         int iRow;
-        uint16x8_t u8Min = vld1q_dup_u16(&uMax);
+        uint16x8_t u8Min = vld1q_dup_u16(&uMax); // Loads a single value into all 8 of a uint16x8_t
         for (iRow = 0; iRow < boundaryRight; iRow++, pData += width) {
             // 0 - 7
-            u8 = vld1q_u16(pData);
+            u8 = vld1q_u16(pData); // Loads 8 values from pData[] into a uint16x8_t
             u8 = vsubq_u16(u8, u8Underflow); // Subtract 1 from each element. Invalid values are 0, so this will underflow them and make them max_uint16
-            u8Min = vminq_u16(u8, u8Min); // Compares corresponding element in each, returns the min of each
+            u8Min = vminq_u16(u8, u8Min); // Compares corresponding element in each, returns the min
             // 8-15
             u8 = vld1q_u16(pData + 8);
             u8 = vsubq_u16(u8, u8Underflow);
-            u8Min = vminq_u16(u8, u8Min); // Compares corresponding element in each, returns the min of each
+            u8Min = vminq_u16(u8, u8Min); // Compares corresponding element in each, returns the min
             // 16-23
             u8 = vld1q_u16(pData + 16);
             u8 = vsubq_u16(u8, u8Underflow);
-            u8Min = vminq_u16(u8, u8Min); // Compares corresponding element in each, returns the min of each
+            u8Min = vminq_u16(u8, u8Min); // Compares corresponding element in each, returns the min
             // 24-31
             u8 = vld1q_u16(pData + 24);
             u8 = vsubq_u16(u8, u8Underflow);
-            u8Min = vminq_u16(u8, u8Min); // Compares corresponding element in each, returns the min of each
+            u8Min = vminq_u16(u8, u8Min); // Compares corresponding element in each, returns the min
         }
-        uint16_t uResultRight = vminvq_u16(u8Min); // Returns the smallest element in the vector
+        uint16_t uResultRight = vminvq_u16(u8Min); // Compares all 8 values and returns the min into a uint16_t
         u8Min = vld1q_dup_u16(&uMax);
         // Do the same for the middle 30 rows (the center...directly ahead)
         for (; iRow < boundaryMiddle; iRow++, pData += width) {
@@ -247,7 +247,7 @@ void FlightController::runDepth()
             // 24-31
             u8 = vld1q_u16(pData + 24);
             u8 = vsubq_u16(u8, u8Underflow);
-            u8Min = vminq_u16(u8, u8Min); // Compares corresponding element in each, returns the min of each
+            u8Min = vminq_u16(u8, u8Min); // Compares corresponding element in each, returns the min
         }
         uint16_t uResultMiddle = vminvq_u16(u8Min);
         u8Min = vld1q_dup_u16(&uMax);
@@ -268,7 +268,7 @@ void FlightController::runDepth()
             // 24-31
             u8 = vld1q_u16(pData + 24);
             u8 = vsubq_u16(u8, u8Underflow);
-            u8Min = vminq_u16(u8, u8Min); // Compares corresponding element in each, returns the min of each
+            u8Min = vminq_u16(u8, u8Min); // Compares corresponding element in each, returns the min
         }
         uint16_t uResultLeft = vminvq_u16(u8Min);
         // Send each message (use the rs2 provided float to convert to meters * 100cm/m)
