@@ -321,7 +321,7 @@ void Navigator::runNavigator()
 
     StopSignal ssBattery;
     std::thread* pThrBattery = nullptr;
-    if (bStartBatteryMonitor) pThrBattery = new std::thread(&Navigator::runBattery, this, ssBattery);
+    if (bStartBatteryMonitor) pThrBattery = new std::thread(&Navigator::runBattery, this, &ssBattery);
     
     while (!ssMain.shouldStop()) {
         pSigRGB->wait();
@@ -393,12 +393,17 @@ void Navigator::runNavigator()
     }
 }
 
-void Navigator::runBattery(StopSignal& ssBattery)
+void Navigator::runBattery(StopSignal* pSs)
 {
+    printL("Navigator::runBattery");
+    if (pSs == nullptr) {
+        printL("Navigator::runBattery no stop signal");
+        return;
+    }
     // Loop over uCheckBattery, on each overflow we'll check the battery. This way we don't have to check very often,
     //  but don't wait too long while tryin to stop this thread.
     uint8_t uCheckBattery = 0;
-    while (!ssBattery.shouldStop()) {
+    while (!pSs->shouldStop()) {
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
         if (uCheckBattery++ != 0) continue;
 
