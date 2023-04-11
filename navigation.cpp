@@ -259,8 +259,10 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iWidth, int iHeight)
     return true;
 }
 
-Navigator::Navigator(FlightController& _control, DataLogger& _logger, CameraController& _camera)
-: tLastChange(0)
+Navigator::Navigator(FlightController& _control, DataLogger& _logger, CameraController& _camera, bool _bStartBatteryMonitor)
+: bSendRTL(false)
+, bStartBatteryMonitor(_bStartBatteryMonitor)
+, tLastChange(0)
 , tMinTimeBetweenChanges(5)
 , control(_control)
 , logger(_logger)
@@ -316,6 +318,11 @@ void Navigator::runNavigator()
 
     std::thread thrObject(&ObjectDetection::run, &detector);
     std::thread thrSegment(&TerrainSegmentation::run, &segmenter);
+
+    StopSignal ssBattery;
+    std::thread* pThrBattery = nullptr;
+    if (bStartBatteryMonitor) pThrBattery = new std::thread(&Navigator::runBattery, *this);
+    
     while (!ssMain.shouldStop()) {
         pSigRGB->wait();
         cv::Mat Frame;
@@ -374,8 +381,39 @@ void Navigator::runNavigator()
     // Handle all the cleanup
     detector.SendStopSignal();
     segmenter.SendStopSignal();
+    if (bStartBatteryMonitor) ssBattery.stop();
     delete pSigRGB;
     // Wait until the threads actually stop (don't want to delete the object while thread is running).
     thrObject.join();
     thrSegment.join();
+    if (bStartBatteryMonitor) {
+        pThrBattery->join();
+        delete pThrBattery;
+        if (bSendRTL) control.SetRTL();
+    }
+}
+
+void Navigator::runBattery()
+{
+    // Loop over uCheckBattery, on each overflow we'll check the battery. This way we don't have to check very often,
+    //  but don't wait too long while tryin to stop this thread.
+    uint8_t uCheckBattery = 0;
+    while (!ssBattery.shouldStop()) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        if (uCheckBattery++ != 0) continue;
+
+        int iBattery = control.GetBattery();
+        if (iBattery == -1) continue; // -1 we didn't get a response so just continue
+
+        // For now, simple method...if battery is < 50% then we will stop the nav threads and RTL.
+        if (iBattery < 50) {
+            bSendRTL = true;
+            ssMain.stop();
+            // Make sure the thread will stop in the event the camera isn't running (see Stop())
+            Signal* pSigRGB = camera.GetSignalRGB();
+            pSigRGB->signal();
+            delete pSigRGB;
+            break;
+        }
+    }
 }

@@ -37,6 +37,7 @@ int main( int argc, char** argv )
 
     // Bools for the various command line options
     bool bOptionArgument = false;
+    bool bBatteryMonitor = false;
     bool bStopNavOnDepthFail = true;
     pSignal_bStopNavOnDepthFail = &bStopNavOnDepthFail;
     bool bSendRTL = false;
@@ -73,6 +74,7 @@ int main( int argc, char** argv )
             else if (strcmp("--log_visited", argv[i]) == 0) bStartPointLogger = true;
             else if (strcmp("--downsample_depth", argv[i]) == 0) bDownsampleDepth = true;
             else if (strcmp("--run_accel", argv[i]) == 0) bRunAccel = true;
+            else if (strcmp("--battery_monitor", argv[i]) == 0) bBatteryMonitor = true;
             else if (strcmp("--simulate_video", argv[i]) == 0) {
                 bSimulateVideo = true;
                 bOptionArgument = true;
@@ -110,7 +112,7 @@ int main( int argc, char** argv )
         if (bManualServerAddress) pController->SetServerAddress(scServerAddress);
 
         printL(">>>Creating Navigator");
-        Navigator nav(*pController, logger, *pCamera);
+        Navigator nav(*pController, logger, *pCamera, bBatteryMonitor);
 
         printL(">>>Starting DataLogger");
         logger.Start();
@@ -180,6 +182,9 @@ void printHelp()
     printL("    Enable decimation filter that will downsample the depth frames.\n");
     printL(" --run_accel");
     printL("    Enable the depth camera's accelerometer.\n");
+    printL(" --battery_monitor");
+    printL("    Run battery monitor thread that will stop navigation and send RTL if");
+    printL("    battery level drops below 50%.\n");
 }
 
 void cleanupFailure()

@@ -66,7 +66,7 @@ private:
 
 class Navigator {
 public:
-    Navigator(FlightController& control, DataLogger& logger, CameraController& camera);
+    Navigator(FlightController& control, DataLogger& logger, CameraController& camera, bool bStartBatteryMonitor);
     ~Navigator();
     
     void Start();
@@ -75,7 +75,11 @@ public:
 
 private:
     void runNavigator();
+    void runBattery();
 
+    // ONLY access from runBattery. runNavigator will access it AFTER it has joined runBattery
+    bool bSendRTL;
+    bool bStartBatteryMonitor;
     time_t tLastChange;
     time_t tMinTimeBetweenChanges;
     FlightController& control;

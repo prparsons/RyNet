@@ -117,6 +117,15 @@ bool FlightController::GetMode(char* scMode, int iStrLen)
     return true;
 }
 
+int FlightController::GetBattery()
+{
+    char* sc = SendRecXML("<battery />");
+    if (sc == nullptr) return -1;
+    int iBattery = ttoi(sc);
+    delete sc;
+    return iBattery;
+}
+
 void FlightController::SetDirection(float fHeadingOffsetDeg)
 {
     char sc[128];
