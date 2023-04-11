@@ -75,7 +75,7 @@ public:
 
 private:
     void runNavigator();
-    void runBattery();
+    void runBattery(StopSignal& ssBattery);
 
     // ONLY access from runBattery. runNavigator will access it AFTER it has joined runBattery
     bool bSendRTL;
