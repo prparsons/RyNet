@@ -14,6 +14,9 @@ from tsp import *
 """
 Command Documentation:
 
+<battery />
+    Get current battery level, percent level from 0-100.
+
 <clean_dist>DISTANCE_M</clean_dist>
     Sets the distance from visited point that is close enough to remove a waypoint from mission list.
 
@@ -508,6 +511,10 @@ def cmdPosRetrieve(vehicle, UDPServerSocket, address):
     strReply = "%f\n%f\n" % (vehicle.location.global_frame.lat, vehicle.location.global_frame.lon)
     UDPServerSocket.sendto(str.encode(strReply), address)
 
+def cmdBatteryRetrieve(vehicle, UDPServerSocket, address):
+    strReply = "%d\n" % (vehicle.battery.level)
+    UDPServerSocket.sendto(str.encode(strReply), address)
+
 def handleCommand(element, vehicle, UDPServerSocket, address):
     global visitedList
     if args.livetest == 'True':
@@ -520,7 +527,10 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
     #if element.tag == 'clean_dist':
         #NOT_IMPLEMENTED
 
-    if element.tag == 'takeoff':
+    if element.tag == 'battery':
+        cmdBatteryRetrieve(vehicle, UDPServerSocket, address)
+        
+    elif element.tag == 'takeoff':
         cmdTakeoff(vehicle, element)
 
     elif element.tag == 'dir':
