@@ -117,6 +117,11 @@ bool FlightController::GetMode(char* scMode, int iStrLen)
     return true;
 }
 
+bool FlightController::CheckDirectionValid(float fDirection, time_t travelTime)
+{
+    return true;
+}
+
 void FlightController::SetDirection(float fHeadingOffsetDeg)
 {
     char sc[128];

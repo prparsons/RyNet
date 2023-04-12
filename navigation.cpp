@@ -314,6 +314,7 @@ void Navigator::runNavigator()
 
     bool bGridSearching = true;
     float fMargin = 5;
+    float fCurrentDirection = 0;
 
     std::thread thrObject(&ObjectDetection::run, &detector);
     std::thread thrSegment(&TerrainSegmentation::run, &segmenter);
@@ -333,10 +334,17 @@ void Navigator::runNavigator()
                 char sc[64];
                 // If enough time since last command, then we'll change
                 if (time(nullptr) - tLastChange > tMinTimeBetweenChanges) {
-                    control.SetDirection(segmenter.GetHabitatDirection());
-                    sprintf(sc, "Grid Search -> Good Habitat %1.3f", segmenter.GetHabitatDirection());
-                    bGridSearching = false;
-                    tLastChange = time(nullptr);
+                    float fDir = segmenter.GetHabitatDirection();
+                    // Verify direction is valid before we switch to guided
+                    if (control.CheckDirectionValid(fDir, tMinTimeBetweenChanges)) {
+                        control.SetDirection(fDir);
+                        fCurrentDirection = fDir;
+                        sprintf(sc, "Grid Search -> Good Habitat %1.3f", segmenter.GetHabitatDirection());
+                        bGridSearching = false;
+                        tLastChange = time(nullptr);
+                    } else {
+                        sprintf(sc, "Grid Search X Good Habitat %1.3f (Invalid Direction)", segmenter.GetHabitatDirection());
+                    }
                 } else {
                     sprintf(sc, "[delay]Grid Search -> Good Habitat %1.3f", segmenter.GetHabitatDirection());
                 }
@@ -346,13 +354,32 @@ void Navigator::runNavigator()
             // Good terrain still visible?
 	        if (segmenter.IsHabitatVisible()) {
                 // If it's in the same direction then do nothing
-                if (abs(segmenter.GetHabitatDirection()) < fMargin) continue;
+                if (abs(segmenter.GetHabitatDirection()) < fMargin) {
+                    // Unless continuing that direction would be an invalid direction
+                    if (!control.CheckDirectionValid(fCurrentDirection, tMinTimeBetweenChanges)) {
+                        control.RestoreRouteNaive();
+                        logger.LogString("Good Habitat -> Grid Search (Invalid Direction)");
+                        bGridSearching = true;
+                        tLastChange = time(nullptr);
+                    }
+                    continue;
+                }
                 char sc[64];
                 // If enough time since last command, then we can change
                 if (time(nullptr) - tLastChange > tMinTimeBetweenChanges) {
-                    control.SetDirection(segmenter.GetHabitatDirection());
-                    sprintf(sc, "Good Habitat Change -> %1.3f", segmenter.GetHabitatDirection());
-                    tLastChange = time(nullptr);
+                    float fDir = segmenter.GetHabitatDirection();
+                    // Verify that the change won't take us in an invalid direction
+                    if (control.CheckDirectionValid(fDir, tMinTimeBetweenChanges)) {
+                        control.SetDirection(fDir);
+                        sprintf(sc, "Good Habitat Change -> %1.3f", segmenter.GetHabitatDirection());
+                        tLastChange = time(nullptr);
+                    } else {
+                        // If it would be an invalid direction, then go back to grid search
+                        control.RestoreRouteNaive();
+                        sprintf(sc, "Good Habitat (Invalid Direction) -> %1.3f", segmenter.GetHabitatDirection());
+                        bGridSearching = true;
+                        tLastChange = time(nullptr);
+                    }
                 } else {
                     sprintf(sc, "[delay]Good Habitat Change -> %1.3f", segmenter.GetHabitatDirection());
                 }
