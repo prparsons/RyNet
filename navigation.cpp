@@ -292,6 +292,18 @@ void Navigator::Join()
     }
 }
 
+void Navigator::SignalStop()
+{
+    if (pThread != nullptr) {
+        ssMain.stop();
+        // If there's nothing coming from the camera, we need to signal it or else the thread
+        //  will never get to the ss.shouldStop().
+        Signal* pSigRGB = camera.GetSignalRGB();
+        pSigRGB->signal();
+        delete pSigRGB;
+    }
+}
+
 void Navigator::Stop()
 {
     if (pThread != nullptr) {

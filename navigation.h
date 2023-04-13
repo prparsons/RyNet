@@ -64,13 +64,14 @@ private:
     image imgRecent;
 };
 
-class Navigator {
+class Navigator:public InterruptStop {
 public:
     Navigator(FlightController& control, DataLogger& logger, CameraController& camera);
     ~Navigator();
     
     void Start();
     void Join();
+    virtual void SignalStop();
     void Stop();
 
 private:
