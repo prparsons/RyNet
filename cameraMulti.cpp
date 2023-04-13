@@ -203,7 +203,7 @@ void CameraController::Stop()
     }
 }
 
-void CameraController::SignalDepthStop()
+void CameraController::SignalStop()
 {
     ss[0].stop();
 }

@@ -228,6 +228,7 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iWidth, int iHeight)
     float fAngleAvgSum = 0;
     int iAngleAvgCount = 0;
     uint8_t pixel;
+    // Should be able to SIMD this
     for (int i = 0; i < size; i++) {
         pixel = pMask[i];
         if (pixel == HABITAT) {
@@ -290,6 +291,18 @@ void Navigator::Join()
         pThread->join();
         delete pThread;
         pThread = nullptr;
+    }
+}
+
+void Navigator::SignalStop()
+{
+    if (pThread != nullptr) {
+        ssMain.stop();
+        // If there's nothing coming from the camera, we need to signal it or else the thread
+        //  will never get to the ss.shouldStop().
+        Signal* pSigRGB = camera.GetSignalRGB();
+        pSigRGB->signal();
+        delete pSigRGB;
     }
 }
 
