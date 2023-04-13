@@ -14,6 +14,7 @@
 enum OptionArgument {
     SIMULATE_VIDEO = 0,
     UDP_SERVER_ADDRESS,
+    NAV_TARGET,
     OPTION_NONE
 };
 
@@ -53,6 +54,7 @@ int main( int argc, char** argv )
     char scVideoSimPath[512];
     scVideoSimPath[0] = 0;
     char scServerAddress[32];
+    int iTargetClass = -1;
     // Read all the command line arguments and options (--option argument)
     for (int i = 1; i < argc; i++) {
         if (bOptionArgument) {
@@ -61,8 +63,16 @@ int main( int argc, char** argv )
             switch (OptionArgumentSelection) {
                 case SIMULATE_VIDEO: strncpy(scVideoSimPath, argv[i], 512); break;
                 case UDP_SERVER_ADDRESS: strncpy(scServerAddress, argv[i], 32); break;
+                case NAV_TARGET: {
+                    char sc[8];
+                    iTargetClass = atoi(argv[i]);
+                    if (iTargetClass < 0 || iTargetClass > 255) {
+                        printL("Target Class must be number between 0 and 255");
+                        return -1;
+                    }
+                }
                 default:
-                    printL("OptionAgurmentSelection Invalid");
+                    printL("OptionArguementSelection Invalid");
                     return -1;
             }
             OptionArgumentSelection = OPTION_NONE;
@@ -82,6 +92,9 @@ int main( int argc, char** argv )
                 bManualServerAddress = true;
                 bOptionArgument = true;
                 OptionArgumentSelection = UDP_SERVER_ADDRESS;
+            } else if (strcmp("--nav_target", argv[i]) == 0) {
+                bOptionArgument = true;
+                OptionArgumentSelection = NAV_TARGET;
             } else {
                 if (strcmp("--help", argv[i]) != 0) {
                     printf("Invalid option [%s]\n", argv[i]);
@@ -113,6 +126,8 @@ int main( int argc, char** argv )
         Navigator nav(*pController, logger, *pCamera);
         if (bRunDepth) pSignal_interrupt = pCamera;
         else pSignal_interrupt = &nav;
+        // If we specified a target class, need to set that now
+        if (iTargetClass != -1) nav.SetTargetClass(uint8_t(iTargetClass));
 
         printL(">>>Starting DataLogger");
         logger.Start();
@@ -182,6 +197,9 @@ void printHelp()
     printL("    Enable decimation filter that will downsample the depth frames.\n");
     printL(" --run_accel");
     printL("    Enable the depth camera's accelerometer.\n");
+    printL(" --nav_target [XX]");
+    printL("    Manually specify the target class the Navigation network should target.");
+    printL("    Target is number from 0-255.\n");
 }
 
 void cleanupFailure()

@@ -39,6 +39,7 @@ public:
     void SetNewImage(image& img);
     void run();
     void SendStopSignal();
+    void SetTargetClass(uint8_t uTarget);
 
     enum Classes {
         SKY = 0,
@@ -53,6 +54,7 @@ private:
     bool ScanMask(uint8_t* pMask, int iWidth, int iHeight);
 
     bool bHabitatVisible;
+    uint8_t uTargetClass;
     float fBestDirection;
     float fImageFOV; // should get this from camera
     DataLogger& logger;
@@ -73,6 +75,8 @@ public:
     void Join();
     virtual void SignalStop();
     void Stop();
+
+    void SetTargetClass(uint8_t uTarget) { segmenter.SetTargetClass(uTarget); }
 
 private:
     void runNavigator();

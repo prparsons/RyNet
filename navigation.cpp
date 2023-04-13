@@ -104,6 +104,7 @@ void ObjectDetection::SendStopSignal()
 
 TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
 : bHabitatVisible(false)
+, uTargetClass(HABITAT)
 , fImageFOV(50) // I calculated this number based on the imx477 sensor size with a 6mm lens
 , logger(_logger)
 , pMask(nullptr)
@@ -175,6 +176,11 @@ void TerrainSegmentation::SendStopSignal()
     sigNewImage.signal();
 }
 
+void TerrainSegmentation::SetTargetClass(uint8_t _uTargetClass)
+{
+    uTargetClass = _uTargetClass;
+}
+
 bool TerrainSegmentation::ProcessImage(image& imgRGB)
 {
     int imgWidth = imgRGB.cols;      // width of the image (in pixels)
@@ -231,7 +237,7 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iWidth, int iHeight)
     // Should be able to SIMD this
     for (int i = 0; i < size; i++) {
         pixel = pMask[i];
-        if (pixel == HABITAT) {
+        if (pixel == uTargetClass) {
             int x = i / iWidth;
             fAngleAvgSum += (abs(x - (iWidth * .5)) / (iWidth * .5)) * (fImageFOV * .5);
             iAngleAvgCount++;
