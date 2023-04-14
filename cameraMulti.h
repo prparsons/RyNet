@@ -27,6 +27,11 @@ private:
     rs2::decimation_filter* pDownsample;
 };
 
+class InterruptStop {
+public:
+    virtual void SignalStop() = 0;
+};
+
 class camera_RS {
 public:
     rs2::pipeline pipe;
@@ -40,7 +45,7 @@ public:
 #define CameraController_RGBSimulation 0x10
 #define CameraController_Accel 0x20
 
-class CameraController {
+class CameraController:public InterruptStop {
 public:
     ~CameraController();
 
@@ -58,7 +63,7 @@ public:
     void Start();
     void Stop();
 
-    void SignalDepthStop();
+    virtual void SignalStop();
     void JoinDepth();
 
 protected:

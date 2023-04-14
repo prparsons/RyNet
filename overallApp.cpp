@@ -14,6 +14,8 @@
 enum OptionArgument {
     SIMULATE_VIDEO = 0,
     UDP_SERVER_ADDRESS,
+    NAV_TARGET,
+    IMG_SLICES,
     OPTION_NONE
 };
 
@@ -26,7 +28,8 @@ void handle_segfault(int iSigNum);
 // If we want to stop the main application with a Ctrl+c signal, then we need to stop the camera and the Navigator.
 // Simplest way I can think of at the moment is signal for depth to stop, let the main thread finishing joining
 // it, then we'll have a pointer to bStopNavOnDepthFail that the interrupt can set to True.
-CameraController* pSignal_pCamera = nullptr;
+// Or, if we used --continue then need to signal nav to stop
+InterruptStop* pSignal_interrupt = nullptr;
 bool* pSignal_bStopNavOnDepthFail = nullptr;
 
 int main( int argc, char** argv )
@@ -53,6 +56,8 @@ int main( int argc, char** argv )
     char scVideoSimPath[512];
     scVideoSimPath[0] = 0;
     char scServerAddress[32];
+    int iTargetClass = -1;
+    int iNumSlices = -1;
     // Read all the command line arguments and options (--option argument)
     for (int i = 1; i < argc; i++) {
         if (bOptionArgument) {
@@ -61,8 +66,22 @@ int main( int argc, char** argv )
             switch (OptionArgumentSelection) {
                 case SIMULATE_VIDEO: strncpy(scVideoSimPath, argv[i], 512); break;
                 case UDP_SERVER_ADDRESS: strncpy(scServerAddress, argv[i], 32); break;
+                case NAV_TARGET: {
+                    iTargetClass = atoi(argv[i]);
+                    if (iTargetClass < 0 || iTargetClass > 255) {
+                        printL("Target Class must be number between 0 and 255");
+                        return -1;
+                    }
+                } break;
+                case IMG_SLICES: {
+                    iNumSlices = atoi(argv[i]);
+                    if (iNumSlices < 0 || iNumSlices > 9) {
+                        printL("Number of slices must be number between 0 and 9");
+                        return -1;
+                    }
+                } break;
                 default:
-                    printL("OptionAgurmentSelection Invalid");
+                    printL("OptionArguementSelection Invalid");
                     return -1;
             }
             OptionArgumentSelection = OPTION_NONE;
@@ -83,6 +102,12 @@ int main( int argc, char** argv )
                 bManualServerAddress = true;
                 bOptionArgument = true;
                 OptionArgumentSelection = UDP_SERVER_ADDRESS;
+            } else if (strcmp("--nav_target", argv[i]) == 0) {
+                bOptionArgument = true;
+                OptionArgumentSelection = NAV_TARGET;
+            } else if (strcmp("--img_slices", argv[i]) == 0) {
+                bOptionArgument = true;
+                OptionArgumentSelection = IMG_SLICES;
             } else {
                 if (strcmp("--help", argv[i]) != 0) {
                     printf("Invalid option [%s]\n", argv[i]);
@@ -106,7 +131,6 @@ int main( int argc, char** argv )
         if (bRunFlir) uCameraFeatures += CameraController_IR;
         if (bSimulateVideo) pCamera = CameraController::OpenCamera(uCameraFeatures, scVideoSimPath);
         else pCamera = CameraController::OpenCamera(uCameraFeatures);
-        pSignal_pCamera = pCamera;
 
         printL(">>>Getting Flight Controller");
         FlightController* pController = FlightController::GetFlightController(logger, *pCamera);
@@ -114,6 +138,11 @@ int main( int argc, char** argv )
 
         printL(">>>Creating Navigator");
         Navigator nav(*pController, logger, *pCamera);
+        if (bRunDepth) pSignal_interrupt = pCamera;
+        else pSignal_interrupt = &nav;
+        // If we specified a target class, need to set that now
+        if (iTargetClass != -1) nav.SetTargetClass(uint8_t(iTargetClass));
+        if (iNumSlices != -1) nav.SetNumberImageSlices(iNumSlices);
 
         printL(">>>Starting DataLogger");
         logger.Start();
@@ -185,6 +214,12 @@ void printHelp()
     printL("    Enable the depth camera's accelerometer.\n");
     printL(" --run_flir");
     printL("    Enable the flir thermal camera on /dev/video4.\n");
+    printL(" --nav_target [XX]");
+    printL("    Manually specify the target class the Navigation network should target.");
+    printL("    Target is number from 0-255.\n");
+    printL(" --img_slices [XX]");
+    printL("    Number of horizontal slices of the RGB image before it is used for");
+    printL("    detection and segmentation. Target is number from 0-9; default is 3.\n");
 }
 
 void cleanupFailure()
@@ -209,12 +244,12 @@ void handle_interrupt(int iSigNum)
         printL("interrupt bStopNavOnDepthFail not set, unable to close program gracefully.");
         exit(iSigNum);
     }
-    if (pSignal_pCamera == nullptr) {
+    if (pSignal_interrupt == nullptr) {
         printL("interrupt pCamera not set, unable to close program gracefully.");
         exit(iSigNum);
     }
     *pSignal_bStopNavOnDepthFail = true;
-    pSignal_pCamera->SignalDepthStop();
+    pSignal_interrupt->SignalStop();
 }
 
 void handle_segfault(int iSigNum)

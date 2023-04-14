@@ -7,7 +7,8 @@
 // ** ObjectDetection
 
 ObjectDetection::ObjectDetection(DataLogger& _logger)
-: logger(_logger)
+: iNumSlices(3)
+, logger(_logger)
 , pNetwork(nullptr)
 {
     pNetwork = detectNet::Create(detectNet::SSD_MOBILENET_V2);
@@ -36,16 +37,16 @@ bool ObjectDetection::ProcessImage(image& _imgRGB)
 
     int imgWidth = imgRGB.cols;      // width of the image (in pixels)
     int imgHeight = imgRGB.rows;      // height of the image (in pixels)
-    // Going to do 3 horizontal slices of the image. 
-    if (imgHeight % 3 != 0) printL("ObjectDetection::ProcessImage doesn't divide by 3");
-    int iSliceHeight = imgHeight / 3;
+    // Going to do iNumSlices horizontal slices of the image. 
+    if (imgHeight % iNumSlices != 0) printL("ObjectDetection::ProcessImage doesn't divide by 3");
+    int iSliceHeight = imgHeight / iNumSlices;
     uchar3* u3Img;
     if (CUDA_FAILED(cudaMalloc(&u3Img, imgWidth * iSliceHeight * 3))) {
         printL("ObjectDetection::ProcessImage cudaMalloc fail");
         return false;
     }
     bool bRet = false;
-    for (int s = 0; s < 3; s++) {
+    for (int s = 0; s < iNumSlices; s++) {
         intptr_t imgRGBOffset = s * imgWidth * imgHeight;
         cudaMemcpy(u3Img, ((uint8_t*)imgRGB.data) + imgRGBOffset, imgWidth * iSliceHeight * 3, cudaMemcpyHostToDevice);   // shared CPU/GPU pointer to image
         detectNet::Detection* arDetections = nullptr;
@@ -78,18 +79,21 @@ void ObjectDetection::run()
     printL("ObjectDetection::run");
     Signal* pSigRGB = new Signal(sigNewImage);
     image imgProcess;
+    int iFramesProcessed = 0;
     while (!ss.shouldStop()) {
         pSigRGB->wait();
         mt.lock();
         imgProcess = imgRecent;
         mt.unlock();
         if (imgProcess.empty()) continue;
+        iFramesProcessed++;
 
         if (ProcessImage(imgProcess)) {
             logger.LogImage(imgProcess, "detect");
         }
     }
     delete pSigRGB;
+    printf("ObjectDetection::run Frames Processed:%d\n", iFramesProcessed);
 }
 
 void ObjectDetection::SendStopSignal()
@@ -100,10 +104,17 @@ void ObjectDetection::SendStopSignal()
     sigNewImage.signal();
 }
 
+void ObjectDetection::SetNumberImageSlices(int _iNumSlices)
+{
+    iNumSlices = _iNumSlices;
+}
+
 // ** TerrainSegmentation
 
 TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
 : bHabitatVisible(false)
+, uTargetClass(HABITAT)
+, iNumSlices(3)
 , fImageFOV(50) // I calculated this number based on the imx477 sensor size with a 6mm lens
 , logger(_logger)
 , pMask(nullptr)
@@ -147,14 +158,15 @@ void TerrainSegmentation::run()
     printL("TerrainSegmentation::run");
     Signal* pSigRGB = new Signal(sigNewImage);
     image imgProcess;
-
+    int iFramesProcessed = 0;
     while (!ss.shouldStop()) {
         pSigRGB->wait();
         mt.lock();
         imgProcess = imgRecent;
         mt.unlock();
         if (imgProcess.empty()) continue;
-
+        
+        iFramesProcessed++;
         if (ProcessImage(imgProcess)) {
             logger.LogImage(imgProcess, "segment");
             char sc[128];
@@ -165,6 +177,7 @@ void TerrainSegmentation::run()
         }
     }
     delete pSigRGB;
+    printf("TerrainSegmentation::run Frames Processed: %d\n", iFramesProcessed);
 }
 
 void TerrainSegmentation::SendStopSignal()
@@ -175,21 +188,31 @@ void TerrainSegmentation::SendStopSignal()
     sigNewImage.signal();
 }
 
+void TerrainSegmentation::SetTargetClass(uint8_t _uTargetClass)
+{
+    uTargetClass = _uTargetClass;
+}
+
+void TerrainSegmentation::SetNumberImageSlices(int _iNumSlices)
+{
+    iNumSlices = _iNumSlices;
+}
+
 bool TerrainSegmentation::ProcessImage(image& imgRGB)
 {
     int imgWidth = imgRGB.cols;      // width of the image (in pixels)
     int imgHeight = imgRGB.rows;      // height of the image (in pixels)
     // 1080x1920  -- 3 images at 1080x640
     uchar3* u3Img;
-    // Going to do 3 horizontal slices of the image. That and it being a 3 channel image is why size is only widthxheight
-    if (imgHeight % 3 != 0) printL("ObjectDetection::ProcessImage doesn't divide by 3");
-    int iSliceHeight = imgHeight / 3;
+    // Going to do iNumSlices horizontal slices of the image. That and it being a 3 channel image is why size is only widthxheight
+    if (imgHeight % iNumSlices != 0) printL("ObjectDetection::ProcessImage doesn't divide by 3");
+    int iSliceHeight = imgHeight / iNumSlices;
     if (CUDA_FAILED(cudaMalloc(&u3Img, imgWidth * iSliceHeight * 3))) {
         printL("TerrainSegmentation::ProcessImage cudaMalloc fail");
         return false;
     }
     bool bRet = false;
-    for (int s = 0; s < 3; s++) {
+    for (int s = 0; s < iNumSlices; s++) {
         intptr_t imgRGBOffset = s * imgWidth * iSliceHeight;
         cudaMemcpy(u3Img, ((uint8_t*)imgRGB.data) + imgRGBOffset, imgWidth * iSliceHeight * 3, cudaMemcpyHostToDevice);
 
@@ -231,7 +254,7 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iWidth, int iHeight)
     // Should be able to SIMD this
     for (int i = 0; i < size; i++) {
         pixel = pMask[i];
-        if (pixel == HABITAT) {
+        if (pixel == uTargetClass) {
             int x = i / iWidth;
             fAngleAvgSum += (abs(x - (iWidth * .5)) / (iWidth * .5)) * (fImageFOV * .5);
             iAngleAvgCount++;
@@ -292,6 +315,18 @@ void Navigator::Join()
     }
 }
 
+void Navigator::SignalStop()
+{
+    if (pThread != nullptr) {
+        ssMain.stop();
+        // If there's nothing coming from the camera, we need to signal it or else the thread
+        //  will never get to the ss.shouldStop().
+        Signal* pSigRGB = camera.GetSignalRGB();
+        pSigRGB->signal();
+        delete pSigRGB;
+    }
+}
+
 void Navigator::Stop()
 {
     if (pThread != nullptr) {
@@ -305,6 +340,12 @@ void Navigator::Stop()
         delete pThread;
         pThread = nullptr;
     }
+}
+
+void Navigator::SetNumberImageSlices(int iNumSlices)
+{
+    detector.SetNumberImageSlices(iNumSlices);
+    segmenter.SetNumberImageSlices(iNumSlices);
 }
 
 void Navigator::runNavigator()
