@@ -79,18 +79,21 @@ void ObjectDetection::run()
     printL("ObjectDetection::run");
     Signal* pSigRGB = new Signal(sigNewImage);
     image imgProcess;
+    int iFramesProcessed = 0;
     while (!ss.shouldStop()) {
         pSigRGB->wait();
         mt.lock();
         imgProcess = imgRecent;
         mt.unlock();
         if (imgProcess.empty()) continue;
+        iFramesProcessed++;
 
         if (ProcessImage(imgProcess)) {
             logger.LogImage(imgProcess, "detect");
         }
     }
     delete pSigRGB;
+    printf("ObjectDetection::run Frames Processed:%d\n", iFramesProcessed);
 }
 
 void ObjectDetection::SendStopSignal()
@@ -155,14 +158,15 @@ void TerrainSegmentation::run()
     printL("TerrainSegmentation::run");
     Signal* pSigRGB = new Signal(sigNewImage);
     image imgProcess;
-
+    int iFramesProcessed = 0;
     while (!ss.shouldStop()) {
         pSigRGB->wait();
         mt.lock();
         imgProcess = imgRecent;
         mt.unlock();
         if (imgProcess.empty()) continue;
-
+        
+        iFramesProcessed++;
         if (ProcessImage(imgProcess)) {
             logger.LogImage(imgProcess, "segment");
             char sc[128];
@@ -173,6 +177,7 @@ void TerrainSegmentation::run()
         }
     }
     delete pSigRGB;
+    printf("TerrainSegmentation::run Frames Processed: %d\n", iFramesProcessed);
 }
 
 void TerrainSegmentation::SendStopSignal()
