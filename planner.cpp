@@ -50,7 +50,10 @@ void FlightController::DestroyFlightController()
     if (pInstance->pThreadIr != nullptr) {
         printL("FlightController::DestroyFlightController Stopping thermal camera");
         pInstance->ssIr.stop();
+        Signal* pSig = pInstance->camera.GetSignalIR();
+        pSig->signal();
         pInstance->pThreadIr->join();
+        delete pSig;
         delete pInstance->pThreadIr;
         pInstance->pThreadIr = nullptr;
     }
