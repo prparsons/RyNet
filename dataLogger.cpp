@@ -157,6 +157,7 @@ void DataLogger::run(void)
         }
         mt.unlock();
         if (bWriteImgLocal) {
+            bWriteImgLocal = false;
             SaveImage("flir", imageWrite, dataWrite);
         }
     }
