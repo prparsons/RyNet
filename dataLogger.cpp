@@ -146,6 +146,19 @@ void DataLogger::run(void)
                     pTimeStruct->tm_sec);
             cv::imwrite(scFileName, imageWrite);
         }
+
+        // Check if there's an IR image we should write
+        mt.lock();
+        if (bWriteImgIr) {
+            bWriteImgIr = false;
+            bWriteImgLocal = true;
+            imageWrite = imageIr;
+            dataWrite = dataImageIr;
+        }
+        mt.unlock();
+        if (bWriteImgLocal) {
+            SaveImage("flir", imageWrite, dataWrite);
+        }
     }
 
     delete pSigImage;
