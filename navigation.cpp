@@ -4,7 +4,6 @@
 #include <unistd.h>
 #include <jetson-utils/cudaMappedMemory.h>
 
-ObjectDetection::SetNetwork("SSD_MOBILENET_V2");
 
 // ** ObjectDetection
 
