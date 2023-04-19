@@ -4,13 +4,17 @@
 #include <unistd.h>
 #include <jetson-utils/cudaMappedMemory.h>
 
+detectNet::NetworkType networkDetection = detectNet::SSD_MOBILENET_V2;
+segNet::NetworkType networkSegmentation = segNet::FCN_RESNET18_VOC_512x320;
+
 // ** ObjectDetection
 
 ObjectDetection::ObjectDetection(DataLogger& _logger)
-: logger(_logger)
+: iNumSlices(3)
+, logger(_logger)
 , pNetwork(nullptr)
 {
-    pNetwork = detectNet::Create(detectNet::SSD_MOBILENET_V2);
+    pNetwork = detectNet::Create(networkDetection);
 	//detectNet* net = detectNet::Create(detectNet::SSD_MOBILENET_V2, 0.5f, 1, TYPE_FASTEST, DEVICE_DLA_0);DEVICE_DLA_1 DEVICE_GPU
     // DLA fails with segmentation fault using detectnet with that network. even resizing images
 }
@@ -36,16 +40,16 @@ bool ObjectDetection::ProcessImage(image& _imgRGB)
 
     int imgWidth = imgRGB.cols;      // width of the image (in pixels)
     int imgHeight = imgRGB.rows;      // height of the image (in pixels)
-    // Going to do 3 horizontal slices of the image. 
-    if (imgHeight % 3 != 0) printL("ObjectDetection::ProcessImage doesn't divide by 3");
-    int iSliceHeight = imgHeight / 3;
+    // Going to do iNumSlices horizontal slices of the image. 
+    if (imgHeight % iNumSlices != 0) printL("ObjectDetection::ProcessImage doesn't divide by 3");
+    int iSliceHeight = imgHeight / iNumSlices;
     uchar3* u3Img;
     if (CUDA_FAILED(cudaMalloc(&u3Img, imgWidth * iSliceHeight * 3))) {
         printL("ObjectDetection::ProcessImage cudaMalloc fail");
         return false;
     }
     bool bRet = false;
-    for (int s = 0; s < 3; s++) {
+    for (int s = 0; s < iNumSlices; s++) {
         intptr_t imgRGBOffset = s * imgWidth * imgHeight;
         cudaMemcpy(u3Img, ((uint8_t*)imgRGB.data) + imgRGBOffset, imgWidth * iSliceHeight * 3, cudaMemcpyHostToDevice);   // shared CPU/GPU pointer to image
         detectNet::Detection* arDetections = nullptr;
@@ -78,18 +82,21 @@ void ObjectDetection::run()
     printL("ObjectDetection::run");
     Signal* pSigRGB = new Signal(sigNewImage);
     image imgProcess;
+    int iFramesProcessed = 0;
     while (!ss.shouldStop()) {
         pSigRGB->wait();
         mt.lock();
         imgProcess = imgRecent;
         mt.unlock();
         if (imgProcess.empty()) continue;
+        iFramesProcessed++;
 
         if (ProcessImage(imgProcess)) {
             logger.LogImage(imgProcess, "detect");
         }
     }
     delete pSigRGB;
+    printf("ObjectDetection::run Frames Processed:%d\n", iFramesProcessed);
 }
 
 void ObjectDetection::SendStopSignal()
@@ -100,15 +107,36 @@ void ObjectDetection::SendStopSignal()
     sigNewImage.signal();
 }
 
+void ObjectDetection::SetNumberImageSlices(int _iNumSlices)
+{
+    iNumSlices = _iNumSlices;
+}
+
+bool ObjectDetection::SetNetwork(const char* scNetwork)
+{
+    if (strcmp(scNetwork, "SSD_MOBILENET_V2") == 0) {
+        networkDetection = detectNet::SSD_MOBILENET_V2;
+    } else if (strcmp(scNetwork, "SSD_MOBILENET_V1") == 0) {
+        networkDetection = detectNet::SSD_MOBILENET_V1;
+    } else if (strcmp(scNetwork, "SSD_INCEPTION_V2") == 0) {
+        networkDetection = detectNet::SSD_INCEPTION_V2;
+    } else {
+        return false;
+    }
+    return true;
+}
+
 // ** TerrainSegmentation
 
 TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
 : bHabitatVisible(false)
+, uTargetClass(HABITAT)
+, iNumSlices(3)
 , fImageFOV(50) // I calculated this number based on the imx477 sensor size with a 6mm lens
 , logger(_logger)
 , pMask(nullptr)
 {
-    pNetwork = segNet::Create(segNet::FCN_RESNET18_VOC_512x320);//FCN_RESNET18_SUNRGB_640x512);//segNet::FCN_RESNET18_DEEPSCENE_576x320);FCN_ALEXNET_AERIAL_FPV_720p
+    pNetwork = segNet::Create(networkSegmentation);//FCN_RESNET18_SUNRGB_640x512);//segNet::FCN_RESNET18_DEEPSCENE_576x320);FCN_ALEXNET_AERIAL_FPV_720p
 //  static segNet* Create( NetworkType networkType=FCN_ALEXNET_CITYSCAPES_SD, uint32_t maxBatchSize=DEFAULT_MAX_BATCH_SIZE,
 //					   precisionType precision=TYPE_FASTEST, deviceType device=DEVICE_GPU, bool allowGPUFallback=true );
 }
@@ -147,14 +175,15 @@ void TerrainSegmentation::run()
     printL("TerrainSegmentation::run");
     Signal* pSigRGB = new Signal(sigNewImage);
     image imgProcess;
-
+    int iFramesProcessed = 0;
     while (!ss.shouldStop()) {
         pSigRGB->wait();
         mt.lock();
         imgProcess = imgRecent;
         mt.unlock();
         if (imgProcess.empty()) continue;
-
+        
+        iFramesProcessed++;
         if (ProcessImage(imgProcess)) {
             logger.LogImage(imgProcess, "segment");
             char sc[128];
@@ -165,6 +194,7 @@ void TerrainSegmentation::run()
         }
     }
     delete pSigRGB;
+    printf("TerrainSegmentation::run Frames Processed: %d\n", iFramesProcessed);
 }
 
 void TerrainSegmentation::SendStopSignal()
@@ -175,21 +205,76 @@ void TerrainSegmentation::SendStopSignal()
     sigNewImage.signal();
 }
 
+void TerrainSegmentation::SetTargetClass(uint8_t _uTargetClass)
+{
+    uTargetClass = _uTargetClass;
+}
+
+void TerrainSegmentation::SetNumberImageSlices(int _iNumSlices)
+{
+    iNumSlices = _iNumSlices;
+}
+
+bool TerrainSegmentation::SetNetwork(const char* scNetwork)
+{
+    if (strcmp("FCN_RESNET18_CITYSCAPES_512x256", scNetwork) == 0) {
+        networkSegmentation = segNet::FCN_RESNET18_CITYSCAPES_512x256;
+        return true;
+    }
+    if (strcmp("FCN_RESNET18_CITYSCAPES_1024x512", scNetwork) == 0) {
+        networkSegmentation = segNet::FCN_RESNET18_CITYSCAPES_1024x512;
+        return true;
+    }
+    if (strcmp("FCN_RESNET18_CITYSCAPES_2048x1024", scNetwork) == 0) {
+        networkSegmentation = segNet::FCN_RESNET18_CITYSCAPES_2048x1024;
+        return true;
+    }
+    if (strcmp("FCN_RESNET18_DEEPSCENE_576x320", scNetwork) == 0) {
+        networkSegmentation = segNet::FCN_RESNET18_DEEPSCENE_576x320;
+        return true;
+    }
+    if (strcmp("FCN_RESNET18_DEEPSCENE_864x480", scNetwork) == 0) {
+        networkSegmentation = segNet::FCN_RESNET18_DEEPSCENE_864x480;
+        return true;
+    }
+    if (strcmp("FCN_RESNET18_VOC_320x320", scNetwork) == 0) {
+        networkSegmentation = segNet::FCN_RESNET18_VOC_320x320;
+        return true;
+    }
+    if (strcmp("FCN_RESNET18_VOC_512x320", scNetwork) == 0) {
+        networkSegmentation = segNet::FCN_RESNET18_VOC_512x320;
+        return true;
+    }
+    if (strcmp("FCN_RESNET18_SUNRGB_512x400", scNetwork) == 0) {
+        networkSegmentation = segNet::FCN_RESNET18_SUNRGB_512x400;
+        return true;
+    }
+    if (strcmp("FCN_RESNET18_SUNRGB_640x512", scNetwork) == 0) {
+        networkSegmentation = segNet::FCN_RESNET18_SUNRGB_640x512;
+        return true;
+    }
+    if (strcmp("FCN_ALEXNET_AERIAL_FPV_720p", scNetwork) == 0) {
+        networkSegmentation = segNet::FCN_ALEXNET_AERIAL_FPV_720p;
+        return true;
+    }
+    return false;
+}
+
 bool TerrainSegmentation::ProcessImage(image& imgRGB)
 {
     int imgWidth = imgRGB.cols;      // width of the image (in pixels)
     int imgHeight = imgRGB.rows;      // height of the image (in pixels)
     // 1080x1920  -- 3 images at 1080x640
     uchar3* u3Img;
-    // Going to do 3 horizontal slices of the image. That and it being a 3 channel image is why size is only widthxheight
-    if (imgHeight % 3 != 0) printL("ObjectDetection::ProcessImage doesn't divide by 3");
-    int iSliceHeight = imgHeight / 3;
+    // Going to do iNumSlices horizontal slices of the image. That and it being a 3 channel image is why size is only widthxheight
+    if (imgHeight % iNumSlices != 0) printL("ObjectDetection::ProcessImage doesn't divide by 3");
+    int iSliceHeight = imgHeight / iNumSlices;
     if (CUDA_FAILED(cudaMalloc(&u3Img, imgWidth * iSliceHeight * 3))) {
         printL("TerrainSegmentation::ProcessImage cudaMalloc fail");
         return false;
     }
     bool bRet = false;
-    for (int s = 0; s < 3; s++) {
+    for (int s = 0; s < iNumSlices; s++) {
         intptr_t imgRGBOffset = s * imgWidth * iSliceHeight;
         cudaMemcpy(u3Img, ((uint8_t*)imgRGB.data) + imgRGBOffset, imgWidth * iSliceHeight * 3, cudaMemcpyHostToDevice);
 
@@ -231,7 +316,7 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iWidth, int iHeight)
     // Should be able to SIMD this
     for (int i = 0; i < size; i++) {
         pixel = pMask[i];
-        if (pixel == HABITAT) {
+        if (pixel == uTargetClass) {
             int x = i / iWidth;
             fAngleAvgSum += (abs(x - (iWidth * .5)) / (iWidth * .5)) * (fImageFOV * .5);
             iAngleAvgCount++;
@@ -319,6 +404,12 @@ void Navigator::Stop()
         delete pThread;
         pThread = nullptr;
     }
+}
+
+void Navigator::SetNumberImageSlices(int iNumSlices)
+{
+    detector.SetNumberImageSlices(iNumSlices);
+    segmenter.SetNumberImageSlices(iNumSlices);
 }
 
 void Navigator::runNavigator()

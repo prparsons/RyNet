@@ -17,10 +17,14 @@ public:
     void SetNewImage(image& img);
     void run();
     void SendStopSignal();
+    
+    void SetNumberImageSlices(int iNumSlices);
+    static bool SetNetwork(const char* scNetwork);
 
 private:
     bool ProcessImage(image& img);
 
+    int iNumSlices;
     DataLogger& logger;
     detectNet* pNetwork;
     ThreadMutex mt;
@@ -40,6 +44,10 @@ public:
     void run();
     void SendStopSignal();
 
+    void SetTargetClass(uint8_t uTarget);
+    void SetNumberImageSlices(int iNumSlices);
+    static bool SetNetwork(const char* scNetwork);
+
     enum Classes {
         SKY = 0,
         TREES,
@@ -53,6 +61,8 @@ private:
     bool ScanMask(uint8_t* pMask, int iWidth, int iHeight);
 
     bool bHabitatVisible;
+    uint8_t uTargetClass;
+    int iNumSlices;
     float fBestDirection;
     float fImageFOV; // should get this from camera
     DataLogger& logger;
@@ -73,6 +83,9 @@ public:
     void Join();
     virtual void SignalStop();
     void Stop();
+
+    void SetTargetClass(uint8_t uTarget) { segmenter.SetTargetClass(uTarget); }
+    void SetNumberImageSlices(int iNumSlices);
 
 private:
     void runNavigator();
