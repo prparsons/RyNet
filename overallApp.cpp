@@ -96,7 +96,7 @@ int main( int argc, char** argv )
             else if (strcmp("--run_accel", argv[i]) == 0) bRunAccel = true;
             else if (strcmp("--detection_net", argv[i]) == 0) {
                 
-            } else if (strcmp("--segment_net"), argv[i]) == 0) {
+            } else if (strcmp("--segment_net", argv[i]) == 0) {
 
             } else if (strcmp("--simulate_video", argv[i]) == 0) {
                 bSimulateVideo = true;
