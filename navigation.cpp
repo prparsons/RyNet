@@ -218,43 +218,43 @@ void TerrainSegmentation::SetNumberImageSlices(int _iNumSlices)
 bool TerrainSegmentation::SetNetwork(const char* scNetwork)
 {
     if (strcmp("FCN_RESNET18_CITYSCAPES_512x256", scNetwork) == 0) {
-        networkDetection = segNet::FCN_RESNET18_CITYSCAPES_512x256;
+        networkSegmentation = segNet::FCN_RESNET18_CITYSCAPES_512x256;
         return true;
     }
     if (strcmp("FCN_RESNET18_CITYSCAPES_1024x512", scNetwork) == 0) {
-        networkDetection = segNet::FCN_RESNET18_CITYSCAPES_1024x512;
+        networkSegmentation = segNet::FCN_RESNET18_CITYSCAPES_1024x512;
         return true;
     }
     if (strcmp("FCN_RESNET18_CITYSCAPES_2048x1024", scNetwork) == 0) {
-        networkDetection = segNet::FCN_RESNET18_CITYSCAPES_2048x1024;
+        networkSegmentation = segNet::FCN_RESNET18_CITYSCAPES_2048x1024;
         return true;
     }
     if (strcmp("FCN_RESNET18_DEEPSCENE_576x320", scNetwork) == 0) {
-        networkDetection = segNet::FCN_RESNET18_DEEPSCENE_576x320;
+        networkSegmentation = segNet::FCN_RESNET18_DEEPSCENE_576x320;
         return true;
     }
     if (strcmp("FCN_RESNET18_DEEPSCENE_864x480", scNetwork) == 0) {
-        networkDetection = segNet::FCN_RESNET18_DEEPSCENE_864x480;
+        networkSegmentation = segNet::FCN_RESNET18_DEEPSCENE_864x480;
         return true;
     }
     if (strcmp("FCN_RESNET18_VOC_320x320", scNetwork) == 0) {
-        networkDetection = segNet::FCN_RESNET18_VOC_320x320;
+        networkSegmentation = segNet::FCN_RESNET18_VOC_320x320;
         return true;
     }
     if (strcmp("FCN_RESNET18_VOC_512x320", scNetwork) == 0) {
-        networkDetection = segNet::FCN_RESNET18_VOC_512x320;
+        networkSegmentation = segNet::FCN_RESNET18_VOC_512x320;
         return true;
     }
     if (strcmp("FCN_RESNET18_SUNRGB_512x400", scNetwork) == 0) {
-        networkDetection = segNet::FCN_RESNET18_SUNRGB_512x400;
+        networkSegmentation = segNet::FCN_RESNET18_SUNRGB_512x400;
         return true;
     }
     if (strcmp("FCN_RESNET18_SUNRGB_640x512", scNetwork) == 0) {
-        networkDetection = segNet::FCN_RESNET18_SUNRGB_640x512;
+        networkSegmentation = segNet::FCN_RESNET18_SUNRGB_640x512;
         return true;
     }
     if (strcmp("FCN_ALEXNET_AERIAL_FPV_720p", scNetwork) == 0) {
-        networkDetection = segNet::FCN_ALEXNET_AERIAL_FPV_720p;
+        networkSegmentation = segNet::FCN_ALEXNET_AERIAL_FPV_720p;
         return true;
     }
     return false;
