@@ -30,6 +30,8 @@ private:
     Signal sigNewImage;
     StopSignal ss;
     image imgRecent;
+
+    static const char* scNetwork = "blah";
 };
 
 class TerrainSegmentation {
@@ -70,6 +72,8 @@ private:
     Signal sigNewImage;
     StopSignal ss;
     image imgRecent;
+
+    static const char* scNetwork = "blah";
 };
 
 class Navigator:public InterruptStop {

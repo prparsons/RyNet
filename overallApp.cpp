@@ -16,6 +16,8 @@ enum OptionArgument {
     UDP_SERVER_ADDRESS,
     NAV_TARGET,
     IMG_SLICES,
+    SEGMENT_NET,
+    DETECT_NET,
     OPTION_NONE
 };
 
@@ -92,7 +94,11 @@ int main( int argc, char** argv )
             else if (strcmp("--log_visited", argv[i]) == 0) bStartPointLogger = true;
             else if (strcmp("--downsample_depth", argv[i]) == 0) bDownsampleDepth = true;
             else if (strcmp("--run_accel", argv[i]) == 0) bRunAccel = true;
-            else if (strcmp("--simulate_video", argv[i]) == 0) {
+            else if (strcmp("--detection_net", argv[i]) == 0) {
+                
+            } else if (strcmp("--segment_net"), argv[i]) == 0) {
+
+            } else if (strcmp("--simulate_video", argv[i]) == 0) {
                 bSimulateVideo = true;
                 bOptionArgument = true;
                 OptionArgumentSelection = SIMULATE_VIDEO;
@@ -215,6 +221,12 @@ void printHelp()
     printL(" --img_slices [XX]");
     printL("    Number of horizontal slices of the RGB image before it is used for");
     printL("    detection and segmentation. Target is number from 0-9; default is 3.\n");
+    printL(" --detection_net [ABCDE]");
+    printL("    Network model to be used with object detection network. detectnet --help");
+    printL("    will list available models.\n");
+    printL(" --segment_net [ABCDE]");
+    printL("    Network model to be used with the image segmentation network. segnet --help");
+    printL("    will list available models.\n");
 }
 
 void cleanupFailure()
