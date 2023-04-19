@@ -35,8 +35,6 @@ private:
     static detectNet::NetworkType network;
 };
 
-detectNet::NetworkType ObjectDetection::network = detectNet::SSD_MOBILENET_V2
-
 class TerrainSegmentation {
 public:
     TerrainSegmentation(DataLogger& logger);
