@@ -32,7 +32,7 @@ private:
     StopSignal ss;
     image imgRecent;
 
-    static constexpr detectNet::NetworkType network = detectNet::SSD_MOBILENET_V2;
+    static detectNet::NetworkType network;
 };
 
 class TerrainSegmentation {
