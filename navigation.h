@@ -19,6 +19,7 @@ public:
     void SendStopSignal();
     
     void SetNumberImageSlices(int iNumSlices);
+    static bool SetNetwork(const char* scNetwork);
 
 private:
     bool ProcessImage(image& img);
@@ -45,6 +46,7 @@ public:
 
     void SetTargetClass(uint8_t uTarget);
     void SetNumberImageSlices(int iNumSlices);
+    static bool SetNetwork(const char* scNetwork);
 
     enum Classes {
         SKY = 0,

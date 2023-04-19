@@ -16,6 +16,8 @@ enum OptionArgument {
     UDP_SERVER_ADDRESS,
     NAV_TARGET,
     IMG_SLICES,
+    SEGMENT_NET,
+    DETECT_NET,
     OPTION_NONE
 };
 
@@ -66,6 +68,18 @@ int main( int argc, char** argv )
             switch (OptionArgumentSelection) {
                 case SIMULATE_VIDEO: strncpy(scVideoSimPath, argv[i], 512); break;
                 case UDP_SERVER_ADDRESS: strncpy(scServerAddress, argv[i], 32); break;
+                case DETECT_NET: {
+                    if (!ObjectDetection::SetNetwork(argv[i])) {
+                        printL("Invalid Detection network specified");
+                        return -1;
+                    }
+                } break;
+                case SEGMENT_NET: {
+                    if (!TerrainSegmentation::SetNetwork(argv[i])) {
+                        printL("Invalid Segmentation network specified");
+                        return -1;
+                    }
+                } break;
                 case NAV_TARGET: {
                     iTargetClass = atoi(argv[i]);
                     if (iTargetClass < 0 || iTargetClass > 255) {
@@ -81,7 +95,7 @@ int main( int argc, char** argv )
                     }
                 } break;
                 default:
-                    printL("OptionArguementSelection Invalid");
+                    printL("OptionArgumentSelection Invalid");
                     return -1;
             }
             OptionArgumentSelection = OPTION_NONE;
@@ -94,7 +108,13 @@ int main( int argc, char** argv )
             else if (strcmp("--downsample_depth", argv[i]) == 0) bDownsampleDepth = true;
             else if (strcmp("--run_accel", argv[i]) == 0) bRunAccel = true;
             else if (strcmp("--run_flir", argv[i]) == 0) bRunFlir = true;
-            else if (strcmp("--simulate_video", argv[i]) == 0) {
+            else if (strcmp("--detection_net", argv[i]) == 0) {
+                bOptionArgument = true;
+                OptionArgumentSelection = DETECT_NET;
+            } else if (strcmp("--segment_net", argv[i]) == 0) {
+                bOptionArgument = true;
+                OptionArgumentSelection = SEGMENT_NET;
+            } else if (strcmp("--simulate_video", argv[i]) == 0) {
                 bSimulateVideo = true;
                 bOptionArgument = true;
                 OptionArgumentSelection = SIMULATE_VIDEO;
@@ -220,6 +240,12 @@ void printHelp()
     printL(" --img_slices [XX]");
     printL("    Number of horizontal slices of the RGB image before it is used for");
     printL("    detection and segmentation. Target is number from 0-9; default is 3.\n");
+    printL(" --detection_net [ABCDE]");
+    printL("    Network model to be used with object detection network. Valid choices are");
+    printL("    \"SSD_MOBILENET_V1\", \"SSD_MOBILENET_V2\", \"SSD_INCEPTION_V2\".\n");
+    printL(" --segment_net [ABCDE]");
+    printL("    Network model to be used with the image segmentation network. segnet --help");
+    printL("    will list available models.\n");
 }
 
 void cleanupFailure()
