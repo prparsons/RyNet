@@ -67,6 +67,18 @@ int main( int argc, char** argv )
             switch (OptionArgumentSelection) {
                 case SIMULATE_VIDEO: strncpy(scVideoSimPath, argv[i], 512); break;
                 case UDP_SERVER_ADDRESS: strncpy(scServerAddress, argv[i], 32); break;
+                case DETECT_NET: {
+                    if (!ObjectDetection::SetNetwork(argv[i])) {
+                        printL("Invalid Detection network specified");
+                        return -1;
+                    }
+                } break;
+                case SEGMENT_NET: {
+                    if (!TerrainSegmentation::SetNetwork(argv[i])) {
+                        printL("Invalid Segmentation network specified");
+                        return -1;
+                    }
+                } break;
                 case NAV_TARGET: {
                     iTargetClass = atoi(argv[i]);
                     if (iTargetClass < 0 || iTargetClass > 255) {
@@ -82,7 +94,7 @@ int main( int argc, char** argv )
                     }
                 } break;
                 default:
-                    printL("OptionArguementSelection Invalid");
+                    printL("OptionArgumentSelection Invalid");
                     return -1;
             }
             OptionArgumentSelection = OPTION_NONE;
@@ -95,9 +107,11 @@ int main( int argc, char** argv )
             else if (strcmp("--downsample_depth", argv[i]) == 0) bDownsampleDepth = true;
             else if (strcmp("--run_accel", argv[i]) == 0) bRunAccel = true;
             else if (strcmp("--detection_net", argv[i]) == 0) {
-                
+                bOptionArgument = true;
+                OptionArgumentSelection = DETECT_NET;
             } else if (strcmp("--segment_net", argv[i]) == 0) {
-
+                bOptionArgument = true;
+                OptionArgumentSelection = SEGMENT_NET;
             } else if (strcmp("--simulate_video", argv[i]) == 0) {
                 bSimulateVideo = true;
                 bOptionArgument = true;

@@ -4,7 +4,8 @@
 #include <unistd.h>
 #include <jetson-utils/cudaMappedMemory.h>
 
-detectNet::NetworkType ObjectDetection::network = detectNet::SSD_MOBILENET_V2;
+detectNet::NetworkType networkDetection = detectNet::SSD_MOBILENET_V2;
+segNet::NetworkType networkSegmentation = segNet::FCN_RESNET18_VOC_512x320;
 
 // ** ObjectDetection
 
@@ -13,7 +14,7 @@ ObjectDetection::ObjectDetection(DataLogger& _logger)
 , logger(_logger)
 , pNetwork(nullptr)
 {
-    pNetwork = detectNet::Create(network);
+    pNetwork = detectNet::Create(networkDetection);
 	//detectNet* net = detectNet::Create(detectNet::SSD_MOBILENET_V2, 0.5f, 1, TYPE_FASTEST, DEVICE_DLA_0);DEVICE_DLA_1 DEVICE_GPU
     // DLA fails with segmentation fault using detectnet with that network. even resizing images
 }
@@ -111,14 +112,14 @@ void ObjectDetection::SetNumberImageSlices(int _iNumSlices)
     iNumSlices = _iNumSlices;
 }
 
-bool ObjectDetection::SetNetwork(const char* _scNetwork)
+bool ObjectDetection::SetNetwork(const char* scNetwork)
 {
-    if (strcmp(_scNetwork, "SSD_MOBILENET_V2") == 0) {
-        network = detectNet::SSD_MOBILENET_V2;
-    } else if (strcmp(_scNetwork, "SSD_MOBILENET_V1") == 0) {
-        network = detectNet::SSD_MOBILENET_V1;
-    } else if (strcmp(_scNetwork, "SSD_INCEPTION_V2") == 0) {
-        network = detectNet::SSD_INCEPTION_V2;
+    if (strcmp(scNetwork, "SSD_MOBILENET_V2") == 0) {
+        networkDetection = detectNet::SSD_MOBILENET_V2;
+    } else if (strcmp(scNetwork, "SSD_MOBILENET_V1") == 0) {
+        networkDetection = detectNet::SSD_MOBILENET_V1;
+    } else if (strcmp(scNetwork, "SSD_INCEPTION_V2") == 0) {
+        networkDetection = detectNet::SSD_INCEPTION_V2;
     } else {
         return false;
     }
@@ -135,7 +136,7 @@ TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
 , logger(_logger)
 , pMask(nullptr)
 {
-    pNetwork = segNet::Create(segNet::FCN_RESNET18_VOC_512x320);//FCN_RESNET18_SUNRGB_640x512);//segNet::FCN_RESNET18_DEEPSCENE_576x320);FCN_ALEXNET_AERIAL_FPV_720p
+    pNetwork = segNet::Create(networkSegmentation);//FCN_RESNET18_SUNRGB_640x512);//segNet::FCN_RESNET18_DEEPSCENE_576x320);FCN_ALEXNET_AERIAL_FPV_720p
 //  static segNet* Create( NetworkType networkType=FCN_ALEXNET_CITYSCAPES_SD, uint32_t maxBatchSize=DEFAULT_MAX_BATCH_SIZE,
 //					   precisionType precision=TYPE_FASTEST, deviceType device=DEVICE_GPU, bool allowGPUFallback=true );
 }
@@ -212,6 +213,51 @@ void TerrainSegmentation::SetTargetClass(uint8_t _uTargetClass)
 void TerrainSegmentation::SetNumberImageSlices(int _iNumSlices)
 {
     iNumSlices = _iNumSlices;
+}
+
+bool TerrainSegmentation::SetNetwork(const char* scNetwork)
+{
+    if (strcmp("FCN_RESNET18_CITYSCAPES_512x256", scNetwork) == 0) {
+        networkDetection = segNet::FCN_RESNET18_CITYSCAPES_512x256;
+        return true;
+    }
+    if (strcmp("FCN_RESNET18_CITYSCAPES_1024x512", scNetwork) == 0) {
+        networkDetection = segNet::FCN_RESNET18_CITYSCAPES_1024x512;
+        return true;
+    }
+    if (strcmp("FCN_RESNET18_CITYSCAPES_2048x1024", scNetwork) == 0) {
+        networkDetection = segNet::FCN_RESNET18_CITYSCAPES_2048x1024;
+        return true;
+    }
+    if (strcmp("FCN_RESNET18_DEEPSCENE_576x320", scNetwork) == 0) {
+        networkDetection = segNet::FCN_RESNET18_DEEPSCENE_576x320;
+        return true;
+    }
+    if (strcmp("FCN_RESNET18_DEEPSCENE_864x480", scNetwork) == 0) {
+        networkDetection = segNet::FCN_RESNET18_DEEPSCENE_864x480;
+        return true;
+    }
+    if (strcmp("FCN_RESNET18_VOC_320x320", scNetwork) == 0) {
+        networkDetection = segNet::FCN_RESNET18_VOC_320x320;
+        return true;
+    }
+    if (strcmp("FCN_RESNET18_VOC_512x320", scNetwork) == 0) {
+        networkDetection = segNet::FCN_RESNET18_VOC_512x320;
+        return true;
+    }
+    if (strcmp("FCN_RESNET18_SUNRGB_512x400", scNetwork) == 0) {
+        networkDetection = segNet::FCN_RESNET18_SUNRGB_512x400;
+        return true;
+    }
+    if (strcmp("FCN_RESNET18_SUNRGB_640x512", scNetwork) == 0) {
+        networkDetection = segNet::FCN_RESNET18_SUNRGB_640x512;
+        return true;
+    }
+    if (strcmp("FCN_ALEXNET_AERIAL_FPV_720p", scNetwork) == 0) {
+        networkDetection = segNet::FCN_ALEXNET_AERIAL_FPV_720p;
+        return true;
+    }
+    return false;
 }
 
 bool TerrainSegmentation::ProcessImage(image& imgRGB)

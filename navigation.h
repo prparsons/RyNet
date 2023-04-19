@@ -31,8 +31,6 @@ private:
     Signal sigNewImage;
     StopSignal ss;
     image imgRecent;
-
-    static detectNet::NetworkType network;
 };
 
 class TerrainSegmentation {
@@ -48,7 +46,7 @@ public:
 
     void SetTargetClass(uint8_t uTarget);
     void SetNumberImageSlices(int iNumSlices);
-    static void SetNetwork(const char* scNetwork);
+    static bool SetNetwork(const char* scNetwork);
 
     enum Classes {
         SKY = 0,
@@ -74,8 +72,6 @@ private:
     Signal sigNewImage;
     StopSignal ss;
     image imgRecent;
-
-    static constexpr const char* scNetwork = "blah";
 };
 
 class Navigator:public InterruptStop {
