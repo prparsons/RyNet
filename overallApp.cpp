@@ -222,8 +222,8 @@ void printHelp()
     printL("    Number of horizontal slices of the RGB image before it is used for");
     printL("    detection and segmentation. Target is number from 0-9; default is 3.\n");
     printL(" --detection_net [ABCDE]");
-    printL("    Network model to be used with object detection network. detectnet --help");
-    printL("    will list available models.\n");
+    printL("    Network model to be used with object detection network. Valid choices are");
+    printL("    \"SSD_MOBILENET_V1\", \"SSD_MOBILENET_V2\", \"SSD_INCEPTION_V2\".\n");
     printL(" --segment_net [ABCDE]");
     printL("    Network model to be used with the image segmentation network. segnet --help");
     printL("    will list available models.\n");

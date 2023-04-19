@@ -11,7 +11,7 @@ ObjectDetection::ObjectDetection(DataLogger& _logger)
 , logger(_logger)
 , pNetwork(nullptr)
 {
-    pNetwork = detectNet::Create(detectNet::SSD_MOBILENET_V2);
+    pNetwork = detectNet::Create(network);
 	//detectNet* net = detectNet::Create(detectNet::SSD_MOBILENET_V2, 0.5f, 1, TYPE_FASTEST, DEVICE_DLA_0);DEVICE_DLA_1 DEVICE_GPU
     // DLA fails with segmentation fault using detectnet with that network. even resizing images
 }
@@ -107,6 +107,20 @@ void ObjectDetection::SendStopSignal()
 void ObjectDetection::SetNumberImageSlices(int _iNumSlices)
 {
     iNumSlices = _iNumSlices;
+}
+
+bool ObjectDetection::SetNetwork(const char* _scNetwork)
+{
+    if (strcmp(_scNetwork, "SSD_MOBILENET_V2") == 0) {
+        network = detectNet::SSD_MOBILENET_V2;
+    } else if (strcmp(_scNetwork, "SSD_MOBILENET_V1") == 0) {
+        network = detectNet::SSD_MOBILENET_V1;
+    } else if (strcmp(_scNetwork, "SSD_INCEPTION_V2") == 0) {
+        network = detectNet::SSD_INCEPTION_V2;
+    } else {
+        return false;
+    }
+    return true;
 }
 
 // ** TerrainSegmentation

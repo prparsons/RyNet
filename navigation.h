@@ -19,6 +19,7 @@ public:
     void SendStopSignal();
     
     void SetNumberImageSlices(int iNumSlices);
+    static bool SetNetwork(const char* scNetwork);
 
 private:
     bool ProcessImage(image& img);
@@ -31,7 +32,7 @@ private:
     StopSignal ss;
     image imgRecent;
 
-    static constexpr const char* scNetwork = "blah";
+    static constexpr detectNet::NetworkType network = detectNet::SSD_MOBILENET_V2;
 };
 
 class TerrainSegmentation {
@@ -47,6 +48,7 @@ public:
 
     void SetTargetClass(uint8_t uTarget);
     void SetNumberImageSlices(int iNumSlices);
+    static void SetNetwork(const char* scNetwork);
 
     enum Classes {
         SKY = 0,
