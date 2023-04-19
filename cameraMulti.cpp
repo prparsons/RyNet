@@ -108,7 +108,7 @@ CameraController::CameraController(uint32_t _features, const char* _scSimulation
 : pFrameCurrentDepth(nullptr)
 , pCameraRS(nullptr)
 , features(_features)
-, iSimulationFrameDelay(500)
+, iSimulationFrameDelay(33)
 {
     printL("CameraController::CameraController");
 
@@ -203,7 +203,7 @@ void CameraController::Stop()
     }
 }
 
-void CameraController::SignalDepthStop()
+void CameraController::SignalStop()
 {
     ss[0].stop();
 }
@@ -371,14 +371,22 @@ void CameraController::run_simulation(cv::Mat* pFrameCurrent, Signal* pSig, Stop
         printL("CameraController::run_simulation StopSignal nullptr");
         return;
     }
+    int iFramesRead = 0;
+    // Looks like we can get frame failures before the file ends, so we'll increment uFrameFail in the instance of a
+    //  failure, and keep trying until it overflows
+    uint8_t uFrameFail = 0;
     while (!pss->shouldStop()) {
         cv::Mat frame;
-        cap >> frame;
-  
-        if (frame.empty()) {
-            printL("CameraController::run_simulation no more frames");
-            break;
+        if (!cap.read(frame)) {
+            if (++uFrameFail == 0) {
+                // It's overflowed, so 255 failures, so time to give up
+                printL("CameraController::run_simulation no more frames");
+                break;
+            }
+            continue;
         }
+        uFrameFail = 0; // Reset this now that we got a frame
+        iFramesRead++;
         
         m.lock();
         frame.copyTo(*pFrameCurrent);
@@ -387,4 +395,5 @@ void CameraController::run_simulation(cv::Mat* pFrameCurrent, Signal* pSig, Stop
         pSig->signal();
         std::this_thread::sleep_for(std::chrono::milliseconds(iSimulationFrameDelay));
     }
+    printf("CameraController::run_simulation Frames Read: %d\n", iFramesRead);
 }
