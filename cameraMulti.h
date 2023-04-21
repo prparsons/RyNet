@@ -45,6 +45,15 @@ public:
 #define CameraController_RGBSimulation 0x10
 #define CameraController_Accel 0x20
 
+class Frame {
+public:
+    Frame(Frame& other);
+    Frame(cv::Mat& source);
+
+    cv::Mat image;
+    const int id;
+};
+
 class CameraController:public InterruptStop {
 public:
     ~CameraController();

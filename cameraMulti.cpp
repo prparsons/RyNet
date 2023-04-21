@@ -5,7 +5,6 @@
 #include <opencv2/highgui.hpp>
 #include "dataLogger.h"
 
-
     
 // wbmode=2 //exposuretimerange=\"30000000 30000000\" aelock=true
 //  ! videoflip method=counterclockwise
@@ -19,7 +18,21 @@ const char* scGStream_RGB_F = "nvarguscamerasrc sensor-id=0 wbmode=%d gainrange=
 const char* scGStream_IR_file = "v4l2src device=/dev/video4 ! 'video/x-raw' ! nvvidconv ! 'video/x-raw(memory:NVMM)' ! omxh264enc ! 'video/x-h264,stream-format=byte-stream' ! h264parse ! qtmux ! filesinklocation=testFlir.mp4";
 const char* scGStream_IR = "v4l2src device=/dev/video4 ! video/x-raw ! videoconvert ! video/x-raw,format=BGR ! appsink";
 
+int iUniqueId = 0;
+
 using namespace cv;
+
+Frame::Frame(Frame& other)
+: id(other.id)
+{
+    image = other.image;
+}
+
+Frame::Frame(Mat& source)
+: id(iUniqueId++)
+{
+
+}
 
 cameraFrame_depth::cameraFrame_depth(const rs2::depth_frame& _frame)
 : rs2::depth_frame(_frame)
