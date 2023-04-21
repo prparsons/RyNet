@@ -14,7 +14,7 @@ public:
     ObjectDetection(DataLogger& logger);
     ~ObjectDetection();
 
-    void SetNewImage(image& img);
+    void SetNewImage(CameraFrame& frm);
     void run();
     void SendStopSignal();
     
@@ -22,7 +22,7 @@ public:
     static bool SetNetwork(const char* scNetwork);
 
 private:
-    bool ProcessImage(image& img);
+    bool ProcessImage(cv::Mat& imgRGB);
 
     int iNumSlices;
     DataLogger& logger;
@@ -30,7 +30,7 @@ private:
     ThreadMutex mt;
     Signal sigNewImage;
     StopSignal ss;
-    image imgRecent;
+    CameraFrame frmRecent;
 };
 
 class TerrainSegmentation {
@@ -40,7 +40,7 @@ public:
 
     bool IsHabitatVisible();
     float GetHabitatDirection();
-    void SetNewImage(image& img);
+    void SetNewImage(CameraFrame& frm);
     void run();
     void SendStopSignal();
 
@@ -57,7 +57,7 @@ public:
     };
 
 private:
-    bool ProcessImage(image& img);
+    bool ProcessImage(cv::Mat& img);
     bool ScanMask(uint8_t* pMask, int iWidth, int iHeight);
 
     bool bHabitatVisible;
@@ -71,7 +71,7 @@ private:
     ThreadMutex mt;
     Signal sigNewImage;
     StopSignal ss;
-    image imgRecent;
+    CameraFrame frmRecent;
 };
 
 class Navigator:public InterruptStop {

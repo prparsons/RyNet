@@ -10,6 +10,7 @@ void printL(const char* sc);
 struct ImageLogData {
     time_t timeLast;
     std::string strData;
+    int id;
     float fLat;
     float fLon;
     float fHeading;
@@ -28,8 +29,8 @@ public:
     void Start();
     void Stop();
 
-    void LogImage(cv::Mat& im, std::string strIdSource);
-    void LogImageIr(cv::Mat& im);
+    void LogImage(CameraFrame& im, std::string strIdSource);
+    void LogImageIr(CameraFrame& im);
     void LogMask(float4* pImg, int width, int height);
     void LogString(const char* scData);
 

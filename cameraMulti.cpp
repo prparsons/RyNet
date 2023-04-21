@@ -22,16 +22,28 @@ int iUniqueId = 0;
 
 using namespace cv;
 
-Frame::Frame(Frame& other)
-: id(other.id)
+CameraFrame::CameraFrame()
+: id(-1)
 {
-    image = other.image;
+
 }
 
-Frame::Frame(Mat& source)
-: id(iUniqueId++)
+CameraFrame& CameraFrame::operator=(Mat& source)
 {
+    id = iUniqueId++;
+    source.copyTo(matrix);
+}
 
+CameraFrame& CameraFrame::operator=(CameraFrame& other)
+{
+    id = other.id;
+    matrix = other.matrix;
+}
+
+void CameraFrame::DeepCopy(CameraFrame& source)
+{
+    id = source.id;
+    source.matrix.copyTo(matrix);
 }
 
 cameraFrame_depth::cameraFrame_depth(const rs2::depth_frame& _frame)
@@ -85,22 +97,22 @@ rs2_vector CameraController::GetFrameAccel()
     return ret;
 }
 
-bool CameraController::GetFrameRGB(cv::Mat& imgCopy)
+bool CameraController::GetFrameRGB(CameraFrame& frmCopy)
 {
     bool bReturn = true;
     m.lock();
     if (FrameCurrentRGB.empty()) bReturn = false;
-    else FrameCurrentRGB.copyTo(imgCopy);
+    else frmCopy = FrameCurrentRGB;
     m.unlock();
     return bReturn;
 }
 
-bool CameraController::GetFrameIR(cv::Mat& imgCopy)
+bool CameraController::GetFrameIR(CameraFrame& frmCopy)
 {
     bool bReturn = true;
     m.lock();
     if (FrameCurrentIR.empty()) bReturn = false;
-    else FrameCurrentIR.copyTo(imgCopy);
+    else frmCopy = FrameCurrentIR;
     m.unlock();
     return true;
 }

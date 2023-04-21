@@ -341,12 +341,12 @@ void FlightController::runIr()
 {
     printL("FlightController::runIr");
     Signal* pSig = camera.GetSignalIR();
-    cv::Mat imageIr;
+    CameraFrame frmIr;
     while (!ssIr.shouldStop()) {
         pSig->wait();
-        camera.GetFrameIR(imageIr);
-        if (imageIr.empty()) continue;
-        logger.LogImageIr(imageIr);
+        camera.GetFrameIR(frmIr);
+        if (frmIr.matrix.empty()) continue;
+        logger.LogImageIr(frmIr);
     }
 }
 

@@ -24,15 +24,15 @@ ObjectDetection::~ObjectDetection()
     if (pNetwork != nullptr) delete pNetwork;
 }
 
-void ObjectDetection::SetNewImage(image& img)
+void ObjectDetection::SetNewImage(CameraFrame& frm)
 {
     mt.lock();
-    img.copyTo(imgRecent);
+    frmRecent.DeepCopy(frm);
     mt.unlock();
     sigNewImage.signal();
 }
 
-bool ObjectDetection::ProcessImage(image& _imgRGB)
+bool ObjectDetection::ProcessImage(cv::Mat& _imgRGB)
 {
     cv::Mat imgRGB;
     cv::resize(_imgRGB, imgRGB, cv::Size(_imgRGB.cols / 2, _imgRGB.rows / 2), cv::INTER_LINEAR);
@@ -81,18 +81,18 @@ void ObjectDetection::run()
 {
     printL("ObjectDetection::run");
     Signal* pSigRGB = new Signal(sigNewImage);
-    image imgProcess;
+    CameraFrame frmProcess;
     int iFramesProcessed = 0;
     while (!ss.shouldStop()) {
         pSigRGB->wait();
         mt.lock();
-        imgProcess = imgRecent;
+        frmProcess = frmRecent; // This doesn't need to be a deep copy
         mt.unlock();
-        if (imgProcess.empty()) continue;
+        if (frmProcess.matrix.empty()) continue;
         iFramesProcessed++;
 
-        if (ProcessImage(imgProcess)) {
-            logger.LogImage(imgProcess, "detect");
+        if (ProcessImage(frmProcess.matrix)) {
+            logger.LogImage(frmProcess, "detect");
         }
     }
     delete pSigRGB;
@@ -162,10 +162,10 @@ float TerrainSegmentation::GetHabitatDirection()
     return fReturn;
 }
 
-void TerrainSegmentation::SetNewImage(image& img)
+void TerrainSegmentation::SetNewImage(CameraFrame& frm)
 {
     mt.lock();
-    img.copyTo(imgRecent);
+    frmRecent.DeepCopy(frm);
     mt.unlock();
     sigNewImage.signal();
 }
@@ -174,18 +174,18 @@ void TerrainSegmentation::run()
 {
     printL("TerrainSegmentation::run");
     Signal* pSigRGB = new Signal(sigNewImage);
-    image imgProcess;
+    CameraFrame frmProcess;
     int iFramesProcessed = 0;
     while (!ss.shouldStop()) {
         pSigRGB->wait();
         mt.lock();
-        imgProcess = imgRecent;
+        frmProcess = frmRecent; // This doesn't need to be a deep copy?
         mt.unlock();
-        if (imgProcess.empty()) continue;
+        if (frmProcess.matrix.empty()) continue;
         
         iFramesProcessed++;
-        if (ProcessImage(imgProcess)) {
-            logger.LogImage(imgProcess, "segment");
+        if (ProcessImage(frmProcess.matrix)) {
+            logger.LogImage(frmProcess, "segment");
             char sc[128];
             mt.lock();
             sprintf(sc, "Good Habitat Found %2.2f", fBestDirection);
@@ -260,7 +260,7 @@ bool TerrainSegmentation::SetNetwork(const char* scNetwork)
     return false;
 }
 
-bool TerrainSegmentation::ProcessImage(image& imgRGB)
+bool TerrainSegmentation::ProcessImage(cv::Mat& imgRGB)
 {
     int imgWidth = imgRGB.cols;      // width of the image (in pixels)
     int imgHeight = imgRGB.rows;      // height of the image (in pixels)
@@ -422,13 +422,13 @@ void Navigator::runNavigator()
     std::thread thrSegment(&TerrainSegmentation::run, &segmenter);
     while (!ssMain.shouldStop()) {
         pSigRGB->wait();
-        cv::Mat Frame;
-        if (!camera.GetFrameRGB(Frame)) {
+        CameraFrame frameNew;
+        if (!camera.GetFrameRGB(frameNew)) {
             printL("runNavigator frame was not valid");
             continue;
         }
-        detector.SetNewImage(Frame);
-        segmenter.SetNewImage(Frame);
+        detector.SetNewImage(frameNew);
+        segmenter.SetNewImage(frameNew);
 
         if (bGridSearching) { // Habitat not visible, we're currently running search pattern
             // Good terrain visible?

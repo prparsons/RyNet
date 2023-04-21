@@ -12,7 +12,23 @@
 #define PI_2 1.570796326794
 #define PIx2 6.283185307180
 
-typedef cv::Mat image;
+class CameraFrame {
+public:
+    CameraFrame();
+
+    CameraFrame& operator=(cv::Mat& source); // Deep copy
+    CameraFrame& operator=(CameraFrame& other); // Not a deep copy
+    void DeepCopy(CameraFrame& other);
+
+    int GetId() const { return id; }
+
+    cv::Mat matrix;
+
+private:
+    CameraFrame(CameraFrame& other);
+
+    int id;
+};
 
 class coord {
 public:

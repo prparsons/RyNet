@@ -45,15 +45,6 @@ public:
 #define CameraController_RGBSimulation 0x10
 #define CameraController_Accel 0x20
 
-class Frame {
-public:
-    Frame(Frame& other);
-    Frame(cv::Mat& source);
-
-    cv::Mat image;
-    const int id;
-};
-
 class CameraController:public InterruptStop {
 public:
     ~CameraController();
@@ -63,8 +54,8 @@ public:
     // Must delete returned pointers
     cameraFrame_depth* GetFrameDepth();
     rs2_vector GetFrameAccel();
-    bool GetFrameRGB(cv::Mat& imgCopy);
-    bool GetFrameIR(cv::Mat& imgCopy);
+    bool GetFrameRGB(CameraFrame& imgCopy);
+    bool GetFrameIR(CameraFrame& imgCopy);
     Signal* GetSignalDepth();
     Signal* GetSignalRGB();
     Signal* GetSignalIR();

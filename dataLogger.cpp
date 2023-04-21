@@ -165,14 +165,14 @@ void DataLogger::run(void)
     delete pSigImage;
 }
 
-void DataLogger::LogImage(cv::Mat& im, std::string strIdSource)
+void DataLogger::LogImage(CameraFrame& frm, std::string strIdSource)
 {
     ImageLogData& data = mapImageData[strIdSource];
     time_t timeNow = time(nullptr);
     time_t timeDifference = timeNow - data.timeLast;
     data.timeLast = timeNow;
     if (timeDifference < SEC_BETWEEN_IMAGES) return;
-    
+    data.id = frm.GetId();
     if (!FlightController::GetPosition(data.fLat, data.fLon)) {
         data.fLat = 0;
         data.fLon = 0;
@@ -182,21 +182,21 @@ void DataLogger::LogImage(cv::Mat& im, std::string strIdSource)
     }
     
     mt.lock();
-    image = im.clone();
+    image = frm.matrix.clone();
     dataImage = data;
     bWriteImg = true;
     mt.unlock();
     sigNewData.signal();
 }
 
-void DataLogger::LogImageIr(cv::Mat& im)
+void DataLogger::LogImageIr(CameraFrame& frm)
 {
     ImageLogData& data = mapImageData["IR"];
     time_t timeNow = time(nullptr);
     time_t timeDifference = timeNow - data.timeLast;
     data.timeLast = timeNow;
     if (timeDifference < SEC_BETWEEN_IMAGES) return;
-    
+    data.id = frm.GetId();
     if (!FlightController::GetPosition(data.fLat, data.fLon)) {
         data.fLat = 0;
         data.fLon = 0;
@@ -206,7 +206,7 @@ void DataLogger::LogImageIr(cv::Mat& im)
     }
     
     mt.lock();
-    imageIr = im.clone();
+    imageIr = frm.matrix.clone();
     dataImageIr = data;
     bWriteImgIr = true;
     mt.unlock();
