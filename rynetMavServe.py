@@ -9,6 +9,8 @@ import xml.etree.ElementTree as ET
 import haversine as hs
 import selectors
 import argparse  
+import hashlib
+import hmac
 from tsp import *
 
 """
@@ -91,6 +93,33 @@ parser.add_argument('--clean_dist_way', type=int, default=100, help='Distance fr
 #Testing without command line, use below
 args = parser.parse_args("--port 3636 --connect tcp:127.0.0.1:5762".split())
 visitedList = []
+
+saltInt = -1
+salt = 0
+
+def verifySignature(signature, salt, bytesFromClient):
+    global saltInt
+    key = "Secret Key"
+    _saltInt = int.from_bytes(salt, "big")
+    print("salt int %d" % _saltInt)
+    if _saltInt <= saltInt:
+        print("salt reuse")
+        return False
+    else:
+        saltInt = _saltInt
+    h = hmac.new(key.encode(), salt + bytesFromClient, hashlib.sha256)
+    return h.digest() == signature
+
+def sendMessage(msgFromClient):
+    global salt
+    h = hmac.new(key.encode(), salt.to_bytes(4, 'big') + msgFromClient.encode(), hashlib.sha256)
+    bytesToSend         = h.digest() + salt.to_bytes(4, 'big') + str.encode(msgFromClient)
+    serverAddressPort   = ("127.0.0.1", 3636)
+    bufferSize          = 1024
+    # Create a UDP socket at client side
+    UDPClientSocket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+    # Send to server using created UDP socket
+    UDPClientSocket.sendto(bytesToSend, serverAddressPort)
 
 def readmissionF(aFileName, vehicle):
     print("\nReading mission from file: %s" % aFileName)
