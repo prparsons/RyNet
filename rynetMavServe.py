@@ -94,21 +94,30 @@ parser.add_argument('--clean_dist_way', type=int, default=100, help='Distance fr
 args = parser.parse_args("--port 3636 --connect tcp:127.0.0.1:5762".split())
 visitedList = []
 
-saltInt = -1
-salt = 0
+key = "Secret Key"
 
-def verifySignature(signature, salt, bytesFromClient):
-    global saltInt
-    key = "Secret Key"
-    _saltInt = int.from_bytes(salt, "big")
-    print("salt int %d" % _saltInt)
-    if _saltInt <= saltInt:
+def hmacVerifyMessage(signature, bytesSalt, bytesMessage, key):
+    try: hmacVerifyMessage.salt
+    except AttributeError: hmacVerifyMessage.salt = 0
+
+    intSalt = int.from_bytes(bytesSalt, "big")
+    print("salt int %d" % intSalt)
+    if intSalt <= hmacVerifyMessage.salt:
         print("salt reuse")
         return False
     else:
-        saltInt = _saltInt
-    h = hmac.new(key.encode(), salt + bytesFromClient, hashlib.sha256)
+        hmacVerifyMessage.salt = intSalt
+    h = hmac.new(key.encode(), bytesSalt + bytesMessage, hashlib.sha256)
     return h.digest() == signature
+
+def hmacCreateMessage(stringMessage, key):
+    try: hmacCreateMessage.salt
+    except AttributeError: hmacCreateMessage.salt = 0
+        
+    print(hmacCreateMessage.salt)
+    hmacCreateMessage.salt += 1
+    h = hmac.new(key.encode(), hmacCreateMessage.salt.to_bytes(4, 'big') + stringMessage.encode(), hashlib.sha256)
+    return h.digest() + hmacCreateMessage.salt.to_bytes(4, 'big') + str.encode(stringMessage)
 
 def sendMessage(msgFromClient):
     global salt
