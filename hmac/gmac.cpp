@@ -82,8 +82,8 @@ bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** s
 
     EVP_PKEY* pKey = nullptr;
     if (bReturn) {
-	pKey = hmacCreateKey(strKey);
-	if (pKey == nullptr) bReturn = false;
+        pKey = hmacCreateKey(strKey);
+        if (pKey == nullptr) bReturn = false;
     }
     // Attach the key to the digest
     if (bReturn && (EVP_DigestSignInit(pSslCtx, NULL, pMd, NULL, pKey) != 1)) {
