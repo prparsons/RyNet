@@ -6,6 +6,48 @@
 // def hmacVerifyMessage(signature, bytesSalt, bytesMessage, key):
 // def hmacCreateMessage(stringMessage, key):
 
+EVP_PKEY* hmacCreateKey(std::string strKey)
+{
+    char scKey[EVP_MAX_MD_SIZE];
+    strncpy(scKey, strKey.c_str(), strKey.length());
+    //**not padding the key with anything
+    EVP_PKEY* pKey = nullptr;
+
+    // Get the key type, create the digest
+    bool bReturn = true;
+    const EVP_MD* pMd = EVP_get_digestbyname("SHA256");
+    if (pMd == nullptr) {
+        printf("EVP_get_digestbyname failed, error 0x%lx\n", ERR_get_error());
+        bReturn = false;
+    }
+    int size = 0;
+    if (bReturn) {
+        size = EVP_MD_size(md);
+        if(size < 16) {
+            printf("EVP_MD_size failed, error 0x%lx\n", ERR_get_error());
+            bReturn = false;
+        }
+    }
+    if (bReturn && (size > strKey.length())) {
+        printf("EVP_MD_size is too large\n");
+        bReturn = false;
+    }
+
+    // Create the key itself
+    if (bReturn) {
+        pKey = EVP_PKEY_new_mac_key(EVP_PKEY_HMAC, NULL, strKey.c_str(), strKey.length());
+        if (pKey == nullptr) {
+            printf("EVP_PKEY_new_mac_key failed, error 0x%lx\n", ERR_get_error());
+            bReturn = false;
+        }
+    }
+    if (!bReturn && pKey != nullptr) {
+        printf("Should be key failure, but it's not\n");
+    }
+    
+    return pKey;
+}
+
 bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** scHmac, char** _scMessage)
 {
     *scHmac = nullptr;
@@ -196,6 +238,14 @@ err:
 
 int main()
 {
+    //bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** scHmac, char** _scMessage)
+
+    // if(sig)
+    //     OPENSSL_free(sig);
+    
+    // if(skey)
+    //     EVP_PKEY_free(skey);
+
 	std::cout << "Hellow world\n";
 	return 0;
 }
