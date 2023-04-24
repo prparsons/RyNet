@@ -50,12 +50,12 @@ int main(int argc, char* argv[])
     if(vkey == NULL)
         exit(1);
     
-    const byte msg[] = "Now is the time for all good men to come to the aide of their country";
+    const byte msg[] = "<pos_retrieve />0000000000000000";//"<pos_retrieve />";//Now is the time for all good men to come to the aide of their country";
     byte* sig = NULL;
     size_t slen = 0;
     
     /* Using the skey or signing key */
-    rc = sign_it(msg, sizeof(msg), &sig, &slen, skey);
+    rc = sign_it(msg, 32/*sizeof(msg)*/, &sig, &slen, skey);
     assert(rc == 0);
     if(rc == 0) {
         printf("Created signature\n");
@@ -167,7 +167,7 @@ int sign_it(const byte* msg, size_t mlen, byte** sig, size_t* slen, EVP_PKEY* pk
             break; /* failed */
         }
         
-        *sig = OPENSSL_malloc(req);
+        *sig = (byte*)OPENSSL_malloc(req);
         assert(*sig != NULL);
         if(*sig == NULL) {
             printf("OPENSSL_malloc failed, error 0x%lx\n", ERR_get_error());
@@ -301,7 +301,9 @@ int make_keys(EVP_PKEY** skey, EVP_PKEY** vkey)
 {
     /* HMAC key */
     byte hkey[EVP_MAX_MD_SIZE];
-    
+    strncpy((char*)hkey, "Secret Key0000000000000000000000",//"Secret Key",
+		    EVP_MAX_MD_SIZE);
+
     int result = -1;
     
     if(!skey || !vkey)
@@ -339,13 +341,13 @@ int make_keys(EVP_PKEY** skey, EVP_PKEY** vkey)
             break; /* failed */
         }
         
-        /* Generate bytes */
+        /* Generate bytes * /
         int rc = RAND_bytes(hkey, size);
         assert(rc == 1);
         if(rc != 1) {
             printf("RAND_bytes failed, error 0x%lx\n", ERR_get_error());
             break;
-        }
+        }*/
         
         print_it("HMAC key", hkey, size);
         
