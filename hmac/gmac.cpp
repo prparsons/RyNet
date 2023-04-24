@@ -1,5 +1,6 @@
 #include <iostream>
 
+#include <string.h>
 #include <openssl/evp.h>
 #include <openssl/err.h>
 
@@ -22,7 +23,7 @@ EVP_PKEY* hmacCreateKey(std::string strKey)
     }
     int size = 0;
     if (bReturn) {
-        size = EVP_MD_size(md);
+        size = EVP_MD_size(pMd);
         if(size < 16) {
             printf("EVP_MD_size failed, error 0x%lx\n", ERR_get_error());
             bReturn = false;
@@ -35,7 +36,7 @@ EVP_PKEY* hmacCreateKey(std::string strKey)
 
     // Create the key itself
     if (bReturn) {
-        pKey = EVP_PKEY_new_mac_key(EVP_PKEY_HMAC, NULL, strKey.c_str(), strKey.length());
+        pKey = EVP_PKEY_new_mac_key(EVP_PKEY_HMAC, NULL, (const unsigned char*)strKey.c_str(), strKey.length());
         if (pKey == nullptr) {
             printf("EVP_PKEY_new_mac_key failed, error 0x%lx\n", ERR_get_error());
             bReturn = false;
@@ -79,8 +80,13 @@ bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** s
         bReturn = false;
     }
 
+    EVP_PKEY* pKey = nullptr;
+    if (bReturn) {
+	pKey = hmacCreateKey(strKey);
+	if (pKey == nullptr) bReturn = false;
+    }
     // Attach the key to the digest
-    if (bReturn && (EVP_DigestSignInit(pSslCtx, NULL, pMd, NULL, pkey) != 1)) {
+    if (bReturn && (EVP_DigestSignInit(pSslCtx, NULL, pMd, NULL, pKey) != 1)) {
         printf("EVP_DigestSignInit failed, error 0x%lx\n", ERR_get_error());
         bReturn = false;
     }
@@ -109,8 +115,8 @@ bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** s
 
     // Get the digest and verify size is correct
     size_t* slen = nullptr;
-    if (bReturn && (EVP_DigestSignFinal(pSslCtx, *scHmac, slen) != 1)) {
-        printf("EVP_DigestSignFinal failed (3), return code %d, error 0x%lx\n", rc, ERR_get_error());
+    if (bReturn && (EVP_DigestSignFinal(pSslCtx, (unsigned char*)(*scHmac), slen) != 1)) {
+        printf("EVP_DigestSignFinal failed (3), error 0x%lx\n", ERR_get_error());
         bReturn = false;
     }
     if (bReturn && (req != *slen)) {
