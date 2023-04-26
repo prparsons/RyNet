@@ -32,8 +32,9 @@ void ObjectDetection::SetNewImage(CameraFrame& frm)
     sigNewImage.signal();
 }
 
-bool ObjectDetection::ProcessImage(cv::Mat& _imgRGB)
+bool ObjectDetection::ProcessImage(CameraFrame& frm)
 {
+    cv::Mat& _imgRGB = frm.matrix;
     cv::Mat imgRGB;
     cv::resize(_imgRGB, imgRGB, cv::Size(_imgRGB.cols / 2, _imgRGB.rows / 2), cv::INTER_LINEAR);
     // 1080x1920 -> 540x960  --- 3 images at 540x320
@@ -61,7 +62,8 @@ bool ObjectDetection::ProcessImage(cv::Mat& _imgRGB)
         char sc[128];
         for (int i = 0; i < iDetections; i++) {
             bRet = true;
-            snprintf(sc, 127, "Detection Slice,Class,Confidence[%d,%d,%d] LTRB:%d %d %d %d", 
+            snprintf(sc, 127, "ImageId, Detection Slice,Class,Confidence[%d,%d,%d,%d] LTRB:%d %d %d %d", 
+                    frm.GetId(),
                     s,
                     int(arDetections[i].ClassID), 
                     int(arDetections[i].Confidence * 100),
@@ -91,7 +93,7 @@ void ObjectDetection::run()
         if (frmProcess.matrix.empty()) continue;
         iFramesProcessed++;
 
-        if (ProcessImage(frmProcess.matrix)) {
+        if (ProcessImage(frmProcess)) {
             logger.LogImage(frmProcess, "detect");
         }
     }
@@ -188,7 +190,7 @@ void TerrainSegmentation::run()
             logger.LogImage(frmProcess, "segment");
             char sc[128];
             mt.lock();
-            sprintf(sc, "Good Habitat Found %2.2f", fBestDirection);
+            sprintf(sc, "Good Habitat Found %2.2f [Image:%d]", fBestDirection, frmProcess.GetId());
             mt.unlock();
             logger.LogString(sc);
         }

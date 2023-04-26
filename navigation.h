@@ -22,7 +22,7 @@ public:
     static bool SetNetwork(const char* scNetwork);
 
 private:
-    bool ProcessImage(cv::Mat& imgRGB);
+    bool ProcessImage(CameraFrame& frm);
 
     int iNumSlices;
     DataLogger& logger;
