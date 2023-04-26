@@ -106,20 +106,7 @@ void DataLogger::run(void)
         mt.unlock();
         if (bWriteImgLocal) {
             bWriteImgLocal = false;
-            WriteImageData(imageWrite, dataImage);
-            timeNow = time(nullptr);
-            pTimeStruct = localtime(&timeNow);
-            char scFileName[128];
-            snprintf(scFileName, 
-                    127, 
-                    "images/img_%d_%d_%d_%d_%d_%d.jpg", 
-                    pTimeStruct->tm_year + 1900, 
-                    pTimeStruct->tm_mon + 1,
-                    pTimeStruct->tm_mday,
-                    pTimeStruct->tm_hour,
-                    pTimeStruct->tm_min,
-                    pTimeStruct->tm_sec);
-            cv::imwrite(scFileName, imageWrite);
+            SaveImage("img", imageWrite, dataWrite);
         }
 
         // Check if there's a mask we should write
@@ -128,6 +115,7 @@ void DataLogger::run(void)
             bWriteMask = false;
             bWriteImgLocal = true;
             imageWrite = mask;
+            dataWrite = dataMask;
         }
         mt.unlock();
         if (bWriteImgLocal) {
@@ -137,7 +125,8 @@ void DataLogger::run(void)
             char scFileName[128];
             snprintf(scFileName, 
                     127, 
-                    "masks/mask_%d_%d_%d_%d_%d_%d.jpg", 
+                    "masks/mask[%d]_%d_%d_%d_%d_%d_%d.jpg", 
+                    dataWrite.id,
                     pTimeStruct->tm_year + 1900, 
                     pTimeStruct->tm_mon + 1,
                     pTimeStruct->tm_mday,
@@ -213,10 +202,11 @@ void DataLogger::LogImageIr(CameraFrame& frm)
     sigNewData.signal();
 }
 
-void DataLogger::LogMask(float4* pImg, int width, int height)
+void DataLogger::LogMask(float4* pImg, int iImageId, int width, int height)
 {
     cv::Mat tempMat(height, width, CV_32FC4, (void*)pImg);
     mt.lock();
+    dataMask.id = iImageId;
     mask = tempMat.clone();
     bWriteMask = true;
     mt.unlock();
@@ -250,8 +240,8 @@ void DataLogger::WriteImageData(cv::Mat& image, ImageLogData& imageData)
     // Now write stuff at the bottom, 2 rows, 5 pixel padding
     double dFontSize = cv::getFontScaleFromHeight(cv::FONT_HERSHEY_SIMPLEX, 20, 1);
     char sc[512];
-    snprintf(sc, 511, "Lat:%.7f Lon:%.7f Alt:%.1fm Head:%.2f Pit:%.2f",
-                imageData.fLat, imageData.fLon, 3.0, imageData.fHeading, imageData.fPitch);
+    snprintf(sc, 511, "Image:%d Lat:%.7f Lon:%.7f Alt:%.1fm Head:%.2f Pit:%.2f",
+                imageData.id, imageData.fLat, imageData.fLon, 3.0, imageData.fHeading, imageData.fPitch);
     cv::putText(imageLarger, 
                 sc,
                 cv::Point(5, image.rows + 25),

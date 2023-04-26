@@ -29,9 +29,9 @@ public:
     void Start();
     void Stop();
 
-    void LogImage(CameraFrame& im, std::string strIdSource);
-    void LogImageIr(CameraFrame& im);
-    void LogMask(float4* pImg, int width, int height);
+    void LogImage(CameraFrame& frm, std::string strIdSource);
+    void LogImageIr(CameraFrame& frm);
+    void LogMask(float4* pImg, int iImageId, int width, int height);
     void LogString(const char* scData);
 
 private:
@@ -52,6 +52,7 @@ private:
     cv::Mat imageIr;
     ImageLogData dataImage;
     ImageLogData dataImageIr;
+    ImageLogData dataMask;
     cv::Mat mask;
     std::vector<char*> listStrings;
     std::map<std::string, ImageLogData> mapImageData;
