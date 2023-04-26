@@ -57,8 +57,8 @@ public:
     };
 
 private:
-    bool ProcessImage(cv::Mat& img);
-    bool ScanMask(uint8_t* pMask, int iWidth, int iHeight);
+    bool ProcessImage(CameraFrame& frm);
+    bool ScanMask(uint8_t* pMask, int iImageId, int iWidth, int iHeight);
 
     bool bHabitatVisible;
     uint8_t uTargetClass;

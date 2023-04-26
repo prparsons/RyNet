@@ -186,7 +186,7 @@ void TerrainSegmentation::run()
         if (frmProcess.matrix.empty()) continue;
         
         iFramesProcessed++;
-        if (ProcessImage(frmProcess.matrix)) {
+        if (ProcessImage(frmProcess)) {
             logger.LogImage(frmProcess, "segment");
             char sc[128];
             mt.lock();
@@ -262,8 +262,9 @@ bool TerrainSegmentation::SetNetwork(const char* scNetwork)
     return false;
 }
 
-bool TerrainSegmentation::ProcessImage(cv::Mat& imgRGB)
+bool TerrainSegmentation::ProcessImage(CameraFrame& frm)
 {
+    cv::Mat& imgRGB = frm.matrix;
     int imgWidth = imgRGB.cols;      // width of the image (in pixels)
     int imgHeight = imgRGB.rows;      // height of the image (in pixels)
     // 1080x1920  -- 3 images at 1080x640
@@ -294,7 +295,7 @@ bool TerrainSegmentation::ProcessImage(cv::Mat& imgRGB)
             cudaFree(u3Img);
             return false;
         }
-        if (ScanMask(pMask, imgWidth, iSliceHeight)) {
+        if (ScanMask(pMask, frm.GetId(), imgWidth, iSliceHeight)) {
             // We're starting at the top, which would be the furthest away.
             //  So as soon as we find our target, then just stop scanning
             bRet = true;
@@ -309,7 +310,7 @@ bool TerrainSegmentation::ProcessImage(cv::Mat& imgRGB)
     return bRet;
 }
 
-bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iWidth, int iHeight)
+bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iImageId, int iWidth, int iHeight)
 {
     int size = iWidth * iHeight;
     float fAngleAvgSum = 0;
@@ -337,7 +338,7 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iWidth, int iHeight)
     float4* imgMask;
     if (!CUDA_FAILED(cudaHostAlloc(&imgMask, maskWidth*maskHeight*16, cudaHostAllocMapped))) {
         pNetwork->Mask(imgMask, maskWidth, maskHeight, segNet::FILTER_POINT);
-        logger.LogMask(imgMask, maskWidth, maskHeight);
+        logger.LogMask(imgMask, iImageId, maskWidth, maskHeight);
         cudaFreeHost(imgMask);
     }
     mt.lock();
