@@ -36,7 +36,6 @@ void DataLogger::Stop()
 {
     if (pThread != nullptr) {
         ss.stop();
-        sigNewData.signal();
         pThread->join();
         delete pThread;
         pThread = nullptr;
@@ -72,7 +71,7 @@ void DataLogger::run(void)
 
     while (!ss.shouldStop()) {
         // Wait on signal
-        pSigImage->wait();
+        pSigImage->wait(1000);
 
         // check text list, if not empty write
         mt.lock();

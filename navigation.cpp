@@ -84,7 +84,7 @@ void ObjectDetection::run()
     image imgProcess;
     int iFramesProcessed = 0;
     while (!ss.shouldStop()) {
-        pSigRGB->wait();
+        pSigRGB->wait(1000);
         mt.lock();
         imgProcess = imgRecent;
         mt.unlock();
@@ -102,9 +102,6 @@ void ObjectDetection::run()
 void ObjectDetection::SendStopSignal()
 {
     ss.stop();
-    // If the camera has stopped, or isn't running, then we need to signal or else it won't ever
-    //  get to the ss.shouldStop check.
-    sigNewImage.signal();
 }
 
 void ObjectDetection::SetNumberImageSlices(int _iNumSlices)
@@ -177,7 +174,7 @@ void TerrainSegmentation::run()
     image imgProcess;
     int iFramesProcessed = 0;
     while (!ss.shouldStop()) {
-        pSigRGB->wait();
+        pSigRGB->wait(1000);
         mt.lock();
         imgProcess = imgRecent;
         mt.unlock();
@@ -200,9 +197,6 @@ void TerrainSegmentation::run()
 void TerrainSegmentation::SendStopSignal()
 {
     ss.stop();
-    // If the camera has stopped, or isn't running, then we need to signal or else it won't ever
-    //  get to the ss.shouldStop check.
-    sigNewImage.signal();
 }
 
 void TerrainSegmentation::SetTargetClass(uint8_t _uTargetClass)
@@ -381,11 +375,6 @@ void Navigator::SignalStop()
 {
     if (pThread != nullptr) {
         ssMain.stop();
-        // If there's nothing coming from the camera, we need to signal it or else the thread
-        //  will never get to the ss.shouldStop().
-        Signal* pSigRGB = camera.GetSignalRGB();
-        pSigRGB->signal();
-        delete pSigRGB;
     }
 }
 
@@ -395,10 +384,7 @@ void Navigator::Stop()
         ssMain.stop();
         // If there's nothing coming from the camera, we need to signal it or else the thread
         //  will never get to the ss.shouldStop().
-        Signal* pSigRGB = camera.GetSignalRGB();
-        pSigRGB->signal();
         pThread->join();
-        delete pSigRGB;
         delete pThread;
         pThread = nullptr;
     }
@@ -421,7 +407,7 @@ void Navigator::runNavigator()
     std::thread thrObject(&ObjectDetection::run, &detector);
     std::thread thrSegment(&TerrainSegmentation::run, &segmenter);
     while (!ssMain.shouldStop()) {
-        pSigRGB->wait();
+        pSigRGB->wait(1000);
         cv::Mat Frame;
         if (!camera.GetFrameRGB(Frame)) {
             printL("runNavigator frame was not valid");

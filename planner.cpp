@@ -32,10 +32,7 @@ void FlightController::DestroyFlightController()
     if (pInstance->pThreadDepth != nullptr) {
         printL("FlightController::DestroyFlightController Stopping depths");
         pInstance->ssDepth.stop();
-        Signal* pSig = pInstance->camera.GetSignalDepth();
-        pSig->signal();
         pInstance->pThreadDepth->join();
-        delete pSig;
         delete pInstance->pThreadDepth;
         pInstance->pThreadDepth = nullptr;
     }
@@ -188,7 +185,7 @@ void FlightController::runDepth()
     const uint16x8_t u8Underflow = vld1q_dup_u16(&uUnderflow);
 
     while (!ssDepth.shouldStop()) {
-        pSig->wait();
+        pSig->wait(1000));
         
         cameraFrame_depth* pFrameDepth = camera.GetFrameDepth();
         if (pFrameDepth == nullptr) {
