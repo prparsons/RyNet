@@ -185,7 +185,7 @@ void FlightController::runDepth()
     const uint16x8_t u8Underflow = vld1q_dup_u16(&uUnderflow);
 
     while (!ssDepth.shouldStop()) {
-        pSig->wait(1000));
+        pSig->wait(1000);
         
         cameraFrame_depth* pFrameDepth = camera.GetFrameDepth();
         if (pFrameDepth == nullptr) {
