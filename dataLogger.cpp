@@ -24,11 +24,7 @@ DataLogger::DataLogger()
 
 DataLogger::~DataLogger()
 {
-    if (pThread != nullptr) {
-        if (pThread->joinable()) pThread->join();
-        delete pThread;
-        pThread = nullptr;
-    }
+    Stop();
 }
 
 void DataLogger::Start()
@@ -40,6 +36,9 @@ void DataLogger::Stop()
 {
     if (pThread != nullptr) {
         ssThread.stop();
+        if (pThread->joinable()) pThread->join();
+        delete pThread;
+        pThread = nullptr;
     }
 }
 
