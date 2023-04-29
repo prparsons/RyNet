@@ -24,30 +24,30 @@ DataLogger::DataLogger()
 
 DataLogger::~DataLogger()
 {
-    Stop();
-}
-
-void DataLogger::Start()
-{
-    pThread = new std::thread(&DataLogger::run, this);
-}
-
-void DataLogger::Stop()
-{
     if (pThread != nullptr) {
-        ss.stop();
-        pThread->join();
+        if (pThread->joinable()) pThread->join();
         delete pThread;
         pThread = nullptr;
     }
 }
 
+void DataLogger::Start()
+{
+    pThread = new std::thread(&DataLogger::run, this, sigNewData, ssThread);
+}
 
-void DataLogger::run(void)
+void DataLogger::Stop()
+{
+    if (pThread != nullptr) {
+        ssThread.stop();
+    }
+}
+
+
+void DataLogger::run(void, Signal sigImage, StopSignal ss)
 {
     printf("DataLogger Thread\n");
 
-    Signal* pSigImage = new Signal(sigNewData); // Deleted in destructor
     time_t timeNow;
     struct tm* pTimeStruct;
 
@@ -71,7 +71,7 @@ void DataLogger::run(void)
 
     while (!ss.shouldStop()) {
         // Wait on signal
-        pSigImage->wait(1000);
+        sigImage->wait(1000);
 
         // check text list, if not empty write
         mt.lock();
@@ -145,8 +145,6 @@ void DataLogger::run(void)
             cv::imwrite(scFileName, imageWrite);
         }
     }
-
-    delete pSigImage;
 }
 
 void DataLogger::LogImage(cv::Mat& im, std::string strIdSource)
