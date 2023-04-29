@@ -15,7 +15,7 @@ public:
     ~ObjectDetection();
 
     void SetNewImage(image& img);
-    void run();
+    void Start();
     void SendStopSignal();
     
     void SetNumberImageSlices(int iNumSlices);
@@ -23,13 +23,15 @@ public:
 
 private:
     bool ProcessImage(image& img);
+    void run(Signal sig, StopSignal ss);
 
     int iNumSlices;
     DataLogger& logger;
     detectNet* pNetwork;
+    std::thread* pThread;
     ThreadMutex mt;
     Signal sigNewImage;
-    StopSignal ss;
+    StopSignal ssThread;
     image imgRecent;
 };
 

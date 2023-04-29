@@ -13,6 +13,7 @@ ObjectDetection::ObjectDetection(DataLogger& _logger)
 : iNumSlices(3)
 , logger(_logger)
 , pNetwork(nullptr)
+, pThread(nullptr)
 {
     pNetwork = detectNet::Create(networkDetection);
 	//detectNet* net = detectNet::Create(detectNet::SSD_MOBILENET_V2, 0.5f, 1, TYPE_FASTEST, DEVICE_DLA_0);DEVICE_DLA_1 DEVICE_GPU
@@ -22,6 +23,10 @@ ObjectDetection::ObjectDetection(DataLogger& _logger)
 ObjectDetection::~ObjectDetection()
 {
     if (pNetwork != nullptr) delete pNetwork;
+    if (pThread != nullptr) {
+        if (pThread->joinable()) pThread->join();
+        delete pThread;
+    }
 }
 
 void ObjectDetection::SetNewImage(image& img)
@@ -77,14 +82,13 @@ bool ObjectDetection::ProcessImage(image& _imgRGB)
     return bRet;
 }
 
-void ObjectDetection::run()
+void ObjectDetection::run(Signal sig, StopSignal ss)
 {
     printL("ObjectDetection::run");
-    Signal* pSigRGB = new Signal(sigNewImage);
     image imgProcess;
     int iFramesProcessed = 0;
     while (!ss.shouldStop()) {
-        pSigRGB->wait(1000);
+        sig.wait(1000);
         mt.lock();
         imgProcess = imgRecent;
         mt.unlock();
@@ -95,13 +99,17 @@ void ObjectDetection::run()
             logger.LogImage(imgProcess, "detect");
         }
     }
-    delete pSigRGB;
     printf("ObjectDetection::run Frames Processed:%d\n", iFramesProcessed);
+}
+
+void ObjectDetection::Start()
+{
+    pThread = new std::thread(&ObjectDetection::run, this, sigNewImage, ssThread);
 }
 
 void ObjectDetection::SendStopSignal()
 {
-    ss.stop();
+    ssThread.stop();
 }
 
 void ObjectDetection::SetNumberImageSlices(int _iNumSlices)
@@ -404,7 +412,7 @@ void Navigator::runNavigator()
     bool bGridSearching = true;
     float fMargin = 5;
 
-    std::thread thrObject(&ObjectDetection::run, &detector);
+    detector.Start();
     std::thread thrSegment(&TerrainSegmentation::run, &segmenter);
     while (!ssMain.shouldStop()) {
         pSigRGB->wait(1000);
@@ -466,6 +474,5 @@ void Navigator::runNavigator()
     segmenter.SendStopSignal();
     delete pSigRGB;
     // Wait until the threads actually stop (don't want to delete the object while thread is running).
-    thrObject.join();
     thrSegment.join();
 }
