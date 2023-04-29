@@ -56,7 +56,7 @@ public:
     rs2_vector GetFrameAccel();
     bool GetFrameRGB(cv::Mat& imgCopy);
     bool GetFrameIR(cv::Mat& imgCopy);
-    Signal* GetSignalDepth();
+    Signal GetSignalDepth();
     Signal* GetSignalRGB();
     Signal* GetSignalIR();
 

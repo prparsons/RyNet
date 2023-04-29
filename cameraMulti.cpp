@@ -89,9 +89,9 @@ bool CameraController::GetFrameIR(cv::Mat& imgCopy)
     return true;
 }
 
-Signal* CameraController::GetSignalDepth()
+Signal CameraController::GetSignalDepth()
 {
-    return new Signal(sigDepth);
+    return sigDepth;
 }
 
 Signal* CameraController::GetSignalRGB()
