@@ -94,6 +94,7 @@ inline Signal::Signal()
 
 inline Signal::Signal(const Signal& sig)
 : pbReady(sig.pbReady)
+, pThreadMutex(nullptr)
 , mutex(sig.mutex)
 , pCond(sig.pCond)
 {
