@@ -44,7 +44,7 @@ void DataLogger::Stop()
 }
 
 
-void DataLogger::run(void, Signal sigImage, StopSignal ss)
+void DataLogger::run(Signal sigImage, StopSignal ss)
 {
     printf("DataLogger Thread\n");
 
@@ -71,7 +71,7 @@ void DataLogger::run(void, Signal sigImage, StopSignal ss)
 
     while (!ss.shouldStop()) {
         // Wait on signal
-        sigImage->wait(1000);
+        sigImage.wait(1000);
 
         // check text list, if not empty write
         mt.lock();

@@ -33,7 +33,7 @@ public:
     void LogString(const char* scData);
 
 private:
-    void run(void, Signal sigImage, StopSignal ss);
+    void run(Signal sigImage, StopSignal ss);
     void WriteImageData(cv::Mat& image, ImageLogData& imageData);
 
     bool bWriteImg;
