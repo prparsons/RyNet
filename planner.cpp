@@ -42,12 +42,6 @@ void FlightController::DestroyFlightController()
     if (pInstance->pThreadIr != nullptr) {
         printL("FlightController::DestroyFlightController Stopping thermal camera");
         pInstance->ssIr.stop();
-        Signal* pSig = pInstance->camera.GetSignalIR();
-        pSig->signal();
-        pInstance->pThreadIr->join();
-        delete pSig;
-        delete pInstance->pThreadIr;
-        pInstance->pThreadIr = nullptr;
     }
     printL("FlightController::DestroyFlightController Deleting flight controller");
     delete pInstance;
@@ -64,7 +58,7 @@ void FlightController::Start(bool bStartDepth, bool bStartPointLogger, bool bSta
         pThreadPoint = new std::thread(&FlightController::runPointLogger, this, ssPtLog);
     }
     if (bStartIr) {
-        pThreadIr = new std::thread(&FlightController::runIr, this);
+        pThreadIr = new std::thread(&FlightController::runIr, this, sigIr, ssIr);
     }
 }
 
@@ -82,9 +76,8 @@ FlightController::~FlightController()
         delete pThreadPoint;
     }
     if (pThreadIr != nullptr) {
-        printL("FlightController::~FlightController Thermal should have been stopped already");
         ssIr.stop();
-        pThreadIr->join();
+        if (pThreadIr->joinable()) pThreadIr->join();
         delete pThreadIr;
     }
 
@@ -325,13 +318,12 @@ void FlightController::runPointLogger(StopSignal ss)
     }
 }
 
-void FlightController::runIr()
+void FlightController::runIr(Signal sig, StopSignal ss)
 {
     printL("FlightController::runIr");
-    Signal* pSig = camera.GetSignalIR();
     CameraFrame frmIr;
-    while (!ssIr.shouldStop()) {
-        pSig->wait();
+    while (!ss.shouldStop()) {
+        sig.wait(1000);
         camera.GetFrameIR(frmIr);
         if (frmIr.matrix.empty()) continue;
         logger.LogImageIr(frmIr);

@@ -47,7 +47,7 @@ private:
 
     void runDepth(Signal sig, StopSignal ss); // Thread function to continuously send depth info for obstacle avoidance
     void runPointLogger(StopSignal ss); // Thread function to continuously retrieve and store visited points when in guided mode
-    void runIr();
+    void runIr(Signal sig, StopSignal ss);
 
     DataLogger& logger;
     CameraController& camera;
@@ -56,6 +56,7 @@ private:
     std::thread* pThreadIr;
     
     Signal sigCameraDepth;
+    Signal sigIr;
     StopSignal ssDepth;
     StopSignal ssPtLog;
     StopSignal ssIr;
