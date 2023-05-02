@@ -58,7 +58,7 @@ public:
     bool GetFrameIR(CameraFrame& imgCopy);
     Signal GetSignalDepth();
     Signal GetSignalRGB();
-    // Signal* GetSignalIR();
+    Signal GetSignalIR();
 
     void Start();
     void Stop();
