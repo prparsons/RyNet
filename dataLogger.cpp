@@ -40,6 +40,7 @@ void DataLogger::Stop()
 {
     if (pThread != nullptr) {
         ssThread.stop();
+        if (pThread->joinable()) pThread->join();
     }
 }
 
