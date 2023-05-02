@@ -57,8 +57,8 @@ public:
     bool GetFrameRGB(cv::Mat& imgCopy);
     bool GetFrameIR(cv::Mat& imgCopy);
     Signal GetSignalDepth();
-    Signal* GetSignalRGB();
-    Signal* GetSignalIR();
+    Signal GetSignalRGB();
+    // Signal* GetSignalIR();
 
     void Start();
     void Stop();

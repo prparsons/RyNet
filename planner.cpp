@@ -47,7 +47,7 @@ void FlightController::Start(bool bStartDepth, bool bStartPointLogger)
 {
     printL("FlightController::Start");
     if (bStartDepth) {
-        pThreadDepth = new std::thread(&FlightController::runDepth, this, ssDepth);
+        pThreadDepth = new std::thread(&FlightController::runDepth, this, sigCameraDepth, ssDepth);
     }
     if (bStartPointLogger) {
         pThreadPoint = new std::thread(&FlightController::runPointLogger, this, ssPtLog);
@@ -58,10 +58,12 @@ FlightController::~FlightController()
 {
     printL("FlightController::~FlightController");
     if (pThreadDepth != nullptr) {
+        ssDepth.stop();
         if (pThreadDepth->joinable()) pThreadDepth->join();
         delete pThreadDepth;
     }
     if (pThreadPoint != nullptr) {
+        ssPtLog.stop();
         if (pThreadPoint->joinable()) pThreadPoint->join();
         delete pThreadPoint;
     }
@@ -165,7 +167,7 @@ void FlightController::SaveRoute()
     SendXML(sc);
 }
 
-void FlightController::runDepth(StopSignal ss)
+void FlightController::runDepth(Signal sig, StopSignal ss)
 {
     printL("FlightController::runDepth");
 
@@ -175,7 +177,7 @@ void FlightController::runDepth(StopSignal ss)
     const uint16x8_t u8Underflow = vld1q_dup_u16(&uUnderflow);
 
     while (!ss.shouldStop()) {
-        sigCameraDepth.wait(1000);
+        sig.wait(1000);
         
         cameraFrame_depth* pFrameDepth = camera.GetFrameDepth();
         if (pFrameDepth == nullptr) {

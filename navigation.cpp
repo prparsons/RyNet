@@ -24,6 +24,7 @@ ObjectDetection::~ObjectDetection()
 {
     if (pNetwork != nullptr) delete pNetwork;
     if (pThread != nullptr) {
+        ssMain.stop();
         if (pThread->joinable()) pThread->join();
         delete pThread;
     }
@@ -140,6 +141,7 @@ TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
 , fImageFOV(50) // I calculated this number based on the imx477 sensor size with a 6mm lens
 , logger(_logger)
 , pMask(nullptr)
+, pThread(nullptr)
 {
     pNetwork = segNet::Create(networkSegmentation);//FCN_RESNET18_SUNRGB_640x512);//segNet::FCN_RESNET18_DEEPSCENE_576x320);FCN_ALEXNET_AERIAL_FPV_720p
 //  static segNet* Create( NetworkType networkType=FCN_ALEXNET_CITYSCAPES_SD, uint32_t maxBatchSize=DEFAULT_MAX_BATCH_SIZE,
@@ -149,6 +151,11 @@ TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
 TerrainSegmentation::~TerrainSegmentation()
 {
     if (pMask != nullptr) delete[] pMask;// cudaFree(pMask);
+    if (pThread != nullptr) {
+        ssMain.stop();
+        if (pThread->joinable()) pThread->join();
+        delete pThread;
+    }
 }
 
 bool TerrainSegmentation::IsHabitatVisible()
@@ -175,14 +182,19 @@ void TerrainSegmentation::SetNewImage(image& img)
     sigNewImage.signal();
 }
 
-void TerrainSegmentation::run()
+void TerrainSegmentation::Start()
+{
+    pThread = new std::thread(&TerrainSegmentation::run, this, sigNewImage, ssMain);
+}
+
+void TerrainSegmentation::run(Signal sig, StopSignal ss)
 {
     printL("TerrainSegmentation::run");
-    Signal* pSigRGB = new Signal(sigNewImage);
     image imgProcess;
     int iFramesProcessed = 0;
+
     while (!ss.shouldStop()) {
-        pSigRGB->wait(1000);
+        sig.wait(1000);
         mt.lock();
         imgProcess = imgRecent;
         mt.unlock();
@@ -198,13 +210,12 @@ void TerrainSegmentation::run()
             logger.LogString(sc);
         }
     }
-    delete pSigRGB;
     printf("TerrainSegmentation::run Frames Processed: %d\n", iFramesProcessed);
 }
 
 void TerrainSegmentation::SendStopSignal()
 {
-    ss.stop();
+    ssMain.stop();
 }
 
 void TerrainSegmentation::SetTargetClass(uint8_t _uTargetClass)
@@ -353,6 +364,7 @@ Navigator::Navigator(FlightController& _control, DataLogger& _logger, CameraCont
 , control(_control)
 , logger(_logger)
 , camera(_camera)
+, sigMainRGB(_camera.GetSignalRGB())
 , pThread(nullptr)
 , detector(logger)
 , segmenter(logger)
@@ -362,20 +374,22 @@ Navigator::Navigator(FlightController& _control, DataLogger& _logger, CameraCont
 
 Navigator::~Navigator()
 {
-    Stop();
+    if (pThread != nullptr) {
+        ssMain.stop();
+        if (pThread->joinable()) pThread->join();
+        delete pThread;
+    }
 }
     
 void Navigator::Start()
 {
-    pThread = new std::thread(&Navigator::runNavigator, this);
+    pThread = new std::thread(&Navigator::runNavigator, this, sigMainRGB, ssMain);
 }
 
 void Navigator::Join()
 {
-    if (pThread != nullptr) {
+    if (pThread != nullptr && pThread->joinable()) {
         pThread->join();
-        delete pThread;
-        pThread = nullptr;
     }
 }
 
@@ -386,36 +400,24 @@ void Navigator::SignalStop()
     }
 }
 
-void Navigator::Stop()
-{
-    if (pThread != nullptr) {
-        ssMain.stop();
-        // If there's nothing coming from the camera, we need to signal it or else the thread
-        //  will never get to the ss.shouldStop().
-        pThread->join();
-        delete pThread;
-        pThread = nullptr;
-    }
-}
-
 void Navigator::SetNumberImageSlices(int iNumSlices)
 {
     detector.SetNumberImageSlices(iNumSlices);
     segmenter.SetNumberImageSlices(iNumSlices);
 }
 
-void Navigator::runNavigator()
+void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
 {
     printL("Navigator::runNavigator");
-    Signal* pSigRGB = camera.GetSignalRGB();
 
     bool bGridSearching = true;
     float fMargin = 5;
 
     detector.Start();
-    std::thread thrSegment(&TerrainSegmentation::run, &segmenter);
-    while (!ssMain.shouldStop()) {
-        pSigRGB->wait(1000);
+    segmenter.Start();
+
+    while (!ss.shouldStop()) {
+        sigRGB.wait(1000);
         cv::Mat Frame;
         if (!camera.GetFrameRGB(Frame)) {
             printL("runNavigator frame was not valid");
@@ -472,7 +474,4 @@ void Navigator::runNavigator()
     // Handle all the cleanup
     detector.SendStopSignal();
     segmenter.SendStopSignal();
-    delete pSigRGB;
-    // Wait until the threads actually stop (don't want to delete the object while thread is running).
-    thrSegment.join();
 }

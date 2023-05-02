@@ -94,15 +94,15 @@ Signal CameraController::GetSignalDepth()
     return sigDepth;
 }
 
-Signal* CameraController::GetSignalRGB()
+Signal CameraController::GetSignalRGB()
 {
-    return new Signal(sigRGB);
+    return sigRGB;
 }
 
-Signal* CameraController::GetSignalIR()
-{
-    return new Signal(sigIR);
-}
+// Signal* CameraController::GetSignalIR()
+// {
+//     return new Signal(sigIR);
+// }
 
 CameraController::CameraController(uint32_t _features, const char* _scSimulationFile)
 : pFrameCurrentDepth(nullptr)
