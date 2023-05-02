@@ -44,7 +44,7 @@ private:
     void SendXML(const char* sc);
     char* SendRecXML(const char* sc, int iTimeoutMS = 100);
     void ConnectMavLink();
-    void runDepth(StopSignal ss); // Thread function to continuously send depth info for obstacle avoidance
+    void runDepth(Signal sig, StopSignal ss); // Thread function to continuously send depth info for obstacle avoidance
     void runPointLogger(StopSignal ss); // Thread function to continuously retrieve and store visited points when in guided mode
 
     DataLogger& logger;

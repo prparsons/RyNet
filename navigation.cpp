@@ -105,12 +105,12 @@ void ObjectDetection::run(Signal sig, StopSignal ss)
 
 void ObjectDetection::Start()
 {
-    pThread = new std::thread(&ObjectDetection::run, this, sigNewImage, ssThread);
+    pThread = new std::thread(&ObjectDetection::run, this, sigNewImage, ssMain);
 }
 
 void ObjectDetection::SendStopSignal()
 {
-    ssThread.stop();
+    ssMain.stop();
 }
 
 void ObjectDetection::SetNumberImageSlices(int _iNumSlices)

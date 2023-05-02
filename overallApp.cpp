@@ -178,7 +178,7 @@ int main( int argc, char** argv )
         // If we get here, depth failed 
         if (bStopNavOnDepthFail) {
             printL(">>>Sending stop signal to stop Nav");
-            nav.Stop();
+            nav.SignalStop();
             ///***this has changed a bit since -> //**I got a seg fault once without --continue, I wonder if it's something to do with this? (datalogger wasn't cleaning up threads...)
         } else {
             nav.Join();
