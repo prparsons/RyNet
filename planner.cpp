@@ -11,6 +11,7 @@ FlightController::FlightController(DataLogger& _logger, CameraController& _camer
 , pThreadDepth(nullptr)
 , pThreadPoint(nullptr)
 , pThreadIr(nullptr)
+, sigCameraDepth(_camera.GetSignalDepth())
 , socketDesc(-1)
 {
     strcpy(scMavLinkAddress, "127.0.0.1");
@@ -33,29 +34,14 @@ void FlightController::DestroyFlightController()
     if (pInstance->pThreadDepth != nullptr) {
         printL("FlightController::DestroyFlightController Stopping depths");
         pInstance->ssDepth.stop();
-        Signal* pSig = pInstance->camera.GetSignalDepth();
-        pSig->signal();
-        pInstance->pThreadDepth->join();
-        delete pSig;
-        delete pInstance->pThreadDepth;
-        pInstance->pThreadDepth = nullptr;
     }
     if (pInstance->pThreadPoint != nullptr) {
         printL("FlightController::DestroyFlightController Stopping point logger");
         pInstance->ssPtLog.stop();
-        pInstance->pThreadPoint->join();
-        delete pInstance->pThreadPoint;
-        pInstance->pThreadPoint = nullptr;
     }
     if (pInstance->pThreadIr != nullptr) {
         printL("FlightController::DestroyFlightController Stopping thermal camera");
         pInstance->ssIr.stop();
-        Signal* pSig = pInstance->camera.GetSignalIR();
-        pSig->signal();
-        pInstance->pThreadIr->join();
-        delete pSig;
-        delete pInstance->pThreadIr;
-        pInstance->pThreadIr = nullptr;
     }
     printL("FlightController::DestroyFlightController Deleting flight controller");
     delete pInstance;
@@ -66,13 +52,13 @@ void FlightController::Start(bool bStartDepth, bool bStartPointLogger, bool bSta
 {
     printL("FlightController::Start");
     if (bStartDepth) {
-        pThreadDepth = new std::thread(&FlightController::runDepth, this);
+        pThreadDepth = new std::thread(&FlightController::runDepth, this, sigCameraDepth, ssDepth);
     }
     if (bStartPointLogger) {
-        pThreadPoint = new std::thread(&FlightController::runPointLogger, this);
+        pThreadPoint = new std::thread(&FlightController::runPointLogger, this, ssPtLog);
     }
     if (bStartIr) {
-        pThreadIr = new std::thread(&FlightController::runIr, this);
+        pThreadIr = new std::thread(&FlightController::runIr, this, sigIr, ssIr);
     }
 }
 
@@ -80,21 +66,18 @@ FlightController::~FlightController()
 {
     printL("FlightController::~FlightController");
     if (pThreadDepth != nullptr) {
-        printL("FlightController::~FlightController Depth should have been stopped already");
         ssDepth.stop();
-        pThreadDepth->join();
+        if (pThreadDepth->joinable()) pThreadDepth->join();
         delete pThreadDepth;
     }
     if (pThreadPoint != nullptr) {
-        printL("FlightController::~FlightController Point logger should have been stopped already");
         ssPtLog.stop();
-        pThreadPoint->join();
+        if (pThreadPoint->joinable()) pThreadPoint->join();
         delete pThreadPoint;
     }
     if (pThreadIr != nullptr) {
-        printL("FlightController::~FlightController Thermal should have been stopped already");
         ssIr.stop();
-        pThreadIr->join();
+        if (pThreadIr->joinable()) pThreadIr->join();
         delete pThreadIr;
     }
 
@@ -197,18 +180,17 @@ void FlightController::SaveRoute()
     SendXML(sc);
 }
 
-void FlightController::runDepth()
+void FlightController::runDepth(Signal sig, StopSignal ss)
 {
     printL("FlightController::runDepth");
-    Signal* pSig = camera.GetSignalDepth();
 
     // https://developer.arm.com/architectures/instruction-sets/intrinsics/
     const uint16_t uMax = 65535;
     const uint16_t uUnderflow = 1;
     const uint16x8_t u8Underflow = vld1q_dup_u16(&uUnderflow);
 
-    while (!ssDepth.shouldStop()) {
-        pSig->wait();
+    while (!ss.shouldStop()) {
+        sig.wait(1000);
         
         cameraFrame_depth* pFrameDepth = camera.GetFrameDepth();
         if (pFrameDepth == nullptr) {
@@ -302,10 +284,9 @@ void FlightController::runDepth()
 
         delete pFrameDepth;
     }
-    delete pSig;
 }
 
-void FlightController::runPointLogger()
+void FlightController::runPointLogger(StopSignal ss)
 {
     printL("FlightController::runPointLogger");
     bool bGuided = false;
@@ -313,7 +294,7 @@ void FlightController::runPointLogger()
     coord currentPosition;
     char scMode[32];
 
-    while (!ssPtLog.shouldStop()) {
+    while (!ss.shouldStop()) {
         if (bGuided) { // In GUIDED
             // Get the current position, add it to the list of visited points
             if (GetPosition(currentPosition.fLatitude, currentPosition.fLongitude)) {
@@ -337,16 +318,15 @@ void FlightController::runPointLogger()
     }
 }
 
-void FlightController::runIr()
+void FlightController::runIr(Signal sig, StopSignal ss)
 {
     printL("FlightController::runIr");
-    Signal* pSig = camera.GetSignalIR();
-    cv::Mat imageIr;
-    while (!ssIr.shouldStop()) {
-        pSig->wait();
-        camera.GetFrameIR(imageIr);
-        if (imageIr.empty()) continue;
-        logger.LogImageIr(imageIr);
+    CameraFrame frmIr;
+    while (!ss.shouldStop()) {
+        sig.wait(1000);
+        camera.GetFrameIR(frmIr);
+        if (frmIr.matrix.empty()) continue;
+        logger.LogImageIr(frmIr);
     }
 }
 

@@ -10,6 +10,7 @@ void printL(const char* sc);
 struct ImageLogData {
     time_t timeLast;
     std::string strData;
+    int id;
     float fLat;
     float fLon;
     float fHeading;
@@ -28,13 +29,13 @@ public:
     void Start();
     void Stop();
 
-    void LogImage(cv::Mat& im, std::string strIdSource);
-    void LogImageIr(cv::Mat& im);
-    void LogMask(float4* pImg, int width, int height);
+    void LogImage(CameraFrame& frm, std::string strIdSource);
+    void LogImageIr(CameraFrame& frm);
+    void LogMask(float4* pImg, int iImageId, int width, int height);
     void LogString(const char* scData);
 
 private:
-    void run(void);
+    void run(Signal sigImage, StopSignal ss);
     void WriteImageData(cv::Mat& image, ImageLogData& imageData);
     void SaveImage(std::string strPrefix, cv::Mat& image, ImageLogData& imageData);
 
@@ -44,13 +45,14 @@ private:
 
     ThreadMutex mt;
     Signal sigNewData;
-    StopSignal ss;
+    StopSignal ssThread;
     std::thread* pThread;
 
     cv::Mat image;
     cv::Mat imageIr;
     ImageLogData dataImage;
     ImageLogData dataImageIr;
+    ImageLogData dataMask;
     cv::Mat mask;
     std::vector<char*> listStrings;
     std::map<std::string, ImageLogData> mapImageData;

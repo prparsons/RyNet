@@ -5,7 +5,6 @@
 #include <opencv2/highgui.hpp>
 #include "dataLogger.h"
 
-
     
 // wbmode=2 //exposuretimerange=\"30000000 30000000\" aelock=true
 //  ! videoflip method=counterclockwise
@@ -19,7 +18,33 @@ const char* scGStream_RGB_F = "nvarguscamerasrc sensor-id=0 wbmode=%d gainrange=
 const char* scGStream_IR_file = "v4l2src device=/dev/video4 ! 'video/x-raw' ! nvvidconv ! 'video/x-raw(memory:NVMM)' ! omxh264enc ! 'video/x-h264,stream-format=byte-stream' ! h264parse ! qtmux ! filesinklocation=testFlir.mp4";
 const char* scGStream_IR = "v4l2src device=/dev/video4 ! video/x-raw ! videoconvert ! video/x-raw,format=BGR ! appsink";
 
+int iUniqueId = 0;
+
 using namespace cv;
+
+CameraFrame::CameraFrame()
+: id(-1)
+{
+
+}
+
+CameraFrame& CameraFrame::operator=(Mat& source)
+{
+    id = iUniqueId++;
+    source.copyTo(matrix);
+}
+
+CameraFrame& CameraFrame::operator=(CameraFrame& other)
+{
+    id = other.id;
+    matrix = other.matrix;
+}
+
+void CameraFrame::DeepCopy(CameraFrame& source)
+{
+    id = source.id;
+    source.matrix.copyTo(matrix);
+}
 
 cameraFrame_depth::cameraFrame_depth(const rs2::depth_frame& _frame)
 : rs2::depth_frame(_frame)
@@ -72,39 +97,39 @@ rs2_vector CameraController::GetFrameAccel()
     return ret;
 }
 
-bool CameraController::GetFrameRGB(cv::Mat& imgCopy)
+bool CameraController::GetFrameRGB(CameraFrame& frmCopy)
 {
     bool bReturn = true;
     m.lock();
     if (FrameCurrentRGB.empty()) bReturn = false;
-    else FrameCurrentRGB.copyTo(imgCopy);
+    else frmCopy = FrameCurrentRGB;
     m.unlock();
     return bReturn;
 }
 
-bool CameraController::GetFrameIR(cv::Mat& imgCopy)
+bool CameraController::GetFrameIR(CameraFrame& frmCopy)
 {
     bool bReturn = true;
     m.lock();
     if (FrameCurrentIR.empty()) bReturn = false;
-    else FrameCurrentIR.copyTo(imgCopy);
+    else frmCopy = FrameCurrentIR;
     m.unlock();
     return true;
 }
 
-Signal* CameraController::GetSignalDepth()
+Signal CameraController::GetSignalDepth()
 {
-    return new Signal(sigDepth);
+    return sigDepth;
 }
 
-Signal* CameraController::GetSignalRGB()
+Signal CameraController::GetSignalRGB()
 {
-    return new Signal(sigRGB);
+    return sigRGB;
 }
 
-Signal* CameraController::GetSignalIR()
+Signal CameraController::GetSignalIR()
 {
-    return new Signal(sigIR);
+    return sigIR;
 }
 
 CameraController::CameraController(uint32_t _features, const char* _scSimulationFile)
