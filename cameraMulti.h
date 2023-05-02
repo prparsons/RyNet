@@ -56,9 +56,9 @@ public:
     rs2_vector GetFrameAccel();
     bool GetFrameRGB(CameraFrame& imgCopy);
     bool GetFrameIR(CameraFrame& imgCopy);
-    Signal* GetSignalDepth();
-    Signal* GetSignalRGB();
-    Signal* GetSignalIR();
+    Signal GetSignalDepth();
+    Signal GetSignalRGB();
+    // Signal* GetSignalIR();
 
     void Start();
     void Stop();

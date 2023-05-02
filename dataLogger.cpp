@@ -25,31 +25,31 @@ DataLogger::DataLogger()
 
 DataLogger::~DataLogger()
 {
-    Stop();
-}
-
-void DataLogger::Start()
-{
-    pThread = new std::thread(&DataLogger::run, this);
-}
-
-void DataLogger::Stop()
-{
     if (pThread != nullptr) {
-        ss.stop();
-        sigNewData.signal();
-        pThread->join();
+        if (pThread->joinable()) pThread->join();
         delete pThread;
         pThread = nullptr;
     }
 }
 
+void DataLogger::Start()
+{
+    pThread = new std::thread(&DataLogger::run, this, sigNewData, ssThread);
+}
 
-void DataLogger::run(void)
+void DataLogger::Stop()
+{
+    if (pThread != nullptr) {
+        ssThread.stop();
+        if (pThread->joinable()) pThread->join();
+    }
+}
+
+
+void DataLogger::run(Signal sigImage, StopSignal ss)
 {
     printf("DataLogger Thread\n");
 
-    Signal* pSigImage = new Signal(sigNewData); // Deleted in destructor
     time_t timeNow;
     struct tm* pTimeStruct;
 
@@ -73,7 +73,7 @@ void DataLogger::run(void)
 
     while (!ss.shouldStop()) {
         // Wait on signal
-        pSigImage->wait();
+        sigImage.wait(1000);
 
         // check text list, if not empty write
         mt.lock();
@@ -150,8 +150,6 @@ void DataLogger::run(void)
             SaveImage("flir", imageWrite, dataWrite);
         }
     }
-
-    delete pSigImage;
 }
 
 void DataLogger::LogImage(CameraFrame& frm, std::string strIdSource)

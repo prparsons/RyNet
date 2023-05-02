@@ -35,7 +35,7 @@ public:
     void LogString(const char* scData);
 
 private:
-    void run(void);
+    void run(Signal sigImage, StopSignal ss);
     void WriteImageData(cv::Mat& image, ImageLogData& imageData);
     void SaveImage(std::string strPrefix, cv::Mat& image, ImageLogData& imageData);
 
@@ -45,7 +45,7 @@ private:
 
     ThreadMutex mt;
     Signal sigNewData;
-    StopSignal ss;
+    StopSignal ssThread;
     std::thread* pThread;
 
     cv::Mat image;
