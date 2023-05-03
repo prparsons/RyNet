@@ -11,7 +11,7 @@ EVP_PKEY* hmacCreateKey(std::string strKey)
 {
     char scKey[EVP_MAX_MD_SIZE];
     for (int i = 0; i < EVP_MAX_MD_SIZE; i++) {
-	    scKey[i] = 0;
+        scKey[i] = 0;
     }
     strncpy(scKey, strKey.c_str(), strKey.length());
     //**not padding the key with anything
@@ -32,7 +32,7 @@ EVP_PKEY* hmacCreateKey(std::string strKey)
             bReturn = false;
         } else {
             printf("Key size%d, md_size%d\n", int(strKey.length()), size);
-	}
+        }
     }
     //if (bReturn && (size > strKey.length())) {
     //    printf("EVP_MD_size is too large\n");
@@ -161,9 +161,12 @@ int main()
     char* scHmac;
     char* scMessage;
     if (!hmacMessage("<pos_retrieve />", "Secret Key", 0, &scHmac, &scMessage)) {
-	    printf("Nope\n");
+        printf("Nope\n");
     }
-	std::cout << "Hellow world\n";
-	return 0;
+    for (int i = 0; i < 32; i++) {
+        printf("%02X", scHmac);
+    }
+    std::cout << "\nHello world\n";
+    return 0;
 }
 
