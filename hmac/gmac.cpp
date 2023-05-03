@@ -10,6 +10,9 @@
 EVP_PKEY* hmacCreateKey(std::string strKey)
 {
     char scKey[EVP_MAX_MD_SIZE];
+    for (int i = 0; i < EVP_MAX_MD_SIZE; i++) {
+	    scKey[i] = 0;
+    }
     strncpy(scKey, strKey.c_str(), strKey.length());
     //**not padding the key with anything
     EVP_PKEY* pKey = nullptr;
@@ -27,16 +30,18 @@ EVP_PKEY* hmacCreateKey(std::string strKey)
         if(size < 16) {
             printf("EVP_MD_size failed, error 0x%lx\n", ERR_get_error());
             bReturn = false;
-        }
+        } else {
+            printf("Key size%d, md_size%d\n", int(strKey.length()), size);
+	}
     }
-    if (bReturn && (size > strKey.length())) {
-        printf("EVP_MD_size is too large\n");
-        bReturn = false;
-    }
+    //if (bReturn && (size > strKey.length())) {
+    //    printf("EVP_MD_size is too large\n");
+    //    bReturn = false;
+    //}
 
     // Create the key itself
     if (bReturn) {
-        pKey = EVP_PKEY_new_mac_key(EVP_PKEY_HMAC, NULL, (const unsigned char*)strKey.c_str(), strKey.length());
+        pKey = EVP_PKEY_new_mac_key(EVP_PKEY_HMAC, NULL, (const unsigned char*)scKey, size);
         if (pKey == nullptr) {
             printf("EVP_PKEY_new_mac_key failed, error 0x%lx\n", ERR_get_error());
             bReturn = false;
@@ -85,16 +90,19 @@ bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** s
         pKey = hmacCreateKey(strKey);
         if (pKey == nullptr) bReturn = false;
     }
+    printf("key creation done\n");
     // Attach the key to the digest
     if (bReturn && (EVP_DigestSignInit(pSslCtx, NULL, pMd, NULL, pKey) != 1)) {
         printf("EVP_DigestSignInit failed, error 0x%lx\n", ERR_get_error());
         bReturn = false;
     }
+    printf("digest sign init done\n");
     // Add the message to the digest
     if (bReturn && (EVP_DigestSignUpdate(pSslCtx, scMessage, uMessageLength) != 1) ) {
         printf("EVP_DigestSignUpdate failed, error 0x%lx\n", ERR_get_error());
         bReturn = false;
     }
+    printf("digest sign update done\n");
 
     // Get the size of the digest, allocate enough room for the output
     size_t req = 0;
@@ -102,6 +110,7 @@ bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** s
         printf("EVP_DigestSignFinal failed (1), error 0x%lx\n", ERR_get_error());
         bReturn = false;
     }
+    printf("digest sign final done\n");
     if (bReturn && (req == 0)) {
         printf("EVP_DigestSignFinal failed (2), error 0x%lx\n", ERR_get_error());
         bReturn = false;
@@ -112,22 +121,26 @@ bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** s
         printf("OPENSSL_malloc failed, error 0x%lx\n", ERR_get_error());
         bReturn = false;
     }
+    printf("ssl malloc done\n");
 
     // Get the digest and verify size is correct
-    size_t* slen = nullptr;
-    if (bReturn && (EVP_DigestSignFinal(pSslCtx, (unsigned char*)(*scHmac), slen) != 1)) {
+    size_t slen = 0;
+    if (bReturn && (EVP_DigestSignFinal(pSslCtx, (unsigned char*)(*scHmac), &slen) != 1)) {
         printf("EVP_DigestSignFinal failed (3), error 0x%lx\n", ERR_get_error());
         bReturn = false;
     }
-    if (bReturn && (req != *slen)) {
-        printf("EVP_DigestSignFinal failed, mismatched signature sizes %ld, %ld", req, *slen);
+    printf("digest sign final 2 done\n");
+    if (bReturn && (req != slen)) {
+        printf("EVP_DigestSignFinal failed, mismatched signature sizes %ld, %ld", req, slen);
         bReturn = false;
     }
 
     if (!bReturn) {
+        printf("Failed to hmac things\n");
         delete scMessage;
         if (pSslCtx) EVP_MD_CTX_destroy(pSslCtx);
     } else {
+        printf("hmac successful, cleaning up\n");
         EVP_MD_CTX_destroy(pSslCtx);
         *_scMessage = scMessage;
     }
@@ -144,7 +157,12 @@ int main()
     
     // if(skey)
     //     EVP_PKEY_free(skey);
-
+    //EVP_PKEY* key = hmacCreateKey("Secret Key");
+    char* scHmac;
+    char* scMessage;
+    if (!hmacMessage("<pos_retrieve />", "Secret Key", 0, &scHmac, &scMessage)) {
+	    printf("Nope\n");
+    }
 	std::cout << "Hellow world\n";
 	return 0;
 }
