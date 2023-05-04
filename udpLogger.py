@@ -2,7 +2,37 @@
 import socket
 import xml.etree.ElementTree as ET
 from datetime import datetime
+import hashlib
+import hmac
    
+
+def hmacVerifyMessage(signature, bytesSalt, bytesMessage, key):
+    try: hmacVerifyMessage.salt
+    except AttributeError: hmacVerifyMessage.salt = -1
+
+    intSalt = int.from_bytes(bytesSalt, "big")
+    print("Verification Salt %d" % intSalt)
+    if intSalt <= hmacVerifyMessage.salt:
+        print("salt reuse")
+        return False
+        
+    h = hmac.new(key.encode(), bytesSalt + bytesMessage, hashlib.sha256)
+    print("Verification Digest: " + h.hexdigest())
+    retValue = h.digest() == signature
+    if retValue == True:
+        hmacVerifyMessage.salt = intSalt
+    return retValue
+
+def hmacCreateMessage(stringMessage, key):
+    try: hmacCreateMessage.salt
+    except AttributeError: hmacCreateMessage.salt = -1
+        
+    hmacCreateMessage.salt += 1
+    print("Creation Salt: %d" % hmacCreateMessage.salt)
+    h = hmac.new(key.encode(), hmacCreateMessage.salt.to_bytes(4, 'big') + stringMessage.encode(), hashlib.sha256)
+    print("Creation Digest: " + h.hexdigest())
+    return h.digest() + hmacCreateMessage.salt.to_bytes(4, 'big') + str.encode(stringMessage)
+
 #Open log file
 fileLog = open("logUDP.txt", "w")
 lat = 35.0
@@ -22,7 +52,15 @@ try:
     # Listen for incoming datagrams
     while(True):
         message,address = UDPServerSocket.recvfrom(1024)
-        message = message.decode('ascii')
+
+        if len(message) < 32:
+            print('message verification, too short failure')
+            continue
+        if hmacVerifyMessage(message[:32], message[32:36], message[36:], args.udp_hmac) == False:
+            print('message verification failure')
+            continue
+
+        message = message[36:].decode('ascii')
         
         current_time = datetime.now()
         time_stamp = current_time.timestamp()

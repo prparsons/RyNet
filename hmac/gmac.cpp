@@ -34,10 +34,10 @@ EVP_PKEY* hmacCreateKey(std::string strKey)
             printf("Key size%d, md_size%d\n", int(strKey.length()), size);
         }
     }
-    //if (bReturn && (size > strKey.length())) {
-    //    printf("EVP_MD_size is too large\n");
-    //    bReturn = false;
-    //}
+    if (bReturn && (size > strKey.length())) {
+       printf("EVP_MD_size is too large\n");
+       bReturn = false;
+    }
 
     // Create the key itself
     if (bReturn) {
