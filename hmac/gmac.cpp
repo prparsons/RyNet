@@ -154,7 +154,6 @@ bool hmacBuffer(std::string strMessage, std::string strKey, char** scHmac)
 
     size_t uMessageLength = strMessage.length();
     char* scMessage = new char[uMessageLength];
-    *((int32_t*)scMessage) = iSalt;
     strncpy(scMessage, strMessage.c_str(), strMessage.length());
     bool bReturn = true;
 
@@ -257,7 +256,7 @@ int main()
         printf("Nope\n");
     }
     for (int i = 0; i < 32; i++) {
-        printf("%02X", scHmac);
+        printf("%02X", ((unsigned char*)scHmac)[i]);
     }
     std::cout << "\nHello world\n";
     return 0;
