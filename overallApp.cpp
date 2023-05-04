@@ -18,6 +18,7 @@ enum OptionArgument {
     IMG_SLICES,
     SEGMENT_NET,
     DETECT_NET,
+    UDP_KEY,
     OPTION_NONE
 };
 
@@ -53,11 +54,13 @@ int main( int argc, char** argv )
     bool bRunAccel = false;
     bool bRunFlir = false;
     bool bDownsampleDepth = false;
+    bool bHmacUdp = false;
     // Command line arguments
     OptionArgument OptionArgumentSelection = OPTION_NONE;
     char scVideoSimPath[512];
     scVideoSimPath[0] = 0;
     char scServerAddress[32];
+    char scUdpKey[33];
     int iTargetClass = -1;
     int iNumSlices = -1;
     // Read all the command line arguments and options (--option argument)
@@ -94,6 +97,14 @@ int main( int argc, char** argv )
                         return -1;
                     }
                 } break;
+                case UDP_KEY: {
+                    if (strlen(argv[i]) > 32) {
+                        printL("Key is too long, it must not be more than 32 characters");
+                        return -1;
+                    }
+                    bHmacUdp = true;
+                    strncpy(scUdpKey, argv[i], 32);
+                } break;
                 default:
                     printL("OptionArgumentSelection Invalid");
                     return -1;
@@ -108,7 +119,10 @@ int main( int argc, char** argv )
             else if (strcmp("--downsample_depth", argv[i]) == 0) bDownsampleDepth = true;
             else if (strcmp("--run_accel", argv[i]) == 0) bRunAccel = true;
             else if (strcmp("--run_flir", argv[i]) == 0) bRunFlir = true;
-            else if (strcmp("--detection_net", argv[i]) == 0) {
+            else if (strcmp("--hmac_udp", argv[i]) == 0) {
+                bOptionArgument = true;
+                OptionArgumentSelection = UDP_KEY;
+            } else if (strcmp("--detection_net", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = DETECT_NET;
             } else if (strcmp("--segment_net", argv[i]) == 0) {
@@ -155,6 +169,7 @@ int main( int argc, char** argv )
         printL(">>>Getting Flight Controller");
         FlightController* pController = FlightController::GetFlightController(logger, *pCamera);
         if (bManualServerAddress) pController->SetServerAddress(scServerAddress);
+        if (bHmacUdp) pController->SetUdpKey(scUdpKey);
 
         printL(">>>Creating Navigator");
         Navigator nav(*pController, logger, *pCamera);
@@ -246,6 +261,9 @@ void printHelp()
     printL(" --segment_net [ABCDE]");
     printL("    Network model to be used with the image segmentation network. segnet --help");
     printL("    will list available models.\n");
+    printL(" --hmac_udp [ABCDE]");
+    printL("    All UDP messages sent/received will be verified with a salted hmac.");
+    printL("    Target is a string up to 32 characters long with no spaces.\n");
 }
 
 void cleanupFailure()

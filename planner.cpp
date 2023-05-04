@@ -20,6 +20,7 @@ FlightController::FlightController(DataLogger& _logger, CameraController& _camer
 , sigCameraDepth(_camera.GetSignalDepth())
 , socketDesc(-1)
 {
+    scKey[0] = 0;
     strcpy(scMavLinkAddress, "127.0.0.1");
     memset(&addressMavLink, 0, sizeof(addressMavLink));
 }
@@ -177,6 +178,11 @@ void FlightController::RestoreRouteClean()
 void FlightController::SetServerAddress(const char* scServerAddress)
 {
     strncpy(scMavLinkAddress, scServerAddress, 32);
+}
+
+void FlightController::SetUdpKey(const char* _scKey)
+{
+    strncpy(scKey, _scKey, 32);
 }
 
 void FlightController::SaveRoute()

@@ -36,6 +36,7 @@ public:
     void RestoreRouteClean();
 
     void SetServerAddress(const char* scServerAddress);
+    void SetUdpKey(const char* scUdpKey);
 
 private:
     FlightController(DataLogger& logger, CameraController& camera);
@@ -66,5 +67,6 @@ private:
     int socketDesc;
     char scMavLinkAddress[32];
     const int iMavlinkPort = 3636;
+    char scKey[33];
 };
 
