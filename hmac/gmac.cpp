@@ -7,16 +7,17 @@
 // def hmacVerifyMessage(signature, bytesSalt, bytesMessage, key):
 // def hmacCreateMessage(stringMessage, key):
 
-EVP_PKEY* hmacCreateKey(std::string strKey)
+EVP_PKEY* hmacCreateKey(const char* _scKey)
 {
     char scKey[EVP_MAX_MD_SIZE];
     for (int i = 0; i < EVP_MAX_MD_SIZE; i++) {
         scKey[i] = 0;
     }
-    strncpy(scKey, strKey.c_str(), strKey.length());
-    //**not padding the key with anything
+    size_t uKeyLength = strlen(_scKey);
+    if (uKeyLength > EVP_MAX_MD_SIZE) uKeyLength = EVP_MAX_MD_SIZE;
+    strncpy(scKey, _scKey, uKeyLength);
+    
     EVP_PKEY* pKey = nullptr;
-
     // Get the key type, create the digest
     bool bReturn = true;
     const EVP_MD* pMd = EVP_get_digestbyname("SHA256");
@@ -30,11 +31,9 @@ EVP_PKEY* hmacCreateKey(std::string strKey)
         if(size < 16) {
             printf("EVP_MD_size failed, error 0x%lx\n", ERR_get_error());
             bReturn = false;
-        } else {
-            printf("Key size%d, md_size%d\n", int(strKey.length()), size);
         }
     }
-    if (bReturn && (size > strKey.length())) {
+    if (bReturn && (size > int(uKeyLength))) {
        printf("EVP_MD_size is too large\n");
        bReturn = false;
     }
@@ -54,15 +53,15 @@ EVP_PKEY* hmacCreateKey(std::string strKey)
     return pKey;
 }
 
-bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** scHmac, char** _scMessage)
+bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** scHmac, char** scSaltAndMessageOut)
 {
     *scHmac = nullptr;
-    *_scMessage = nullptr;
+    *scSaltAndMessageOut = nullptr;
 
     size_t uMessageLength = strMessage.length() + 4;
-    char* scMessage = new char[uMessageLength];
-    *((int32_t*)scMessage) = iSalt;
-    strncpy(scMessage + 4, strMessage.c_str(), strMessage.length());
+    char* scSaltAndMessage = new char[uMessageLength];
+    *((int32_t*)scSaltAndMessage) = iSalt;
+    strncpy(scSaltAndMessage + 4, strMessage.c_str(), strMessage.length());
     bool bReturn = true;
 
     // Create the message digest context
@@ -70,7 +69,7 @@ bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** s
     pSslCtx = EVP_MD_CTX_create();
     if (pSslCtx == nullptr) {
         printf("EVP_MD_CTX_create failed, error 0x%lx\n", ERR_get_error());
-        delete[] scMessage;
+        delete[] scSaltAndMessage;
         return false;
     }
     // Get the message digest for sha256
@@ -98,7 +97,7 @@ bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** s
     }
     printf("digest sign init done\n");
     // Add the message to the digest
-    if (bReturn && (EVP_DigestSignUpdate(pSslCtx, scMessage, uMessageLength) != 1) ) {
+    if (bReturn && (EVP_DigestSignUpdate(pSslCtx, scSaltAndMessage, uMessageLength) != 1) ) {
         printf("EVP_DigestSignUpdate failed, error 0x%lx\n", ERR_get_error());
         bReturn = false;
     }
@@ -137,12 +136,12 @@ bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** s
 
     if (!bReturn) {
         printf("Failed to hmac things\n");
-        delete scMessage;
+        delete scSaltAndMessage;
         if (pSslCtx) EVP_MD_CTX_destroy(pSslCtx);
     } else {
         printf("hmac successful, cleaning up\n");
         EVP_MD_CTX_destroy(pSslCtx);
-        *_scMessage = scMessage;
+        *scSaltAndMessageOut = scSaltAndMessage;
     }
 
     return bReturn;
