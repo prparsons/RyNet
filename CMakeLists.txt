@@ -16,6 +16,9 @@ find_package( OpenCV REQUIRED )
 include_directories( ${OpenCV_INCLUDE_DIRS} )
 link_directories(/usr/lib/aarch64-linux-gnu/tegra)
 
+# OpenSSL
+find_package(OpenSSL REQUIRED)
+
 # CUDA and Qt4 are required
 find_package(CUDA)
 find_package(Qt4)
@@ -36,4 +39,4 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 cuda_add_executable(overallApp overallApp.cpp dataLogger.cpp cameraMulti.cpp planner.cpp navigation.cpp )
 
 # link my-recognition to jetson-inference library
-target_link_libraries(overallApp jetson-inference realsense2 ${OpenCV_LIBS})
+target_link_libraries(overallApp jetson-inference realsense2 OpenSSL::SSL ${OpenCV_LIBS})
