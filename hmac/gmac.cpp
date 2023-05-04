@@ -33,7 +33,7 @@ EVP_PKEY* hmacCreateKey(const char* _scKey)
             bReturn = false;
         }
     }
-    if (bReturn && (size > int(uKeyLength))) {
+    if (bReturn && (size > EVP_MAX_MD_SIZE)) {
        printf("EVP_MD_size is too large\n");
        bReturn = false;
     }
@@ -86,7 +86,7 @@ bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** s
 
     EVP_PKEY* pKey = nullptr;
     if (bReturn) {
-        pKey = hmacCreateKey(strKey);
+        pKey = hmacCreateKey(strKey.c_str());
         if (pKey == nullptr) bReturn = false;
     }
     printf("key creation done\n");
@@ -178,7 +178,7 @@ bool hmacBuffer(std::string strMessage, std::string strKey, char** scHmac)
 
     EVP_PKEY* pKey = nullptr;
     if (bReturn) {
-        pKey = hmacCreateKey(strKey);
+        pKey = hmacCreateKey(strKey.c_str());
         if (pKey == nullptr) bReturn = false;
     }
     printf("key creation done\n");
