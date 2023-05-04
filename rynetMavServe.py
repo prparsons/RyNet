@@ -88,10 +88,10 @@ parser.add_argument('--port', type=int, default=3636, help="Port to listen on [d
 parser.add_argument('--livetest', default='False', help='If True, will only send <obs /> messages to the drone.')
 parser.add_argument('--clean_dist_visit', type=int, default=10, help='Distance between visited points that is close enough to consider them duplicates.')
 parser.add_argument('--clean_dist_way', type=int, default=100, help='Distance from visited point that is close enough to remove a waypoint from mission list.')
-
+parser.add_argument('--udp_hmac', type=str, default='', help='If specified, all udp commands will be verified. String key should be provided.')
 #args = parser.parse_args()
 #Testing without command line, use below
-args = parser.parse_args("--port 3636 --connect tcp:127.0.0.1:5762".split())
+args = parser.parse_args("--port 3636 --connect tcp:127.0.0.1:5762 --udp_hmac SecretKey".split())
 visitedList = []
 
 def hmacVerifyMessage(signature, bytesSalt, bytesMessage, key):
@@ -103,12 +103,13 @@ def hmacVerifyMessage(signature, bytesSalt, bytesMessage, key):
     if intSalt <= hmacVerifyMessage.salt:
         print("salt reuse")
         return False
-    else:
-        hmacVerifyMessage.salt = intSalt
         
     h = hmac.new(key.encode(), bytesSalt + bytesMessage, hashlib.sha256)
     print("Verification Digest: " + h.hexdigest())
-    return h.digest() == signature
+    retValue = h.digest() == signature
+    if retValue == True:
+        hmacVerifyMessage.salt = intSalt
+    return retValue
 
 def hmacCreateMessage(stringMessage, key):
     try: hmacCreateMessage.salt
@@ -124,7 +125,7 @@ def hmacCreateMessage(stringMessage, key):
 #message = '<pos_retrieve />'
 #key = 'Secret Key'
 #bytesSig = hmacCreateMessage(message, key)
-#print(hmacVerifyMessage(bytesSig[:32], hmacCreateMessage.salt.to_bytes(4, 'big'), message.encode(), key))
+#print(hmacVerifyMessage(bytesSig[:32], bytesSig[32:36], bytesSig[36:], key))
 #Should get the following output:
 #Creation Salt: 0
 #Creation Digest: b227c99f8f6255dc93596b8fecc1274708e31ce84b72a11c64e413b39539ecd3
@@ -647,7 +648,16 @@ def arm_and_takeoff(vehicle, aTargetAltitude):
 def recvUDP(sock, vehicle):
     try:
         message,address = sock.recvfrom(1024)
-        parseXML(message, vehicle, sock, address)
+        if args.udp_hmac != '':
+            if len(message) < 32:
+                print('message verification, too short failure')
+                return
+            if hmacVerifyMessage(message[:32], message[32:36], message[36:], args.udp_hmac) == False:
+                print('message verification failure')
+                return
+            parseXML(message[36:], vehicle, sock, address)
+        else:
+            parseXML(message, vehicle, sock, address)
     except:
         print('recv failure')
 
