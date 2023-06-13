@@ -52,6 +52,7 @@ int main( int argc, char** argv )
     bool bRunRGB = true;
     bool bRunDepth = true;
     bool bRunAccel = false;
+    bool bRunFlir = false;
     bool bDownsampleDepth = false;
     // Command line arguments
     OptionArgument OptionArgumentSelection = OPTION_NONE;
@@ -108,6 +109,7 @@ int main( int argc, char** argv )
             else if (strcmp("--downsample_depth", argv[i]) == 0) bDownsampleDepth = true;
             else if (strcmp("--run_accel", argv[i]) == 0) bRunAccel = true;
             else if (strcmp("--battery_monitor", argv[i]) == 0) bBatteryMonitor = true;
+            else if (strcmp("--run_flir", argv[i]) == 0) bRunFlir = true;
             else if (strcmp("--detection_net", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = DETECT_NET;
@@ -148,6 +150,7 @@ int main( int argc, char** argv )
         if (bRunDepth) uCameraFeatures += CameraController_Depth;
         if (bRunAccel) uCameraFeatures += CameraController_Accel;
         if (bDownsampleDepth) uCameraFeatures += CameraController_DownsampleDepth;
+        if (bRunFlir) uCameraFeatures += CameraController_IR;
         if (bSimulateVideo) pCamera = CameraController::OpenCamera(uCameraFeatures, scVideoSimPath);
         else pCamera = CameraController::OpenCamera(uCameraFeatures);
 
@@ -170,7 +173,7 @@ int main( int argc, char** argv )
         printL(">>>Starting Navigator");
         nav.Start();
         printL(">>>Starting Flight Controller");
-        pController->Start(bRunDepth, bStartPointLogger);
+        pController->Start(bRunDepth, bStartPointLogger, bRunFlir);
 
         // std::system_error if the thread could not be started.
         //**I think there might be issues with shutdown of stuff...need to trace through it all and double check
@@ -180,11 +183,11 @@ int main( int argc, char** argv )
         // If we get here, depth failed 
         if (bStopNavOnDepthFail) {
             printL(">>>Sending stop signal to stop Nav");
-            nav.Stop();
+            nav.SignalStop();
             ///***this has changed a bit since -> //**I got a seg fault once without --continue, I wonder if it's something to do with this? (datalogger wasn't cleaning up threads...)
-        } else {
-            nav.Join();
-        }// else could have a set alititude option, climb a bit if no depth?
+        }
+
+        nav.Join();
         printL(">>>Navigator Stopped");
         if (bSendRTL) pController->SetRTL();
         logger.Stop();
@@ -234,6 +237,8 @@ void printHelp()
     printL(" --battery_monitor");
     printL("    Run battery monitor thread that will stop navigation and send RTL if");
     printL("    battery level drops below 50%.\n");
+    printL(" --run_flir");
+    printL("    Enable the flir thermal camera on /dev/video4.\n");
     printL(" --nav_target [XX]");
     printL("    Manually specify the target class the Navigation network should target.");
     printL("    Target is number from 0-255.\n");

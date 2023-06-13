@@ -17,6 +17,7 @@ void printL(const char* sc)
 
 DataLogger::DataLogger()
 : bWriteImg(false)
+, bWriteImgIr(false)
 , bWriteMask(false)
 , pThread(nullptr)
 {
@@ -24,31 +25,31 @@ DataLogger::DataLogger()
 
 DataLogger::~DataLogger()
 {
-    Stop();
-}
-
-void DataLogger::Start()
-{
-    pThread = new std::thread(&DataLogger::run, this);
-}
-
-void DataLogger::Stop()
-{
     if (pThread != nullptr) {
-        ss.stop();
-        sigNewData.signal();
-        pThread->join();
+        if (pThread->joinable()) pThread->join();
         delete pThread;
         pThread = nullptr;
     }
 }
 
+void DataLogger::Start()
+{
+    pThread = new std::thread(&DataLogger::run, this, sigNewData, ssThread);
+}
 
-void DataLogger::run(void)
+void DataLogger::Stop()
+{
+    if (pThread != nullptr) {
+        ssThread.stop();
+        if (pThread->joinable()) pThread->join();
+    }
+}
+
+
+void DataLogger::run(Signal sigImage, StopSignal ss)
 {
     printf("DataLogger Thread\n");
 
-    Signal* pSigImage = new Signal(sigNewData); // Deleted in destructor
     time_t timeNow;
     struct tm* pTimeStruct;
 
@@ -72,7 +73,7 @@ void DataLogger::run(void)
 
     while (!ss.shouldStop()) {
         // Wait on signal
-        pSigImage->wait();
+        sigImage.wait(1000);
 
         // check text list, if not empty write
         mt.lock();
@@ -105,20 +106,7 @@ void DataLogger::run(void)
         mt.unlock();
         if (bWriteImgLocal) {
             bWriteImgLocal = false;
-            WriteImageData(imageWrite, dataImage);
-            timeNow = time(nullptr);
-            pTimeStruct = localtime(&timeNow);
-            char scFileName[128];
-            snprintf(scFileName, 
-                    127, 
-                    "images/img_%d_%d_%d_%d_%d_%d.jpg", 
-                    pTimeStruct->tm_year + 1900, 
-                    pTimeStruct->tm_mon + 1,
-                    pTimeStruct->tm_mday,
-                    pTimeStruct->tm_hour,
-                    pTimeStruct->tm_min,
-                    pTimeStruct->tm_sec);
-            cv::imwrite(scFileName, imageWrite);
+            SaveImage("img", imageWrite, dataWrite);
         }
 
         // Check if there's a mask we should write
@@ -127,6 +115,7 @@ void DataLogger::run(void)
             bWriteMask = false;
             bWriteImgLocal = true;
             imageWrite = mask;
+            dataWrite = dataMask;
         }
         mt.unlock();
         if (bWriteImgLocal) {
@@ -136,7 +125,8 @@ void DataLogger::run(void)
             char scFileName[128];
             snprintf(scFileName, 
                     127, 
-                    "masks/mask_%d_%d_%d_%d_%d_%d.jpg", 
+                    "masks/mask[%d]_%d_%d_%d_%d_%d_%d.jpg", 
+                    dataWrite.id,
                     pTimeStruct->tm_year + 1900, 
                     pTimeStruct->tm_mon + 1,
                     pTimeStruct->tm_mday,
@@ -145,19 +135,31 @@ void DataLogger::run(void)
                     pTimeStruct->tm_sec);
             cv::imwrite(scFileName, imageWrite);
         }
-    }
 
-    delete pSigImage;
+        // Check if there's an IR image we should write
+        mt.lock();
+        if (bWriteImgIr) {
+            bWriteImgIr = false;
+            bWriteImgLocal = true;
+            imageWrite = imageIr;
+            dataWrite = dataImageIr;
+        }
+        mt.unlock();
+        if (bWriteImgLocal) {
+            bWriteImgLocal = false;
+            SaveImage("flir", imageWrite, dataWrite);
+        }
+    }
 }
 
-void DataLogger::LogImage(cv::Mat& im, std::string strIdSource)
+void DataLogger::LogImage(CameraFrame& frm, std::string strIdSource)
 {
     ImageLogData& data = mapImageData[strIdSource];
     time_t timeNow = time(nullptr);
     time_t timeDifference = timeNow - data.timeLast;
     data.timeLast = timeNow;
     if (timeDifference < SEC_BETWEEN_IMAGES) return;
-    
+    data.id = frm.GetId();
     if (!FlightController::GetPosition(data.fLat, data.fLon)) {
         data.fLat = 0;
         data.fLon = 0;
@@ -167,17 +169,42 @@ void DataLogger::LogImage(cv::Mat& im, std::string strIdSource)
     }
     
     mt.lock();
-    image = im.clone();
+    image = frm.matrix.clone();
     dataImage = data;
     bWriteImg = true;
     mt.unlock();
     sigNewData.signal();
 }
 
-void DataLogger::LogMask(float4* pImg, int width, int height)
+void DataLogger::LogImageIr(CameraFrame& frm)
+{
+    ImageLogData& data = mapImageData["IR"];
+    time_t timeNow = time(nullptr);
+    time_t timeDifference = timeNow - data.timeLast;
+    data.timeLast = timeNow;
+    if (timeDifference < SEC_BETWEEN_IMAGES) return;
+    data.id = frm.GetId();
+    if (!FlightController::GetPosition(data.fLat, data.fLon)) {
+        data.fLat = 0;
+        data.fLon = 0;
+    }
+    if (!FlightController::GetHeading(data.fHeading)) {
+        data.fHeading = 999; // Obvious incorrect value
+    }
+    
+    mt.lock();
+    imageIr = frm.matrix.clone();
+    dataImageIr = data;
+    bWriteImgIr = true;
+    mt.unlock();
+    sigNewData.signal();
+}
+
+void DataLogger::LogMask(float4* pImg, int iImageId, int width, int height)
 {
     cv::Mat tempMat(height, width, CV_32FC4, (void*)pImg);
     mt.lock();
+    dataMask.id = iImageId;
     mask = tempMat.clone();
     bWriteMask = true;
     mt.unlock();
@@ -211,8 +238,8 @@ void DataLogger::WriteImageData(cv::Mat& image, ImageLogData& imageData)
     // Now write stuff at the bottom, 2 rows, 5 pixel padding
     double dFontSize = cv::getFontScaleFromHeight(cv::FONT_HERSHEY_SIMPLEX, 20, 1);
     char sc[512];
-    snprintf(sc, 511, "Lat:%.7f Lon:%.7f Alt:%.1fm Head:%.2f Pit:%.2f",
-                imageData.fLat, imageData.fLon, 3.0, imageData.fHeading, imageData.fPitch);
+    snprintf(sc, 511, "Image:%d Lat:%.7f Lon:%.7f Alt:%.1fm Head:%.2f Pit:%.2f",
+                imageData.id, imageData.fLat, imageData.fLon, 3.0, imageData.fHeading, imageData.fPitch);
     cv::putText(imageLarger, 
                 sc,
                 cv::Point(5, image.rows + 25),
@@ -220,4 +247,23 @@ void DataLogger::WriteImageData(cv::Mat& image, ImageLogData& imageData)
                 dFontSize,
                 cv::Scalar(255, 255, 255));
     image = imageLarger;
+}
+
+void DataLogger::SaveImage(std::string strPrefix, cv::Mat& image, ImageLogData& imageData)
+{
+    WriteImageData(image, imageData);
+    time_t timeNow = time(nullptr);
+    struct tm* pTimeStruct = localtime(&timeNow);
+    char scFileName[128];
+    snprintf(scFileName, 
+            127, 
+            "images/%s_%d_%d_%d_%d_%d_%d.jpg",
+            strPrefix.c_str(),
+            pTimeStruct->tm_year + 1900, 
+            pTimeStruct->tm_mon + 1,
+            pTimeStruct->tm_mday,
+            pTimeStruct->tm_hour,
+            pTimeStruct->tm_min,
+            pTimeStruct->tm_sec);
+    cv::imwrite(scFileName, image);
 }
