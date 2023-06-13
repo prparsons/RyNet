@@ -420,7 +420,7 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
 
     StopSignal ssBattery;
     std::thread* pThrBattery = nullptr;
-    if (bStartBatteryMonitor) pThrBattery = new std::thread(&Navigator::runBattery, this, &ssBattery);
+    if (bStartBatteryMonitor) pThrBattery = new std::thread(&Navigator::runBattery, this, ssBattery, ssMain);
     
     detector.Start();
     segmenter.Start();
@@ -486,23 +486,20 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
     
     if (bStartBatteryMonitor) {
         ssBattery.stop();
-        pThrBattery->join();
+        if (pThrBattery->joinable()) pThrBattery->join();
         delete pThrBattery;
         if (bSendRTL) control.SetRTL();
     }
 }
 
-void Navigator::runBattery(StopSignal* pSs)
+void Navigator::runBattery(StopSignal ss, StopSignal ssMainThread)
 {
     printL("Navigator::runBattery");
-    if (pSs == nullptr) {
-        printL("Navigator::runBattery no stop signal");
-        return;
-    }
+
     // Loop over uCheckBattery, on each overflow we'll check the battery. This way we don't have to check very often,
     //  but don't wait too long while tryin to stop this thread.
     uint8_t uCheckBattery = 0;
-    while (!pSs->shouldStop()) {
+    while (!ss.shouldStop()) {
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
         if (uCheckBattery++ != 0) continue;
 
@@ -512,11 +509,7 @@ void Navigator::runBattery(StopSignal* pSs)
         // For now, simple method...if battery is < 50% then we will stop the nav threads and RTL.
         if (iBattery < 50) {
             bSendRTL = true;
-            ssMain.stop();
-            // Make sure the thread will stop in the event the camera isn't running (see Stop())
-            Signal* pSigRGB = camera.GetSignalRGB();
-            pSigRGB->signal();
-            delete pSigRGB;
+            ssMainThread.stop();
             break;
         }
     }

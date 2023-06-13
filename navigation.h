@@ -94,7 +94,7 @@ public:
     void SetNumberImageSlices(int iNumSlices);
 
 private:
-    void runBattery(StopSignal* pSs);
+    void runBattery(StopSignal ss, StopSignal ssMainThread);
     void runNavigator(Signal sig, StopSignal ss);
 
     // ONLY access from runBattery. runNavigator will access it AFTER it has joined runBattery
