@@ -13,6 +13,7 @@ ObjectDetection::ObjectDetection(DataLogger& _logger)
 : iNumSlices(3)
 , logger(_logger)
 , pNetwork(nullptr)
+, pThread(nullptr)
 {
     pNetwork = detectNet::Create(networkDetection);
 	//detectNet* net = detectNet::Create(detectNet::SSD_MOBILENET_V2, 0.5f, 1, TYPE_FASTEST, DEVICE_DLA_0);DEVICE_DLA_1 DEVICE_GPU
@@ -22,18 +23,24 @@ ObjectDetection::ObjectDetection(DataLogger& _logger)
 ObjectDetection::~ObjectDetection()
 {
     if (pNetwork != nullptr) delete pNetwork;
+    if (pThread != nullptr) {
+        ssMain.stop();
+        if (pThread->joinable()) pThread->join();
+        delete pThread;
+    }
 }
 
-void ObjectDetection::SetNewImage(image& img)
+void ObjectDetection::SetNewImage(CameraFrame& frm)
 {
     mt.lock();
-    img.copyTo(imgRecent);
+    frmRecent.DeepCopy(frm);
     mt.unlock();
     sigNewImage.signal();
 }
 
-bool ObjectDetection::ProcessImage(image& _imgRGB)
+bool ObjectDetection::ProcessImage(CameraFrame& frm)
 {
+    cv::Mat& _imgRGB = frm.matrix;
     cv::Mat imgRGB;
     cv::resize(_imgRGB, imgRGB, cv::Size(_imgRGB.cols / 2, _imgRGB.rows / 2), cv::INTER_LINEAR);
     // 1080x1920 -> 540x960  --- 3 images at 540x320
@@ -61,7 +68,8 @@ bool ObjectDetection::ProcessImage(image& _imgRGB)
         char sc[128];
         for (int i = 0; i < iDetections; i++) {
             bRet = true;
-            snprintf(sc, 127, "Detection Slice,Class,Confidence[%d,%d,%d] LTRB:%d %d %d %d", 
+            snprintf(sc, 127, "ImageId, Detection Slice,Class,Confidence[%d,%d,%d,%d] LTRB:%d %d %d %d", 
+                    frm.GetId(),
                     s,
                     int(arDetections[i].ClassID), 
                     int(arDetections[i].Confidence * 100),
@@ -77,34 +85,34 @@ bool ObjectDetection::ProcessImage(image& _imgRGB)
     return bRet;
 }
 
-void ObjectDetection::run()
+void ObjectDetection::run(Signal sig, StopSignal ss)
 {
     printL("ObjectDetection::run");
-    Signal* pSigRGB = new Signal(sigNewImage);
-    image imgProcess;
+    CameraFrame frmProcess;
     int iFramesProcessed = 0;
     while (!ss.shouldStop()) {
-        pSigRGB->wait();
+        sig.wait(1000);
         mt.lock();
-        imgProcess = imgRecent;
+        frmProcess = frmRecent; // This doesn't need to be a deep copy
         mt.unlock();
-        if (imgProcess.empty()) continue;
+        if (frmProcess.matrix.empty()) continue;
         iFramesProcessed++;
 
-        if (ProcessImage(imgProcess)) {
-            logger.LogImage(imgProcess, "detect");
+        if (ProcessImage(frmProcess)) {
+            logger.LogImage(frmProcess, "detect");
         }
     }
-    delete pSigRGB;
     printf("ObjectDetection::run Frames Processed:%d\n", iFramesProcessed);
+}
+
+void ObjectDetection::Start()
+{
+    pThread = new std::thread(&ObjectDetection::run, this, sigNewImage, ssMain);
 }
 
 void ObjectDetection::SendStopSignal()
 {
-    ss.stop();
-    // If the camera has stopped, or isn't running, then we need to signal or else it won't ever
-    //  get to the ss.shouldStop check.
-    sigNewImage.signal();
+    ssMain.stop();
 }
 
 void ObjectDetection::SetNumberImageSlices(int _iNumSlices)
@@ -135,6 +143,7 @@ TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
 , fImageFOV(50) // I calculated this number based on the imx477 sensor size with a 6mm lens
 , logger(_logger)
 , pMask(nullptr)
+, pThread(nullptr)
 {
     pNetwork = segNet::Create(networkSegmentation);//FCN_RESNET18_SUNRGB_640x512);//segNet::FCN_RESNET18_DEEPSCENE_576x320);FCN_ALEXNET_AERIAL_FPV_720p
 //  static segNet* Create( NetworkType networkType=FCN_ALEXNET_CITYSCAPES_SD, uint32_t maxBatchSize=DEFAULT_MAX_BATCH_SIZE,
@@ -144,6 +153,11 @@ TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
 TerrainSegmentation::~TerrainSegmentation()
 {
     if (pMask != nullptr) delete[] pMask;// cudaFree(pMask);
+    if (pThread != nullptr) {
+        ssMain.stop();
+        if (pThread->joinable()) pThread->join();
+        delete pThread;
+    }
 }
 
 bool TerrainSegmentation::IsHabitatVisible()
@@ -162,47 +176,48 @@ float TerrainSegmentation::GetHabitatDirection()
     return fReturn;
 }
 
-void TerrainSegmentation::SetNewImage(image& img)
+void TerrainSegmentation::SetNewImage(CameraFrame& frm)
 {
     mt.lock();
-    img.copyTo(imgRecent);
+    frmRecent.DeepCopy(frm);
     mt.unlock();
     sigNewImage.signal();
 }
 
-void TerrainSegmentation::run()
+void TerrainSegmentation::Start()
+{
+    pThread = new std::thread(&TerrainSegmentation::run, this, sigNewImage, ssMain);
+}
+
+void TerrainSegmentation::run(Signal sig, StopSignal ss)
 {
     printL("TerrainSegmentation::run");
-    Signal* pSigRGB = new Signal(sigNewImage);
-    image imgProcess;
+    CameraFrame frmProcess;
     int iFramesProcessed = 0;
+
     while (!ss.shouldStop()) {
-        pSigRGB->wait();
+        sig.wait(1000);
         mt.lock();
-        imgProcess = imgRecent;
+        frmProcess = frmRecent; // This doesn't need to be a deep copy?
         mt.unlock();
-        if (imgProcess.empty()) continue;
+        if (frmProcess.matrix.empty()) continue;
         
         iFramesProcessed++;
-        if (ProcessImage(imgProcess)) {
-            logger.LogImage(imgProcess, "segment");
+        if (ProcessImage(frmProcess)) {
+            logger.LogImage(frmProcess, "segment");
             char sc[128];
             mt.lock();
-            sprintf(sc, "Good Habitat Found %2.2f", fBestDirection);
+            sprintf(sc, "Good Habitat Found %2.2f [Image:%d]", fBestDirection, frmProcess.GetId());
             mt.unlock();
             logger.LogString(sc);
         }
     }
-    delete pSigRGB;
     printf("TerrainSegmentation::run Frames Processed: %d\n", iFramesProcessed);
 }
 
 void TerrainSegmentation::SendStopSignal()
 {
-    ss.stop();
-    // If the camera has stopped, or isn't running, then we need to signal or else it won't ever
-    //  get to the ss.shouldStop check.
-    sigNewImage.signal();
+    ssMain.stop();
 }
 
 void TerrainSegmentation::SetTargetClass(uint8_t _uTargetClass)
@@ -260,8 +275,9 @@ bool TerrainSegmentation::SetNetwork(const char* scNetwork)
     return false;
 }
 
-bool TerrainSegmentation::ProcessImage(image& imgRGB)
+bool TerrainSegmentation::ProcessImage(CameraFrame& frm)
 {
+    cv::Mat& imgRGB = frm.matrix;
     int imgWidth = imgRGB.cols;      // width of the image (in pixels)
     int imgHeight = imgRGB.rows;      // height of the image (in pixels)
     // 1080x1920  -- 3 images at 1080x640
@@ -292,7 +308,7 @@ bool TerrainSegmentation::ProcessImage(image& imgRGB)
             cudaFree(u3Img);
             return false;
         }
-        if (ScanMask(pMask, imgWidth, iSliceHeight)) {
+        if (ScanMask(pMask, frm.GetId(), imgWidth, iSliceHeight)) {
             // We're starting at the top, which would be the furthest away.
             //  So as soon as we find our target, then just stop scanning
             bRet = true;
@@ -307,7 +323,7 @@ bool TerrainSegmentation::ProcessImage(image& imgRGB)
     return bRet;
 }
 
-bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iWidth, int iHeight)
+bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iImageId, int iWidth, int iHeight)
 {
     int size = iWidth * iHeight;
     float fAngleAvgSum = 0;
@@ -335,7 +351,7 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iWidth, int iHeight)
     float4* imgMask;
     if (!CUDA_FAILED(cudaHostAlloc(&imgMask, maskWidth*maskHeight*16, cudaHostAllocMapped))) {
         pNetwork->Mask(imgMask, maskWidth, maskHeight, segNet::FILTER_POINT);
-        logger.LogMask(imgMask, maskWidth, maskHeight);
+        logger.LogMask(imgMask, iImageId, maskWidth, maskHeight);
         cudaFreeHost(imgMask);
     }
     mt.lock();
@@ -351,6 +367,7 @@ Navigator::Navigator(FlightController& _control, DataLogger& _logger, CameraCont
 , control(_control)
 , logger(_logger)
 , camera(_camera)
+, sigMainRGB(_camera.GetSignalRGB())
 , pThread(nullptr)
 , detector(logger)
 , segmenter(logger)
@@ -360,20 +377,22 @@ Navigator::Navigator(FlightController& _control, DataLogger& _logger, CameraCont
 
 Navigator::~Navigator()
 {
-    Stop();
+    if (pThread != nullptr) {
+        ssMain.stop();
+        if (pThread->joinable()) pThread->join();
+        delete pThread;
+    }
 }
     
 void Navigator::Start()
 {
-    pThread = new std::thread(&Navigator::runNavigator, this);
+    pThread = new std::thread(&Navigator::runNavigator, this, sigMainRGB, ssMain);
 }
 
 void Navigator::Join()
 {
-    if (pThread != nullptr) {
+    if (pThread != nullptr && pThread->joinable()) {
         pThread->join();
-        delete pThread;
-        pThread = nullptr;
     }
 }
 
@@ -381,26 +400,6 @@ void Navigator::SignalStop()
 {
     if (pThread != nullptr) {
         ssMain.stop();
-        // If there's nothing coming from the camera, we need to signal it or else the thread
-        //  will never get to the ss.shouldStop().
-        Signal* pSigRGB = camera.GetSignalRGB();
-        pSigRGB->signal();
-        delete pSigRGB;
-    }
-}
-
-void Navigator::Stop()
-{
-    if (pThread != nullptr) {
-        ssMain.stop();
-        // If there's nothing coming from the camera, we need to signal it or else the thread
-        //  will never get to the ss.shouldStop().
-        Signal* pSigRGB = camera.GetSignalRGB();
-        pSigRGB->signal();
-        pThread->join();
-        delete pSigRGB;
-        delete pThread;
-        pThread = nullptr;
     }
 }
 
@@ -410,26 +409,26 @@ void Navigator::SetNumberImageSlices(int iNumSlices)
     segmenter.SetNumberImageSlices(iNumSlices);
 }
 
-void Navigator::runNavigator()
+void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
 {
     printL("Navigator::runNavigator");
-    Signal* pSigRGB = camera.GetSignalRGB();
 
     bool bGridSearching = true;
     float fMargin = 5;
     float fCurrentDirection = 0;
 
-    std::thread thrObject(&ObjectDetection::run, &detector);
-    std::thread thrSegment(&TerrainSegmentation::run, &segmenter);
-    while (!ssMain.shouldStop()) {
-        pSigRGB->wait();
-        cv::Mat Frame;
-        if (!camera.GetFrameRGB(Frame)) {
+    detector.Start();
+    segmenter.Start();
+
+    while (!ss.shouldStop()) {
+        sigRGB.wait(1000);
+        CameraFrame frameNew;
+        if (!camera.GetFrameRGB(frameNew)) {
             printL("runNavigator frame was not valid");
             continue;
         }
-        detector.SetNewImage(Frame);
-        segmenter.SetNewImage(Frame);
+        detector.SetNewImage(frameNew);
+        segmenter.SetNewImage(frameNew);
 
         if (bGridSearching) { // Habitat not visible, we're currently running search pattern
             // Good terrain visible?
@@ -505,8 +504,4 @@ void Navigator::runNavigator()
     // Handle all the cleanup
     detector.SendStopSignal();
     segmenter.SendStopSignal();
-    delete pSigRGB;
-    // Wait until the threads actually stop (don't want to delete the object while thread is running).
-    thrObject.join();
-    thrSegment.join();
 }

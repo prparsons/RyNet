@@ -14,23 +14,25 @@ public:
     ObjectDetection(DataLogger& logger);
     ~ObjectDetection();
 
-    void SetNewImage(image& img);
-    void run();
+    void SetNewImage(CameraFrame& frm);
+    void Start();
     void SendStopSignal();
     
     void SetNumberImageSlices(int iNumSlices);
     static bool SetNetwork(const char* scNetwork);
 
 private:
-    bool ProcessImage(image& img);
+    bool ProcessImage(CameraFrame& frm);
+    void run(Signal sig, StopSignal ss);
 
     int iNumSlices;
     DataLogger& logger;
     detectNet* pNetwork;
+    std::thread* pThread;
     ThreadMutex mt;
     Signal sigNewImage;
-    StopSignal ss;
-    image imgRecent;
+    StopSignal ssMain;
+    CameraFrame frmRecent;
 };
 
 class TerrainSegmentation {
@@ -40,8 +42,9 @@ public:
 
     bool IsHabitatVisible();
     float GetHabitatDirection();
-    void SetNewImage(image& img);
-    void run();
+    
+    void SetNewImage(CameraFrame& frm);
+    void Start();
     void SendStopSignal();
 
     void SetTargetClass(uint8_t uTarget);
@@ -57,21 +60,25 @@ public:
     };
 
 private:
-    bool ProcessImage(image& img);
-    bool ScanMask(uint8_t* pMask, int iWidth, int iHeight);
+    bool ProcessImage(CameraFrame& frm);
+    bool ScanMask(uint8_t* pMask, int iImageId, int iWidth, int iHeight);
+    void run(Signal sig, StopSignal ss);
 
     bool bHabitatVisible;
     uint8_t uTargetClass;
     int iNumSlices;
     float fBestDirection;
     float fImageFOV; // should get this from camera
+    uint8_t* pMask; // only access from thread (this really doesn't even need to be a class member)
+
     DataLogger& logger;
     segNet* pNetwork;
-    uint8_t* pMask; // only access from thread (this really doesn't even need to be a class member)
+    std::thread* pThread;
+
     ThreadMutex mt;
     Signal sigNewImage;
-    StopSignal ss;
-    image imgRecent;
+    StopSignal ssMain;
+    CameraFrame frmRecent;
 };
 
 class Navigator:public InterruptStop {
@@ -81,21 +88,23 @@ public:
     
     void Start();
     void Join();
-    virtual void SignalStop();
-    void Stop();
+    void SignalStop();
 
     void SetTargetClass(uint8_t uTarget) { segmenter.SetTargetClass(uTarget); }
     void SetNumberImageSlices(int iNumSlices);
 
 private:
-    void runNavigator();
+    void runNavigator(Signal sig, StopSignal ss);
 
     time_t tLastChange;
     time_t tMinTimeBetweenChanges;
+
     FlightController& control;
     DataLogger& logger;
     CameraController& camera;
+
     StopSignal ssMain;
+    Signal sigMainRGB;
     std::thread* pThread;
     ObjectDetection detector;
     TerrainSegmentation segmenter;

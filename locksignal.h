@@ -6,19 +6,6 @@
 
 typedef std::mutex ThreadMutex;
 
-class ThreadLock {
-public:
-    ThreadLock(ThreadMutex& m);
-    ThreadLock(const ThreadLock& other);
-    
-    void lock() { uniquelock.lock(); }
-    void unlock() { uniquelock.unlock(); }
-    
-private:
-    ThreadMutex& m;
-    std::unique_lock<ThreadMutex> uniquelock;
-};
-
 class StopSignal {
 public:
     StopSignal();
@@ -28,16 +15,12 @@ public:
     bool shouldStop();
     void stop();
 
-    void lockForCopy();
-    void unlockForCopy();
-
     void reset();
 
 private:
     bool* pbStop;
-    ThreadMutex* pm;
-    int* piCount;
-    std::unique_lock<ThreadMutex> ul;
+    ThreadMutex* pThreadMutex;
+    ThreadMutex& mutex;
 };
 
 class Signal {
@@ -57,79 +40,47 @@ private:
     ThreadMutex* pThreadMutex;
     ThreadMutex& mutex;
     std::condition_variable* pCond;
-    std::unique_lock<ThreadMutex> uniquelock;
 };
-
-inline ThreadLock::ThreadLock(ThreadMutex& _m)
-: m(_m)
-, uniquelock(m, std::defer_lock)
-{
-}
-
-inline ThreadLock::ThreadLock(const ThreadLock& other)
-: m(other.m)
-, uniquelock(m, std::defer_lock)
-{
-}
 
 inline StopSignal::StopSignal()
 : pbStop(new bool(false))
-, pm(new ThreadMutex)
-, piCount(new int(1))
-, ul(*pm, std::defer_lock)
+, pThreadMutex(new ThreadMutex)
+, mutex(*pThreadMutex)
 {
 
 }
 
 inline StopSignal::StopSignal(const StopSignal& o)
-: pbStop(o.pbStop)
-, pm(o.pm)
-, piCount(o.piCount)
-, ul(*pm, std::defer_lock)
+: pThreadMutex(nullptr)
+, mutex(o.mutex)
 {
-    ul.lock();
-    *(piCount)++;
-    ul.unlock();
+    std::lock_guard<ThreadMutex> lockGuard(mutex);
+    pbStop = o.pbStop;
 }
 
 inline StopSignal::~StopSignal()
 {
-    ul.lock();
-    if (--(*piCount) == 0) {
-        ul.unlock();
+    if (pThreadMutex != nullptr) {
         delete pbStop;
-        delete pm;
-        delete piCount;
-    } else {
-        ul.unlock();
+        delete pThreadMutex;
     }
 }
 
 inline bool StopSignal::shouldStop()
 {
-    std::lock_guard<ThreadMutex> lk(*pm);
+    std::lock_guard<ThreadMutex> lk(mutex);
     return (*pbStop);
 }
 
 inline void StopSignal::stop()
 {
-    std::lock_guard<ThreadMutex> lk(*pm);
+    std::lock_guard<ThreadMutex> lk(mutex);
     (*pbStop) = true;
-}
-
-inline void StopSignal::lockForCopy()
-{
-    ul.lock();
-}
-
-inline void StopSignal::unlockForCopy()
-{
-    ul.unlock();
 }
 
 inline void StopSignal::reset()
 {
-    std::lock_guard<ThreadMutex> lk(*pm);
+    std::lock_guard<ThreadMutex> lk(mutex);
     (*pbStop) = false;
 }
 
@@ -137,15 +88,14 @@ inline Signal::Signal()
 : pbReady(new bool(false))
 , pThreadMutex(new ThreadMutex)
 , mutex(*pThreadMutex)
-, uniquelock(mutex, std::defer_lock)
 , pCond(new std::condition_variable)
 {
 }
 
 inline Signal::Signal(const Signal& sig)
 : pbReady(sig.pbReady)
+, pThreadMutex(nullptr)
 , mutex(sig.mutex)
-, uniquelock(mutex, std::defer_lock)
 , pCond(sig.pCond)
 {
 
@@ -162,15 +112,14 @@ inline Signal::~Signal()
 
 inline void Signal::signal()
 {
-    uniquelock.lock();
+    std::lock_guard<ThreadMutex> lockGuard(mutex);
     *pbReady = true;
-    uniquelock.unlock();
     pCond->notify_one();
 }
 
 inline void Signal::wait()
 {
-    uniquelock.lock();
+    std::unique_lock<ThreadMutex> uniquelock(mutex);
     pCond->wait(uniquelock, [this]{return *pbReady;});
     *pbReady = false;
     uniquelock.unlock();
@@ -178,7 +127,7 @@ inline void Signal::wait()
 
 inline void Signal::wait(int iTimeoutMS)
 {
-    uniquelock.lock();
+    std::unique_lock<ThreadMutex> uniquelock(mutex);
     pCond->wait_for(uniquelock, std::chrono::milliseconds(iTimeoutMS), [this]{return *pbReady;});
     *pbReady = false;
     uniquelock.unlock();
