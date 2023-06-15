@@ -61,6 +61,7 @@ bool ObjectDetection::ProcessImage(image& _imgRGB)
         detectNet::Detection* arDetections = nullptr;
         int iDetections = pNetwork->Detect(u3Img, imgWidth, iSliceHeight, &arDetections);
         if (iDetections < 1) {
+            cudaFree(u3Img);
             return false;
         }
 
