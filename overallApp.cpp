@@ -42,6 +42,7 @@ int main( int argc, char** argv )
 
     // Bools for the various command line options
     bool bOptionArgument = false;
+    bool bBatteryMonitor = false;
     bool bStopNavOnDepthFail = true;
     pSignal_bStopNavOnDepthFail = &bStopNavOnDepthFail;
     bool bSendRTL = false;
@@ -107,6 +108,7 @@ int main( int argc, char** argv )
             else if (strcmp("--log_visited", argv[i]) == 0) bStartPointLogger = true;
             else if (strcmp("--downsample_depth", argv[i]) == 0) bDownsampleDepth = true;
             else if (strcmp("--run_accel", argv[i]) == 0) bRunAccel = true;
+            else if (strcmp("--battery_monitor", argv[i]) == 0) bBatteryMonitor = true;
             else if (strcmp("--run_flir", argv[i]) == 0) bRunFlir = true;
             else if (strcmp("--detection_net", argv[i]) == 0) {
                 bOptionArgument = true;
@@ -157,7 +159,7 @@ int main( int argc, char** argv )
         if (bManualServerAddress) pController->SetServerAddress(scServerAddress);
 
         printL(">>>Creating Navigator");
-        Navigator nav(*pController, logger, *pCamera);
+        Navigator nav(*pController, logger, *pCamera, bBatteryMonitor);
         if (bRunDepth) pSignal_interrupt = pCamera;
         else pSignal_interrupt = &nav;
         // If we specified a target class, need to set that now
@@ -232,6 +234,9 @@ void printHelp()
     printL("    Enable decimation filter that will downsample the depth frames.\n");
     printL(" --run_accel");
     printL("    Enable the depth camera's accelerometer.\n");
+    printL(" --battery_monitor");
+    printL("    Run battery monitor thread that will stop navigation and send RTL if");
+    printL("    battery level drops below 50%.\n");
     printL(" --run_flir");
     printL("    Enable the flir thermal camera on /dev/video4.\n");
     printL(" --nav_target [XX]");
