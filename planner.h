@@ -72,5 +72,6 @@ private:
     char scMavLinkAddress[32];
     const int iMavlinkPort = 3636;
     char scKey[33];
+    int iSalt;
 };
 

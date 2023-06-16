@@ -19,6 +19,7 @@ FlightController::FlightController(DataLogger& _logger, CameraController& _camer
 , pThreadIr(nullptr)
 , sigCameraDepth(_camera.GetSignalDepth())
 , socketDesc(-1)
+, iSalt(0)
 {
     scKey[0] = 0;
     strcpy(scMavLinkAddress, "127.0.0.1");
@@ -375,7 +376,7 @@ void FlightController::SendXML(const char* strMessage)
     #endif
 }
 
-char* FlightController::SendRecXML(const char* strMessage, int iTimeoutMS)
+char* FlightController::SendRecXML(const char* _scMessage, int iTimeoutMS)
 {
     #ifdef FLIGHT_CONTROLLER_TCP
     //Send some data
@@ -395,9 +396,27 @@ char* FlightController::SendRecXML(const char* strMessage, int iTimeoutMS)
     scResponse[iLength] = 0;
     return scResponse;
     #else
+    char* scSaltedMessage = nullptr;
+    char* scHmac = nullptr;
+    char* scMessage = nullptr;
+    int iStrLen = strlen(_scMessage);
+    if (scKey[0] != 0) {
+        if (!hmacMessage(_scMessage, scKey, iSalt++, &scHmac, &scSaltedMessage)) {
+            //cleanup and return
+            printL("Failure!!!");
+            return;
+        }
+        scMessage = new char[32 + strlen(scSaltedMessage)];
+        iStrLen = 32 + strlen(scSaltedMessage);
+        strncpy(scMessage, scHmac, 32);
+        strncpy(scMessage + 32, scSaltedMessage, strlen(scSaltedMessage));
+    } else {
+        scMessage = _scMessage;
+    }
+
     mtXML.lock();
     if (socketDesc < 0) ConnectMavLink();
-    sendto(socketDesc, strMessage, strlen(strMessage), MSG_CONFIRM, (const struct sockaddr*)&addressMavLink, sizeof(addressMavLink));
+    sendto(socketDesc, scMessage, iStrLen, MSG_CONFIRM, (const struct sockaddr*)&addressMavLink, sizeof(addressMavLink));
     char* scResponse = new char[512];
     int iLength = recv(socketDesc, scResponse, 511, MSG_DONTWAIT);
     if (iLength < 0) {
@@ -408,11 +427,19 @@ char* FlightController::SendRecXML(const char* strMessage, int iTimeoutMS)
             // Still failed...give up
             delete[] scResponse;
             mtXML.unlock();
+            if (scKey[0] != 0) {
+                OPENSSL_free(scHmac);
+                delete[] scMessage;
+            }
             return nullptr;
         }
     }
     scResponse[iLength] = 0;
     mtXML.unlock();
+    if (scKey[0] != 0) {
+        OPENSSL_free(scHmac);
+        delete[] scMessage;
+    }
     return scResponse;
     #endif
 }
