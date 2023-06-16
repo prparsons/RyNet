@@ -405,7 +405,7 @@ char* FlightController::SendRecXML(const char* _scMessage, int iTimeoutMS)
         if (!hmacMessage(scMessage, scKey, iSalt++, &scHmac, &scSaltedMessage)) {
             //cleanup and return
             printL("Failure!!!");
-            return;
+            return nullptr;
         }
         scHmacMessage = new char[32 + strlen(scSaltedMessage)];
         iStrLen = 32 + strlen(scSaltedMessage);
