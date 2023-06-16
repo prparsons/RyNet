@@ -6,8 +6,8 @@
 #include <openssl/err.h>
 
 
-EVP_PKEY* hmacCreateKey(std::string strKey);
-bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** scHmac, char** _scMessage);
+EVP_PKEY* hmacCreateKey(const char* _scKey);
+bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** scHmac, char** scSaltAndMessageOut);
 
 FlightController* pInstance = nullptr;
 
@@ -478,7 +478,7 @@ void FlightController::ConnectMavLink()
     #endif
 }
 
-EVP_PKEY* hmacCreateKey(std::string strKey)
+EVP_PKEY* hmacCreateKey(const char* _scKey)
 {
     if (_scKey == nullptr) return nullptr;
 
@@ -524,7 +524,7 @@ EVP_PKEY* hmacCreateKey(std::string strKey)
     return pKey;
 }
 
-bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** scHmac, char** _scMessage)
+bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** scHmac, char** scSaltAndMessageOut)
 {
     *scHmac = nullptr;
     *scSaltAndMessageOut = nullptr;
