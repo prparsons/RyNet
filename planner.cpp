@@ -407,11 +407,11 @@ char* FlightController::SendRecXML(const char* _scMessage, int iTimeoutMS)
             printL("Failure!!!");
             return nullptr;
         }
-        scHmacMessage = new char[32 + strlen(scSaltedMessage)];
-        iStrLen = 32 + strlen(scSaltedMessage);
-        strncpy(scHmacMessage, scHmac, 32);
-        strncpy(scHmacMessage + 32, scSaltedMessage, strlen(scSaltedMessage));
+        scHmacMessage = new char[32 + 4 + iStrLen];
+        memcpy(scHmacMessage, scHmac, 32);
+        memcpy(scHmacMessage + 32, scSaltedMessage, 4 + iStrLen);
         scMessage = scHmacMessage;
+        iStrLen += 32 + 4;
     }
 
     mtXML.lock();
