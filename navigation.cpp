@@ -61,8 +61,12 @@ bool ObjectDetection::ProcessImage(CameraFrame& frm)
         cudaMemcpy(u3Img, ((uint8_t*)imgRGB.data) + imgRGBOffset, imgWidth * iSliceHeight * 3, cudaMemcpyHostToDevice);   // shared CPU/GPU pointer to image
         detectNet::Detection* arDetections = nullptr;
         int iDetections = pNetwork->Detect(u3Img, imgWidth, iSliceHeight, &arDetections);
-        if (iDetections < 1) {
+        if (iDetections < 0) {
+            // Error processing image
+            cudaFree(u3Img);
             return false;
+        } else if (iDetections == 0) {
+            continue;
         }
 
         char sc[128];
@@ -361,8 +365,10 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iImageId, int iWidth, int
     return true;
 }
 
-Navigator::Navigator(FlightController& _control, DataLogger& _logger, CameraController& _camera)
-: tLastChange(0)
+Navigator::Navigator(FlightController& _control, DataLogger& _logger, CameraController& _camera, bool _bStartBatteryMonitor)
+: bSendRTL(false)
+, bStartBatteryMonitor(_bStartBatteryMonitor)
+, tLastChange(0)
 , tMinTimeBetweenChanges(5)
 , control(_control)
 , logger(_logger)
@@ -415,7 +421,12 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
 
     bool bGridSearching = true;
     float fMargin = 5;
+    float fCurrentDirection = 0;
 
+    StopSignal ssBattery;
+    std::thread* pThrBattery = nullptr;
+    if (bStartBatteryMonitor) pThrBattery = new std::thread(&Navigator::runBattery, this, ssBattery, ssMain);
+    
     detector.Start();
     segmenter.Start();
 
@@ -435,10 +446,17 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
                 char sc[64];
                 // If enough time since last command, then we'll change
                 if (time(nullptr) - tLastChange > tMinTimeBetweenChanges) {
-                    control.SetDirection(segmenter.GetHabitatDirection());
-                    sprintf(sc, "Grid Search -> Good Habitat %1.3f", segmenter.GetHabitatDirection());
-                    bGridSearching = false;
-                    tLastChange = time(nullptr);
+                    float fDir = segmenter.GetHabitatDirection();
+                    // Verify direction is valid before we switch to guided
+                    if (control.CheckDirectionValid(fDir, tMinTimeBetweenChanges)) {
+                        control.SetDirection(fDir);
+                        fCurrentDirection = fDir;
+                        sprintf(sc, "Grid Search -> Good Habitat %1.3f", segmenter.GetHabitatDirection());
+                        bGridSearching = false;
+                        tLastChange = time(nullptr);
+                    } else {
+                        sprintf(sc, "Grid Search X Good Habitat %1.3f (Invalid Direction)", segmenter.GetHabitatDirection());
+                    }
                 } else {
                     sprintf(sc, "[delay]Grid Search -> Good Habitat %1.3f", segmenter.GetHabitatDirection());
                 }
@@ -448,13 +466,32 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
             // Good terrain still visible?
 	        if (segmenter.IsHabitatVisible()) {
                 // If it's in the same direction then do nothing
-                if (abs(segmenter.GetHabitatDirection()) < fMargin) continue;
+                if (abs(segmenter.GetHabitatDirection()) < fMargin) {
+                    // Unless continuing that direction would be an invalid direction
+                    if (!control.CheckDirectionValid(fCurrentDirection, tMinTimeBetweenChanges)) {
+                        control.RestoreRouteNaive();
+                        logger.LogString("Good Habitat -> Grid Search (Invalid Direction)");
+                        bGridSearching = true;
+                        tLastChange = time(nullptr);
+                    }
+                    continue;
+                }
                 char sc[64];
                 // If enough time since last command, then we can change
                 if (time(nullptr) - tLastChange > tMinTimeBetweenChanges) {
-                    control.SetDirection(segmenter.GetHabitatDirection());
-                    sprintf(sc, "Good Habitat Change -> %1.3f", segmenter.GetHabitatDirection());
-                    tLastChange = time(nullptr);
+                    float fDir = segmenter.GetHabitatDirection();
+                    // Verify that the change won't take us in an invalid direction
+                    if (control.CheckDirectionValid(fDir, tMinTimeBetweenChanges)) {
+                        control.SetDirection(fDir);
+                        sprintf(sc, "Good Habitat Change -> %1.3f", segmenter.GetHabitatDirection());
+                        tLastChange = time(nullptr);
+                    } else {
+                        // If it would be an invalid direction, then go back to grid search
+                        control.RestoreRouteNaive();
+                        sprintf(sc, "Good Habitat (Invalid Direction) -> %1.3f", segmenter.GetHabitatDirection());
+                        bGridSearching = true;
+                        tLastChange = time(nullptr);
+                    }
                 } else {
                     sprintf(sc, "[delay]Good Habitat Change -> %1.3f", segmenter.GetHabitatDirection());
                 }
@@ -477,4 +514,34 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
     // Handle all the cleanup
     detector.SendStopSignal();
     segmenter.SendStopSignal();
+    
+    if (bStartBatteryMonitor) {
+        ssBattery.stop();
+        if (pThrBattery->joinable()) pThrBattery->join();
+        delete pThrBattery;
+        if (bSendRTL) control.SetRTL();
+    }
+}
+
+void Navigator::runBattery(StopSignal ss, StopSignal ssMainThread)
+{
+    printL("Navigator::runBattery");
+
+    // Loop over uCheckBattery, on each overflow we'll check the battery. This way we don't have to check very often,
+    //  but don't wait too long while tryin to stop this thread.
+    uint8_t uCheckBattery = 0;
+    while (!ss.shouldStop()) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        if (uCheckBattery++ != 0) continue;
+
+        int iBattery = control.GetBattery();
+        if (iBattery == -1) continue; // -1 we didn't get a response so just continue
+
+        // For now, simple method...if battery is < 50% then we will stop the nav threads and RTL.
+        if (iBattery < 50) {
+            bSendRTL = true;
+            ssMainThread.stop();
+            break;
+        }
+    }
 }

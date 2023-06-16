@@ -27,6 +27,10 @@ public:
     static bool GetPosition(float fLat, float fLon, int iTimeoutMS = 100);
     static bool GetHeading(float fHeading, int iTimeoutMS = 100);
     bool GetMode(char* scMode, int iStrLen);
+    int GetBattery();
+
+    // Can we travel in the indicated direction for the indicated time
+    bool CheckDirectionValid(float fDirection, time_t travelTime);
 
     void SetDirection(float fHeadingOffsetDeg); // Store the currently programmed route, adjust heading
     void SetDestination(float fHeadingOffsetDeg, float fDistance); // Store route, adjust heading, after distance will automatically restore route
