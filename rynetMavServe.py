@@ -101,8 +101,7 @@ def hmacVerifyMessage(signature, bytesSalt, bytesMessage, key):
     try: hmacVerifyMessage.salt
     except AttributeError: hmacVerifyMessage.salt = -1
 
-    intSalt = int.from_bytes(bytesSalt, "big")
-    print("Verification Salt %d" % intSalt)
+    intSalt = int.from_bytes(bytesSalt, "little")
     if intSalt <= hmacVerifyMessage.salt:
         print("salt reuse")
         return False
