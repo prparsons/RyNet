@@ -61,8 +61,12 @@ bool ObjectDetection::ProcessImage(CameraFrame& frm)
         cudaMemcpy(u3Img, ((uint8_t*)imgRGB.data) + imgRGBOffset, imgWidth * iSliceHeight * 3, cudaMemcpyHostToDevice);   // shared CPU/GPU pointer to image
         detectNet::Detection* arDetections = nullptr;
         int iDetections = pNetwork->Detect(u3Img, imgWidth, iSliceHeight, &arDetections);
-        if (iDetections < 1) {
+        if (iDetections < 0) {
+            // Error processing image
+            cudaFree(u3Img);
             return false;
+        } else if (iDetections == 0) {
+            continue;
         }
 
         char sc[128];
