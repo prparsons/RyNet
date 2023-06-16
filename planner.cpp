@@ -398,20 +398,20 @@ char* FlightController::SendRecXML(const char* _scMessage, int iTimeoutMS)
     #else
     char* scSaltedMessage = nullptr;
     char* scHmac = nullptr;
-    char* scMessage = nullptr;
-    int iStrLen = strlen(_scMessage);
+    char* scHmacMessage = nullptr;
+    const char* scMessage = _scMessage;
+    int iStrLen = strlen(scMessage);
     if (scKey[0] != 0) {
-        if (!hmacMessage(_scMessage, scKey, iSalt++, &scHmac, &scSaltedMessage)) {
+        if (!hmacMessage(scMessage, scKey, iSalt++, &scHmac, &scSaltedMessage)) {
             //cleanup and return
             printL("Failure!!!");
             return;
         }
-        scMessage = new char[32 + strlen(scSaltedMessage)];
+        scHmacMessage = new char[32 + strlen(scSaltedMessage)];
         iStrLen = 32 + strlen(scSaltedMessage);
-        strncpy(scMessage, scHmac, 32);
-        strncpy(scMessage + 32, scSaltedMessage, strlen(scSaltedMessage));
-    } else {
-        scMessage = _scMessage;
+        strncpy(scHmacMessage, scHmac, 32);
+        strncpy(scHmacMessage + 32, scSaltedMessage, strlen(scSaltedMessage));
+        scMessage = scHmacMessage;
     }
 
     mtXML.lock();
@@ -429,7 +429,8 @@ char* FlightController::SendRecXML(const char* _scMessage, int iTimeoutMS)
             mtXML.unlock();
             if (scKey[0] != 0) {
                 OPENSSL_free(scHmac);
-                delete[] scMessage;
+                delete[] scSaltedMessage;
+                delete[] scHmacMessage;
             }
             return nullptr;
         }
@@ -438,7 +439,8 @@ char* FlightController::SendRecXML(const char* _scMessage, int iTimeoutMS)
     mtXML.unlock();
     if (scKey[0] != 0) {
         OPENSSL_free(scHmac);
-        delete[] scMessage;
+        delete[] scSaltedMessage;
+        delete[] scHmacMessage;
     }
     return scResponse;
     #endif
