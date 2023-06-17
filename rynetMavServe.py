@@ -14,6 +14,9 @@ from tsp import *
 """
 Command Documentation:
 
+<altitude />
+    Get current altitude
+
 <battery />
     Get current battery level, percent level from 0-100.
 
@@ -452,6 +455,10 @@ def cmdModeRetrieve(vehicle, UDPServerSocket, address):
     strReply = vehicle.mode.name
     UDPServerSocket.sendto(str.encode(strReply), address)
 
+def cmdAltitudeRetrieve(vehicle, UDPServerSocket, address):
+    strReply = vehicle.location.global_relative_frame.alt
+    UDPServerSocket.sendto(str.encode(strReply), address)
+
 def cmdObs(vehicle, element): 
     if 'dir' in element.attrib:
         print("dir found")
@@ -558,6 +565,9 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
     elif element.tag == 'pos_retrieve':
         cmdPosRetrieve(vehicle, UDPServerSocket, address)
         visitedList.append([vehicle.location.global_frame.lat, vehicle.location.global_frame.lon])
+
+    elif element.tag == 'altitude':
+        cmdAltitudeRetrieve(vehicle, UDPServerSocket, address)
 
     #elif element.tag == 'altitude_set':
         #need to read through the whole route and set each one

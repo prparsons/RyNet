@@ -66,6 +66,7 @@ void FlightController::WaitForStartup(int iAltitude)
 {
     int iCurrentAltitude = 0;
     char scMode[32];
+    scMode[0] = 0;
     while (iCurrentAltitude < iAltitude) {
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         if (GetMode(scMode, 31)) {
