@@ -62,6 +62,20 @@ void FlightController::Start(bool bStartDepth, bool bStartPointLogger, bool bSta
     }
 }
 
+void FlightController::WaitForStartup(int iAltitude)
+{
+    int iCurrentAltitude = 0;
+    char scMode[32];
+    while (iCurrentAltitude < iAltitude) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        if (GetMode(scMode, 31)) {
+            if (strcmp("GUIDED", scMode) == 0) {
+                GetAltitude(iCurrentAltitude);
+            }
+        }
+    }
+}
+
 FlightController::~FlightController()
 {
     printL("FlightController::~FlightController");
@@ -109,6 +123,11 @@ bool FlightController::GetHeading(float fHeading, int iTimeoutMS)
     fHeading = atof(sc);
     delete[] sc;
     return true;
+}
+
+void FlightController::GetAltitude(int& iAltitude)
+{
+
 }
 
 bool FlightController::GetMode(char* scMode, int iStrLen)

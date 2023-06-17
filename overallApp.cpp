@@ -18,6 +18,7 @@ enum OptionArgument {
     IMG_SLICES,
     SEGMENT_NET,
     DETECT_NET,
+    STARTUP,
     OPTION_NONE
 };
 
@@ -61,6 +62,7 @@ int main( int argc, char** argv )
     char scServerAddress[32];
     int iTargetClass = -1;
     int iNumSlices = -1;
+    int iStartupAltitude = -1;
     // Read all the command line arguments and options (--option argument)
     for (int i = 1; i < argc; i++) {
         if (bOptionArgument) {
@@ -95,6 +97,13 @@ int main( int argc, char** argv )
                         return -1;
                     }
                 } break;
+                case STARTUP: {
+                    iStartupAltitude = atoi(argv[i]);
+                    if (iStartupAltitude < 10 || iStartupAltitude > 120) {
+                        printL("Startup altitude must be between 10 and 120");
+                        return -1;
+                    }
+                } break;
                 default:
                     printL("OptionArgumentSelection Invalid");
                     return -1;
@@ -113,6 +122,9 @@ int main( int argc, char** argv )
             else if (strcmp("--detection_net", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = DETECT_NET;
+            } else if (strcmp("--startup", argv[i]) == 0) {
+                bOptionArgument = true;
+                OptionArgumentSelection = STARTUP;
             } else if (strcmp("--segment_net", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = SEGMENT_NET;
@@ -170,10 +182,13 @@ int main( int argc, char** argv )
         logger.Start();
         printL(">>>Starting Camera");
         pCamera->Start(); // Camera starts all it's own threads
-        printL(">>>Starting Navigator");
-        nav.Start();
         printL(">>>Starting Flight Controller");
         pController->Start(bRunDepth, bStartPointLogger, bRunFlir);
+        if (iStartupAltitude != -1) {
+            pController->WaitForStartup(iStartupAltitude);
+        }
+        printL(">>>Starting Navigator");
+        nav.Start();
 
         // std::system_error if the thread could not be started.
         //**I think there might be issues with shutdown of stuff...need to trace through it all and double check
@@ -251,6 +266,9 @@ void printHelp()
     printL(" --segment_net [ABCDE]");
     printL("    Network model to be used with the image segmentation network. segnet --help");
     printL("    will list available models.\n");
+    printL(" --startup [XX]");
+    printL("    Target altitude drone must reach before navigation routine starts.");
+    printL("    Target is number from 10-120m.\n");
 }
 
 void cleanupFailure()
