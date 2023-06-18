@@ -19,6 +19,7 @@ enum OptionArgument {
     SEGMENT_NET,
     DETECT_NET,
     WAIT_TAKEOFF,
+    GEO_DIST,
     OPTION_NONE
 };
 
@@ -63,6 +64,7 @@ int main( int argc, char** argv )
     int iTargetClass = -1;
     int iNumSlices = -1;
     int iTakeoffAltitude = -1;
+    int iGeoDist = -1;
     // Read all the command line arguments and options (--option argument)
     for (int i = 1; i < argc; i++) {
         if (bOptionArgument) {
@@ -97,6 +99,13 @@ int main( int argc, char** argv )
                         return -1;
                     }
                 } break;
+                case GEO_DIST: {
+                    iGeoDist = atoi(argv[i]);
+                    if (iGeoDist < 1 || iGeoDist > 9999) {
+                        printL("Maximum distance from takeoff must be between 1 and 9999.");
+                        return -1;
+                    }
+                } break;
                 case WAIT_TAKEOFF: {
                     iTakeoffAltitude = atoi(argv[i]);
                     if (iTakeoffAltitude < 10 || iTakeoffAltitude > 120) {
@@ -122,6 +131,9 @@ int main( int argc, char** argv )
             else if (strcmp("--detection_net", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = DETECT_NET;
+            } else if (strcmp("--max_dist", argv[i]) == 0) {
+                bOptionArgument = true;
+                OptionArgumentSelection = GEO_DIST;
             } else if (strcmp("--wait_takeoff", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = WAIT_TAKEOFF;
@@ -267,8 +279,11 @@ void printHelp()
     printL("    Network model to be used with the image segmentation network. segnet --help");
     printL("    will list available models.\n");
     printL(" --wait_takeoff [XX]");
-    printL("    Target altitude drone must reach before navigation routine starts.");
+    printL("    Altitude drone must reach before navigation routine starts.");
     printL("    Target is number from 10-120m.\n");
+    printL(" --max_dist [XX]");
+    printL("    Maximum distance allowed from takeoff position.");
+    printL("    Target is number from 1-9999.\n");
 }
 
 void cleanupFailure()

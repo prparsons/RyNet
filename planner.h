@@ -23,9 +23,9 @@ public:
     static void DestroyFlightController();
 
     void WaitForTakeoff(int iAltitude);
-    void Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr);
+    void Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr, int iMaxDist);
 
-    static bool GetPosition(float fLat, float fLon, int iTimeoutMS = 100);
+    static bool GetPosition(float& fLat, float& fLon, int iTimeoutMS = 100);
     static bool GetHeading(float fHeading, int iTimeoutMS = 100);
     void GetAltitude(float& fAltitude); // If unsuccessful, will leave iAltitude unchanged
     bool GetMode(char* scMode, int iStrLen);
@@ -70,7 +70,10 @@ private:
 
     struct sockaddr_in addressMavLink;
     int socketDesc;
+    int iMaxDist;
     char scMavLinkAddress[32];
     const int iMavlinkPort = 3636;
+    float fHomeLat;
+    float fHomeLon;
 };
 

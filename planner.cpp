@@ -13,6 +13,9 @@ FlightController::FlightController(DataLogger& _logger, CameraController& _camer
 , pThreadIr(nullptr)
 , sigCameraDepth(_camera.GetSignalDepth())
 , socketDesc(-1)
+, iMaxDist(-1)
+, fHomeLat(0)
+, fHomeLon(0)
 {
     strcpy(scMavLinkAddress, "127.0.0.1");
     memset(&addressMavLink, 0, sizeof(addressMavLink));
@@ -48,7 +51,7 @@ void FlightController::DestroyFlightController()
     pInstance = nullptr;
 }
 
-void FlightController::Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr)
+void FlightController::Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr, int _iMaxDist)
 {
     printL("FlightController::Start");
     if (bStartDepth) {
@@ -60,6 +63,7 @@ void FlightController::Start(bool bStartDepth, bool bStartPointLogger, bool bSta
     if (bStartIr) {
         pThreadIr = new std::thread(&FlightController::runIr, this, sigIr, ssIr);
     }
+    iMaxDist = _iMaxDist;
 }
 
 void FlightController::WaitForTakeoff(int iAltitude)
@@ -84,6 +88,13 @@ void FlightController::WaitForTakeoff(int iAltitude)
     }
     printf("Has reached startup altitude %.3f", fCurrentAltitude);
     logger.LogString("Has reached startup altitude");
+
+    float fLat;
+    float fLon;
+    if (GetPosition(fLat, fLon)) {
+        fHomeLat = fLat;
+        fHomeLon = fLon;
+    }
 }
 
 FlightController::~FlightController()
@@ -108,7 +119,7 @@ FlightController::~FlightController()
     //socket
 }
 
-bool FlightController::GetPosition(float fLat, float fLon, int iTimeoutMS)
+bool FlightController::GetPosition(float& fLat, float& fLon, int iTimeoutMS)
 {
     if (pInstance == nullptr) return false;
     char* sc = pInstance->SendRecXML("<pos_retrieve />", iTimeoutMS);
@@ -163,6 +174,20 @@ int FlightController::GetBattery()
 
 bool FlightController::CheckDirectionValid(float fDirection, time_t travelTime)
 {
+    if ((fHomeLat == 0 && fHomeLon == 0) || iMaxDist == -1) {
+        return true;
+    }
+    float fQueryLat = 0;
+    float fQueryLon = 0;
+    // First find the position based on lat, long, distance
+
+    // Now find distance from that and home
+    float fDistance = 0;
+    
+    if (fDistance > iMaxDist) {
+        return false;
+    }
+
     return true;
 }
 
