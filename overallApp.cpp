@@ -18,7 +18,7 @@ enum OptionArgument {
     IMG_SLICES,
     SEGMENT_NET,
     DETECT_NET,
-    STARTUP,
+    WAIT_TAKEOFF,
     OPTION_NONE
 };
 
@@ -62,7 +62,7 @@ int main( int argc, char** argv )
     char scServerAddress[32];
     int iTargetClass = -1;
     int iNumSlices = -1;
-    int iStartupAltitude = -1;
+    int iTakeoffAltitude = -1;
     // Read all the command line arguments and options (--option argument)
     for (int i = 1; i < argc; i++) {
         if (bOptionArgument) {
@@ -97,10 +97,10 @@ int main( int argc, char** argv )
                         return -1;
                     }
                 } break;
-                case STARTUP: {
-                    iStartupAltitude = atoi(argv[i]);
-                    if (iStartupAltitude < 10 || iStartupAltitude > 120) {
-                        printL("Startup altitude must be between 10 and 120");
+                case WAIT_TAKEOFF: {
+                    iTakeoffAltitude = atoi(argv[i]);
+                    if (iTakeoffAltitude < 10 || iTakeoffAltitude > 120) {
+                        printL("Takeoff wait altitude must be between 10 and 120");
                         return -1;
                     }
                 } break;
@@ -122,9 +122,9 @@ int main( int argc, char** argv )
             else if (strcmp("--detection_net", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = DETECT_NET;
-            } else if (strcmp("--startup", argv[i]) == 0) {
+            } else if (strcmp("--wait_takeoff", argv[i]) == 0) {
                 bOptionArgument = true;
-                OptionArgumentSelection = STARTUP;
+                OptionArgumentSelection = WAIT_TAKEOFF;
             } else if (strcmp("--segment_net", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = SEGMENT_NET;
@@ -184,8 +184,8 @@ int main( int argc, char** argv )
         pCamera->Start(); // Camera starts all it's own threads
         printL(">>>Starting Flight Controller");
         pController->Start(bRunDepth, bStartPointLogger, bRunFlir);
-        if (iStartupAltitude != -1) {
-            pController->WaitForStartup(iStartupAltitude);
+        if (iTakeoffAltitude != -1) {
+            pController->WaitForTakeoff(iTakeoffAltitude);
         }
         printL(">>>Starting Navigator");
         nav.Start();
@@ -266,7 +266,7 @@ void printHelp()
     printL(" --segment_net [ABCDE]");
     printL("    Network model to be used with the image segmentation network. segnet --help");
     printL("    will list available models.\n");
-    printL(" --startup [XX]");
+    printL(" --wait_takeoff [XX]");
     printL("    Target altitude drone must reach before navigation routine starts.");
     printL("    Target is number from 10-120m.\n");
 }

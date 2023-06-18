@@ -22,12 +22,12 @@ public:
     static FlightController* GetFlightController(DataLogger& logger, CameraController& camera);
     static void DestroyFlightController();
 
-    void WaitForStartup(int iAltitude);
+    void WaitForTakeoff(int iAltitude);
     void Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr);
 
     static bool GetPosition(float fLat, float fLon, int iTimeoutMS = 100);
     static bool GetHeading(float fHeading, int iTimeoutMS = 100);
-    void GetAltitude(int& iAltitude);
+    void GetAltitude(int& iAltitude); // If unsuccessful, will leave iAltitude unchanged
     bool GetMode(char* scMode, int iStrLen);
     int GetBattery();
 

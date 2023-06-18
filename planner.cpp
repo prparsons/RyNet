@@ -62,19 +62,31 @@ void FlightController::Start(bool bStartDepth, bool bStartPointLogger, bool bSta
     }
 }
 
-void FlightController::WaitForStartup(int iAltitude)
+void FlightController::WaitForTakeoff(int iAltitude)
 {
     int iCurrentAltitude = 0;
     char scMode[32];
     scMode[0] = 0;
+    bool bTakeoffMessage = true;
     while (iCurrentAltitude < iAltitude) {
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        if (bTakeoffMessage) {
+            bTakeoffMessage = false;
+        }
+        // Want to wait until guided mode has been entered before checking altitude
         if (GetMode(scMode, 31)) {
+            if (bTakeoffMessage) {
+                bTakeoffMessage = false;
+                printL("Has entered guided");
+                logger.LogString("Has entered guided");
+            }
             if (strcmp("GUIDED", scMode) == 0) {
                 GetAltitude(iCurrentAltitude);
             }
         }
     }
+    printL("Has reached startup altitude");
+    logger.LogString("Has reached startup altitude");
 }
 
 FlightController::~FlightController()
