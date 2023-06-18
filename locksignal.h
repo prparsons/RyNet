@@ -74,6 +74,7 @@ inline bool StopSignal::shouldStop()
 
 inline void StopSignal::stop()
 {
+    printf("StopSignal::stop\n");
     std::lock_guard<ThreadMutex> lk(mutex);
     (*pbStop) = true;
 }
