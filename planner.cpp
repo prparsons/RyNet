@@ -141,10 +141,9 @@ bool FlightController::GetHeading(float fHeading, int iTimeoutMS)
 void FlightController::GetAltitude(int& iAltitude)
 {
     char* sc = SendRecXML("<altitude />");
-    if (sc == nullptr) return false;
+    if (sc == nullptr) return;
     iAltitude = atoi(sc);
     delete sc;
-    return true;
 }
 
 bool FlightController::GetMode(char* scMode, int iStrLen)
