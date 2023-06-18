@@ -64,28 +64,25 @@ void FlightController::Start(bool bStartDepth, bool bStartPointLogger, bool bSta
 
 void FlightController::WaitForTakeoff(int iAltitude)
 {
-    int iCurrentAltitude = 0;
+    float fCurrentAltitude = 0;
     char scMode[32];
     scMode[0] = 0;
     bool bTakeoffMessage = true;
-    while (iCurrentAltitude < iAltitude) {
+    while (fCurrentAltitude < float(iAltitude)) {
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        if (bTakeoffMessage) {
-            bTakeoffMessage = false;
-        }
         // Want to wait until guided mode has been entered before checking altitude
         if (GetMode(scMode, 31)) {
-            if (bTakeoffMessage) {
-                bTakeoffMessage = false;
-                printL("Has entered guided");
-                logger.LogString("Has entered guided");
-            }
-            if (strcmp("GUIDED", scMode) == 0) {
-                GetAltitude(iCurrentAltitude);
+            if (strcmp("AUTO", scMode) == 0) {
+                if (bTakeoffMessage) {
+                    bTakeoffMessage = false;
+                    printL("Has entered guided");
+                    logger.LogString("Has entered guided");
+                }
+                GetAltitude(fCurrentAltitude);
             }
         }
     }
-    printL("Has reached startup altitude");
+    printf("Has reached startup altitude %.3f", fCurrentAltitude);
     logger.LogString("Has reached startup altitude");
 }
 
@@ -138,13 +135,12 @@ bool FlightController::GetHeading(float fHeading, int iTimeoutMS)
     return true;
 }
 
-void FlightController::GetAltitude(int& iAltitude)
+void FlightController::GetAltitude(float& fAltitude)
 {
     char* sc = SendRecXML("<altitude />");
-    if (sc == nullptr) return false;
-    iAltitude = atoi(sc);
+    if (sc == nullptr) return;
+    fAltitude = atof(sc);
     delete sc;
-    return true;
 }
 
 bool FlightController::GetMode(char* scMode, int iStrLen)
