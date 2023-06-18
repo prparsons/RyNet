@@ -404,7 +404,6 @@ void Navigator::Join()
 
 void Navigator::SignalStop()
 {
-    printL("Navigator::SignalStop");
     if (pThread != nullptr) {
         ssMain.stop();
     }

@@ -137,10 +137,10 @@ bool FlightController::GetHeading(float fHeading, int iTimeoutMS)
 
 void FlightController::GetAltitude(float& fAltitude)
 {
-    char* sc = SendRecXML("<altitude />");
+    char* sc = SendRecXML("<altitude_retrieve />");
     if (sc == nullptr) return;
     fAltitude = atof(sc);
-    delete sc;
+    delete[] sc;
 }
 
 bool FlightController::GetMode(char* scMode, int iStrLen)
@@ -154,7 +154,7 @@ bool FlightController::GetMode(char* scMode, int iStrLen)
 
 int FlightController::GetBattery()
 {
-    char* sc = SendRecXML("<battery />");
+    char* sc = SendRecXML("<battery_retrieve />");
     if (sc == nullptr) return -1;
     int iBattery = atoi(sc);
     delete sc;

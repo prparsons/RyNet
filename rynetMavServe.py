@@ -14,10 +14,10 @@ from tsp import *
 """
 Command Documentation:
 
-<altitude />
+<altitude_retrieve />
     Get current altitude
 
-<battery />
+<battery_retrieve />
     Get current battery level, percent level from 0-100.
 
 <clean_dist>DISTANCE_M</clean_dist>
@@ -26,6 +26,9 @@ Command Documentation:
 <dir dist='200'>OFFSET_HEADING_DEGREES</dir>
     Sets mode to GUIDED, and then turns indicated amount
         dist -- distance to set waypoint in meters[default:1000]
+
+<heading_retrieve />
+    Get current vehicle heading
 
 <mode_retrieve />
     Retrieves the current mode and returns it to the client as a string ("AUTO", "GUIDED")
@@ -455,8 +458,14 @@ def cmdModeRetrieve(vehicle, UDPServerSocket, address):
     strReply = vehicle.mode.name
     UDPServerSocket.sendto(str.encode(strReply), address)
 
+def cmdDirRetrieve(vehicle, UDPServerSocket, address):
+    heading = vehicle.heading
+    strReply = "%.1f" % heading
+    UDPServerSocket.sendto(str.encode(strReply), address)
+
 def cmdAltitudeRetrieve(vehicle, UDPServerSocket, address):
-    strReply = vehicle.location.global_relative_frame.alt
+    altitude = vehicle.location.global_relative_frame.alt
+    strReply = "%.3f" % altitude
     UDPServerSocket.sendto(str.encode(strReply), address)
 
 def cmdObs(vehicle, element): 
@@ -534,7 +543,7 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
     #if element.tag == 'clean_dist':
         #NOT_IMPLEMENTED
 
-    if element.tag == 'battery':
+    if element.tag == 'battery_retrieve':
         cmdBatteryRetrieve(vehicle, UDPServerSocket, address)
         
     elif element.tag == 'takeoff':
@@ -546,6 +555,9 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
 
     elif element.tag == 'mode_retrieve':
         cmdModeRetrieve(vehicle, UDPServerSocket, address)
+
+    elif element.tag == 'heading_retrieve':
+        cmdDirRetrieve(vehicle, UDPServerSocket, address)
 
     elif element.tag == 'obs':
         cmdObs(vehicle, element)
@@ -566,7 +578,7 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
         cmdPosRetrieve(vehicle, UDPServerSocket, address)
         visitedList.append([vehicle.location.global_frame.lat, vehicle.location.global_frame.lon])
 
-    elif element.tag == 'altitude':
+    elif element.tag == 'altitude_retrieve':
         cmdAltitudeRetrieve(vehicle, UDPServerSocket, address)
 
     #elif element.tag == 'altitude_set':
@@ -641,7 +653,7 @@ selectorDefault = selectors.DefaultSelector()
 # Create a datagram socket
 sockUDP = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
 # Bind to address and ip
-sockUDP.bind(("127.0.0.1", args.port))
+sockUDP.bind(("192.168.2.103", args.port))
 sockUDP.setblocking(False)
 selectorDefault.register(sockUDP, selectors.EVENT_READ, recvUDP)
 

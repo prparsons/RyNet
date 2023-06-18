@@ -200,7 +200,7 @@ int main( int argc, char** argv )
             printL(">>>Sending stop signal to stop Nav");
             nav.SignalStop();
             ///***this has changed a bit since -> //**I got a seg fault once without --continue, I wonder if it's something to do with this? (datalogger wasn't cleaning up threads...)
-        } else printL(">>>Continue specified, no stop signal");
+        }
 
         nav.Join();
         printL(">>>Navigator Stopped");
