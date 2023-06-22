@@ -531,7 +531,7 @@ void Navigator::runBattery(StopSignal ss, StopSignal ssMainThread)
     //  but don't wait too long while tryin to stop this thread.
     uint8_t uCheckBattery = 0;
     while (!ss.shouldStop()) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         if (uCheckBattery++ != 0) continue;
 
         int iBattery = control.GetBattery();
