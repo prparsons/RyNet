@@ -74,13 +74,13 @@ void FlightController::WaitForTakeoff(int iAltitude)
     bool bTakeoffMessage = true;
     while (fCurrentAltitude < float(iAltitude)) {
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        // Want to wait until guided mode has been entered before checking altitude
+        // Want to wait until AUTO mode has been entered before checking altitude
         if (GetMode(scMode, 31)) {
             if (strcmp("AUTO", scMode) == 0) {
                 if (bTakeoffMessage) {
                     bTakeoffMessage = false;
-                    printL("Has entered guided");
-                    logger.LogString("Has entered guided");
+                    printL("Has entered auto");
+                    logger.LogString("Has entered auto");
                 }
                 GetAltitude(fCurrentAltitude);
             }
