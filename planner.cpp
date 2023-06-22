@@ -136,12 +136,21 @@ bool FlightController::GetPosition(float& fLat, float& fLon, int iTimeoutMS)
     return true;
 }
 
-bool FlightController::GetHeading(float fHeading, int iTimeoutMS)
+bool FlightController::GetHeading(float& fHeading, int iTimeoutMS)
 {
     if (pInstance == nullptr) return false;
     char* sc = pInstance->SendRecXML("<heading_retrieve />", iTimeoutMS);
     if (sc == nullptr) return false;
     fHeading = atof(sc);
+    delete[] sc;
+    return true;
+}
+
+bool FlightController::GetSpeed(float& fSpeedMS)
+{
+    char* sc SendRecXML("<speed_retrieve />");
+    if (sc == nullptr) return false;
+    fSpeedMS = atof(sc);
     delete[] sc;
     return true;
 }
@@ -174,21 +183,36 @@ int FlightController::GetBattery()
 
 bool FlightController::CheckDirectionValid(float fDirection, time_t travelTime)
 {
+    // Home Location must exist and max distance must have been set
     if ((fHomeLat == 0 && fHomeLon == 0) || iMaxDist == -1) {
         return true;
     }
-    float fQueryLat = 0;
-    float fQueryLon = 0;
-    // First find the position based on lat, long, distance
 
-    // Now find distance from that and home
-    float fDistance = 0;
-    
-    if (fDistance > iMaxDist) {
-        return false;
+    // Get current position
+    float fLatCurrent = 0;
+    float fLonCurrent = 0;
+    if (!GetPosition(fLatCurrent, fLonCurrent)) {
+        printL("Failed to get position");
+        return true;
     }
 
-    return true;
+    float fCurrentSpeedMS = 0;
+    // Get Current speed in m/s, use that to calculate distance traveled in m
+    if (!GetSpeed(fCurrentSpeedMS)) {
+        printL("Failed to get speed");
+        return true;
+    }
+    float fDistanceM = fCurrentSpeedMS * travelTime;
+
+    float fQueryLat = 0;
+    float fQueryLon = 0;
+    // Find the final position based on lat, long, distance
+    PointFromBearing(fLatCurrent, fLonCurrent, fDistanceM, fDirection, fQueryLat, fQueryLon);
+
+    // Now find distance between that and home
+    float fDistance = PointDistance(fHomeLat, fHomeLon, fQueryLat, fQueryLon);
+    
+    return fDistance < iMaxDist;
 }
 
 void FlightController::SetDirection(float fHeadingOffsetDeg)
