@@ -65,6 +65,9 @@ Command Documentation:
 <rtl />
     Sets vehicle mode to RTL
 
+<speed_retrieve />
+    Gets vehicle groundspeed in meters per second
+
 <takeoff setauto='true'>ALTITUDE_METERS</takeoff>
     Will arm and take off (simple example from dronekit)
         setauto -- will change the vehicle mode to AUTO 3 sec after takeoff
@@ -468,6 +471,11 @@ def cmdAltitudeRetrieve(vehicle, UDPServerSocket, address):
     strReply = "%.3f" % altitude
     UDPServerSocket.sendto(str.encode(strReply), address)
 
+def cmdSpeedRetrieve(vehicle, UDPServerSocket, address):
+    speed = vehicle.groundspeed
+    strReply = "%.1f" % speed
+    UDPServerSocket.sendto(str.encode(strReply), address)
+
 def cmdObs(vehicle, element): 
     if 'dir' in element.attrib:
         print("dir found")
@@ -586,6 +594,9 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
 
     elif element.tag == 'rtl':
         vehicle.mode = VehicleMode("RTL")
+
+    elif element.tag == 'speed_retrieve':
+        cmdSpeedRetrieve(vehicle, UDPServerSocket, address)
         
     elif element.tag == 'route_restore':
         cmdRouteRestore(vehicle, element)
