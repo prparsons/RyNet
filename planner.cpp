@@ -155,12 +155,13 @@ bool FlightController::GetSpeed(float& fSpeedMS)
     return true;
 }
 
-void FlightController::GetAltitude(float& fAltitude)
+bool FlightController::GetAltitude(float& fAltitude)
 {
     char* sc = SendRecXML("<altitude_retrieve />");
-    if (sc == nullptr) return;
+    if (sc == nullptr) return false;
     fAltitude = atof(sc);
     delete[] sc;
+    return true;
 }
 
 bool FlightController::GetMode(char* scMode, int iStrLen)

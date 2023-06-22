@@ -28,7 +28,7 @@ public:
     static bool GetPosition(float& fLat, float& fLon, int iTimeoutMS = 100);
     static bool GetHeading(float& fHeading, int iTimeoutMS = 100);
     bool GetSpeed(float& fSpeedMS); 
-    void GetAltitude(float& fAltitude); // If unsuccessful, will leave iAltitude unchanged
+    bool GetAltitude(float& fAltitude);
     bool GetMode(char* scMode, int iStrLen);
     int GetBattery();
 
