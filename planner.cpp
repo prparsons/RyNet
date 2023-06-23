@@ -212,7 +212,8 @@ bool FlightController::CheckDirectionValid(float fDirection, time_t travelTime)
 
     // Now find distance between that and home
     float fDistance = PointDistance(fHomeLat, fHomeLon, fQueryLat, fQueryLon);
-    
+    printf("Current: [%.4f,%.4f]; Speed: %.1f; DistTravel: %.1f; Dest: [%.4f,%.4f]; Dest-Home Dist: %.1f\n", 
+        fLatCurrent, fLonCurrent, fCurrentSpeedMS, fDistanceM, fQueryLat, fQueryLon, fDistance);
     return fDistance < iMaxDist;
 }
 
