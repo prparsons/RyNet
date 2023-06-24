@@ -130,13 +130,13 @@ bool FlightController::GetPosition(float& fLat, float& fLon, int iTimeoutMS)
     char* sc = pInstance->SendRecXML("<pos_retrieve />", iTimeoutMS);
     if (sc == nullptr) return false;
     int i;
-    // string is in format "LAT LON"
+    // string is in format "LAT\nLON"
     for (i = 0; i < strlen(sc); i++) {
-        if (sc[i] = ' ') break;
+        if (sc[i] == '\n') break;
     }
     sc[i] = 0;
-    fLat = atof(sc);
-    fLon = atof(sc + i + 1);
+    fLat = float(atof(sc));
+    fLon = float(atof(sc + i + 1));
     delete[] sc;
     return true;
 }
