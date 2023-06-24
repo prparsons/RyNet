@@ -195,7 +195,8 @@ int main( int argc, char** argv )
         printL(">>>Starting Camera");
         pCamera->Start(); // Camera starts all it's own threads
         printL(">>>Starting Flight Controller");
-        pController->Start(bRunDepth, bStartPointLogger, bRunFlir);
+        if (iGeoDist != -1) pController->Start(bRunDepth, bStartPointLogger, bRunFlir, iGeoDist);
+        else pController->Start(bRunDepth, bStartPointLogger, bRunFlir);
         if (iTakeoffAltitude != -1) {
             pController->WaitForTakeoff(iTakeoffAltitude);
         }

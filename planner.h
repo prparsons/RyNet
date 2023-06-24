@@ -24,6 +24,7 @@ public:
 
     void WaitForTakeoff(int iAltitude);
     void Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr, int iMaxDist);
+    void Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr);
 
     static bool GetPosition(float& fLat, float& fLon, int iTimeoutMS = 100);
     static bool GetHeading(float& fHeading, int iTimeoutMS = 100);

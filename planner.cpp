@@ -53,6 +53,12 @@ void FlightController::DestroyFlightController()
 
 void FlightController::Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr, int _iMaxDist)
 {
+    iMaxDist = _iMaxDist;
+    Start(bStartDepth, bStartPointLogger, bStartIr);
+}
+
+void FlightController::Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr)
+{
     printL("FlightController::Start");
     if (bStartDepth) {
         pThreadDepth = new std::thread(&FlightController::runDepth, this, sigCameraDepth, ssDepth);
@@ -63,7 +69,6 @@ void FlightController::Start(bool bStartDepth, bool bStartPointLogger, bool bSta
     if (bStartIr) {
         pThreadIr = new std::thread(&FlightController::runIr, this, sigIr, ssIr);
     }
-    iMaxDist = _iMaxDist;
 }
 
 void FlightController::WaitForTakeoff(int iAltitude)
@@ -148,7 +153,7 @@ bool FlightController::GetHeading(float& fHeading, int iTimeoutMS)
 
 bool FlightController::GetSpeed(float& fSpeedMS)
 {
-    char* sc SendRecXML("<speed_retrieve />");
+    char* sc = SendRecXML("<speed_retrieve />");
     if (sc == nullptr) return false;
     fSpeedMS = atof(sc);
     delete[] sc;
