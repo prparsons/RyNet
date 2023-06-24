@@ -15,7 +15,7 @@
 #define f180_PI 57.29578f
 #define RADIUS_EARTH 6371
 
-float PointDistance(float fLat1, float fLon1, float fLat2, float fLon2)
+inline float PointDistance(float fLat1, float fLon1, float fLat2, float fLon2)
 {
     float fLatDiff = (fLat2 - fLat1) * PI_180f;
     float fLonDiff = (fLon2 - fLon1) * PI_180f;
@@ -28,7 +28,7 @@ float PointDistance(float fLat1, float fLon1, float fLat2, float fLon2)
     return RADIUS_EARTH * c;
 }
 
-void PointFromBearing(float fLatCurrent, float fLonCurrent, float fDistanceM, float fBearingDeg, float& fLat, float& fLon)
+inline void PointFromBearing(float fLatCurrent, float fLonCurrent, float fDistanceM, float fBearingDeg, float& fLat, float& fLon)
 {
     fLatCurrent *= PI_180f;
     fLonCurrent *= PI_180f;
