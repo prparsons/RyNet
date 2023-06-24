@@ -16,33 +16,42 @@ Command Documentation:
 
 <altitude_retrieve />
     Get current altitude
+    --live_test enabled
 
 <battery_retrieve />
     Get current battery level, percent level from 0-100.
+    --live_test enabled
 
 <clean_dist>DISTANCE_M</clean_dist>
     Sets the distance from visited point that is close enough to remove a waypoint from mission list.
+    --live_test disabled
 
 <dir dist='200'>OFFSET_HEADING_DEGREES</dir>
     Sets mode to GUIDED, and then turns indicated amount
         dist -- distance to set waypoint in meters[default:1000]
+    --live_test disabled
 
 <heading_retrieve />
     Get current vehicle heading
+    --live_test enabled
 
 <mode_retrieve />
     Retrieves the current mode and returns it to the client as a string ("AUTO", "GUIDED")
+    --live_test enabled
 
 <obs dir='30'>DISTANCE_CM</obs>
     Sends obstacle distance sensor message
         dir -- direction the sensor is facing
+    --live_test enabled
 
 <pos_retrieve />
     Gets the current position (lat,lon) and returns it back to the client separated by \n
+    --live_test enabled
 
 <route_load setauto='true'>MISSION_FILENAME</route_load>
     Loads a waypoints file as the current mission
         setauto -- if present and true, will set the autopilot's mode to auto after setting the route
+    --live_test disabled
 
 <route_restore loadsaved='true' lat='35.1' lon='-110.1' clean='simple' setauto='true' />
     Restores a route, optionally cleaning it and setting vehicle mode to AUTO
@@ -51,26 +60,33 @@ Command Documentation:
         clean -- [simple] will find closest waypoint and remove everything prior to it
                  [2opt] will remove visited waypoints and use 2opt to reconstruct route
         setauto -- if present and true, will set the autopilot's mode to auto after setting the route
+    --live_test disabled
 
 <route_retrieve />
     Gets current route and returns it back to client as a string
+    --live_test disabled
 
 <route_save />
     Saves current route to savedMission.txt
+    --live_test disabled
 
 <route_set setauto='true'>ROUTE</route_set>
     Sets the text of element as the current route
         setauto -- if present and true, will set the autopilot's mode to auto after setting the route
+    --live_test disabled
 
 <rtl />
     Sets vehicle mode to RTL
+    --live_test disabled
 
 <speed_retrieve />
     Gets vehicle groundspeed in meters per second
+    --live_test enabled
 
 <takeoff setauto='true'>ALTITUDE_METERS</takeoff>
     Will arm and take off (simple example from dronekit)
         setauto -- will change the vehicle mode to AUTO 3 sec after takeoff
+    --live_test disabled
 
 
 SITL Testing instructions:
@@ -549,15 +565,21 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
         return
     
     #if element.tag == 'clean_dist':
+        #if args.live_test == True:
+            #return
         #NOT_IMPLEMENTED
 
     if element.tag == 'battery_retrieve':
         cmdBatteryRetrieve(vehicle, UDPServerSocket, address)
         
     elif element.tag == 'takeoff':
+        if args.live_test == True:
+            return
         cmdTakeoff(vehicle, element)
 
     elif element.tag == 'dir':
+        if args.live_test == True:
+            return
         cmdDir(vehicle, element)
         #Reset the visited point list so we only have points visited while in Guided mode
 
@@ -571,15 +593,23 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
         cmdObs(vehicle, element)
 
     elif element.tag == 'route_save':
+        if args.live_test == True:
+            return
         save_missionF('savedMission.txt', vehicle)
 
     elif element.tag == 'route_retrieve':
+        if args.live_test == True:
+            return
         cmdRoutRetrieve(vehicle, UDPServerSocket, address)
 
     elif element.tag == 'route_set':
+        if args.live_test == True:
+            return
         cmdRouteSet(vehicle, element)
 
     elif element.tag == 'route_load':
+        if args.live_test == True:
+            return
         cmdRouteLoad(vehicle, element)
 
     elif element.tag == 'pos_retrieve':
@@ -593,12 +623,16 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
         #need to read through the whole route and set each one
 
     elif element.tag == 'rtl':
+        if args.live_test == True:
+            return
         vehicle.mode = VehicleMode("RTL")
 
     elif element.tag == 'speed_retrieve':
         cmdSpeedRetrieve(vehicle, UDPServerSocket, address)
         
     elif element.tag == 'route_restore':
+        if args.live_test == True:
+            return
         cmdRouteRestore(vehicle, element)
         visitedList = []
 
