@@ -19,6 +19,9 @@ enum OptionArgument {
     SEGMENT_NET,
     DETECT_NET,
     UDP_KEY,
+    WAIT_TAKEOFF,
+    GEO_DIST,
+    UDP_TIMEOUT,
     OPTION_NONE
 };
 
@@ -64,6 +67,9 @@ int main( int argc, char** argv )
     char scUdpKey[33];
     int iTargetClass = -1;
     int iNumSlices = -1;
+    int iTakeoffAltitude = -1;
+    int iGeoDist = -1;
+    int iUdpTimeoutUs = -1;
     // Read all the command line arguments and options (--option argument)
     for (int i = 1; i < argc; i++) {
         if (bOptionArgument) {
@@ -105,6 +111,26 @@ int main( int argc, char** argv )
                     }
                     bHmacUdp = true;
                     strncpy(scUdpKey, argv[i], 32);
+                case GEO_DIST: {
+                    iGeoDist = atoi(argv[i]);
+                    if (iGeoDist < 1 || iGeoDist > 9999) {
+                        printL("Maximum distance from takeoff must be between 1 and 9999.");
+                        return -1;
+                    }
+                } break;
+                case UDP_TIMEOUT: {
+                    iUdpTimeoutUs = atoi(argv[i]);
+                    if (iUdpTimeoutUs < 1 || iUdpTimeoutUs > 1000000) {
+                        printL("UDP timeout must be between 1-1000000 microseconds.");
+                        return -1;
+                    }
+                } break;
+                case WAIT_TAKEOFF: {
+                    iTakeoffAltitude = atoi(argv[i]);
+                    if (iTakeoffAltitude < 10 || iTakeoffAltitude > 120) {
+                        printL("Takeoff wait altitude must be between 10 and 120");
+                        return -1;
+                    }
                 } break;
                 default:
                     printL("OptionArgumentSelection Invalid");
@@ -127,6 +153,15 @@ int main( int argc, char** argv )
             } else if (strcmp("--detection_net", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = DETECT_NET;
+            } else if (strcmp("--max_dist", argv[i]) == 0) {
+                bOptionArgument = true;
+                OptionArgumentSelection = GEO_DIST;
+            } else if (strcmp("--wait_takeoff", argv[i]) == 0) {
+                bOptionArgument = true;
+                OptionArgumentSelection = WAIT_TAKEOFF;
+            } else if (strcmp("--udp_timeout", argv[i]) == 0) {
+                bOptionArgument = true;
+                OptionArgumentSelection = UDP_TIMEOUT;
             } else if (strcmp("--segment_net", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = SEGMENT_NET;
@@ -172,6 +207,7 @@ int main( int argc, char** argv )
         FlightController* pController = FlightController::GetFlightController(logger, *pCamera);
         if (bManualServerAddress) pController->SetServerAddress(scServerAddress);
         if (bHmacUdp) pController->SetUdpKey(scUdpKey);
+        if (iUdpTimeoutUs != -1) pController->SetUdpTimout(iUdpTimeoutUs);
 
         printL(">>>Creating Navigator");
         Navigator nav(*pController, logger, *pCamera, bBatteryMonitor);
@@ -185,10 +221,14 @@ int main( int argc, char** argv )
         logger.Start();
         printL(">>>Starting Camera");
         pCamera->Start(); // Camera starts all it's own threads
+        printL(">>>Starting Flight Controller");
+        if (iGeoDist != -1) pController->Start(bRunDepth, bStartPointLogger, bRunFlir, iGeoDist);
+        else pController->Start(bRunDepth, bStartPointLogger, bRunFlir);
+        if (iTakeoffAltitude != -1) {
+            pController->WaitForTakeoff(iTakeoffAltitude);
+        }
         printL(">>>Starting Navigator");
         nav.Start();
-        printL(">>>Starting Flight Controller");
-        pController->Start(bRunDepth, bStartPointLogger, bRunFlir);
 
         // std::system_error if the thread could not be started.
         //**I think there might be issues with shutdown of stuff...need to trace through it all and double check
@@ -269,6 +309,15 @@ void printHelp()
     printL(" --hmac_udp [ABCDE]");
     printL("    All UDP messages sent/received will be verified with a salted hmac.");
     printL("    Target is a string up to 32 characters long with no spaces.\n");
+    printL(" --wait_takeoff [XX]");
+    printL("    Altitude drone must reach before navigation routine starts.");
+    printL("    Target is number from 10-120m.\n");
+    printL(" --max_dist [XX]");
+    printL("    Maximum distance allowed from takeoff position.");
+    printL("    Target is number from 1-9999.\n");
+    printL(" --udp_timeout [XX]");
+    printL("    Timeout value for UDP packets in microseconds.");
+    printL("    Target is number from 1-1000000.\n");
 }
 
 void cleanupFailure()

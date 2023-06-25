@@ -22,10 +22,15 @@ public:
     static FlightController* GetFlightController(DataLogger& logger, CameraController& camera);
     static void DestroyFlightController();
 
+    void WaitForTakeoff(int iAltitude);
+    void SetUdpTimout(int iTimeoutUs);
+    void Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr, int iMaxDist);
     void Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr);
 
-    static bool GetPosition(float fLat, float fLon, int iTimeoutMS = 100);
-    static bool GetHeading(float fHeading, int iTimeoutMS = 100);
+    static bool GetPosition(float& fLat, float& fLon);
+    static bool GetHeading(float& fHeading);
+    bool GetSpeed(float& fSpeedMS); 
+    bool GetAltitude(float& fAltitude);
     bool GetMode(char* scMode, int iStrLen);
     int GetBattery();
 
@@ -47,7 +52,7 @@ private:
 
     void SaveRoute();
     void SendXML(const char* sc);
-    char* SendRecXML(const char* sc, int iTimeoutMS = 100);
+    char* SendRecXML(const char* sc);
     void ConnectMavLink();
 
     void runDepth(Signal sig, StopSignal ss); // Thread function to continuously send depth info for obstacle avoidance
@@ -69,9 +74,13 @@ private:
 
     struct sockaddr_in addressMavLink;
     int socketDesc;
+    int iUdpTimeoutUs;
+    int iMaxDist;
     char scMavLinkAddress[32];
     const int iMavlinkPort = 3636;
     char scKey[33];
     int iSalt;
+    float fHomeLat;
+    float fHomeLon;
 };
 

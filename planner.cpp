@@ -20,6 +20,10 @@ FlightController::FlightController(DataLogger& _logger, CameraController& _camer
 , sigCameraDepth(_camera.GetSignalDepth())
 , socketDesc(-1)
 , iSalt(0)
+, iUdpTimeoutUs(100000)
+, iMaxDist(-1)
+, fHomeLat(0)
+, fHomeLon(0)
 {
     scKey[0] = 0;
     strcpy(scMavLinkAddress, "127.0.0.1");
@@ -56,6 +60,12 @@ void FlightController::DestroyFlightController()
     pInstance = nullptr;
 }
 
+void FlightController::Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr, int _iMaxDist)
+{
+    iMaxDist = _iMaxDist;
+    Start(bStartDepth, bStartPointLogger, bStartIr);
+}
+
 void FlightController::Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr)
 {
     printL("FlightController::Start");
@@ -68,6 +78,49 @@ void FlightController::Start(bool bStartDepth, bool bStartPointLogger, bool bSta
     if (bStartIr) {
         pThreadIr = new std::thread(&FlightController::runIr, this, sigIr, ssIr);
     }
+}
+
+void FlightController::WaitForTakeoff(int iAltitude)
+{
+    float fCurrentAltitude = 0;
+    char scMode[32];
+    scMode[0] = 0;
+    bool bTakeoffMessage = true;
+    while (fCurrentAltitude < float(iAltitude)) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        // Want to wait until AUTO mode has been entered before checking altitude
+        if (GetMode(scMode, 31)) {
+            if (strcmp("AUTO", scMode) == 0) {
+                if (bTakeoffMessage) {
+                    bTakeoffMessage = false;
+                    printL("Has entered auto");
+                    logger.LogString("Has entered auto");
+                }
+                GetAltitude(fCurrentAltitude);
+            }
+        }
+    }
+    printf("Has reached startup altitude %.3f", fCurrentAltitude);
+    logger.LogString("Has reached startup altitude");
+
+    float fLat;
+    float fLon;
+    if (GetPosition(fLat, fLon)) {
+        fHomeLat = fLat;
+        fHomeLon = fLon;
+        printf("Setting Home Pos: %.4f, %.4f\n", fHomeLat, fHomeLon);
+    }
+}
+
+void FlightController::SetUdpTimout(int iTimeoutUs)
+{
+    iUdpTimeoutUs = iTimeoutUs;
+    if (socketDesc == -1) return;
+    // If socketDesc already exists, then we'll set the timeout now
+    struct timeval tv;
+    tv.tv_sec = 0;
+    tv.tv_usec = iUdpTimeoutUs;
+    setsockopt(socketDesc, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
 }
 
 FlightController::~FlightController()
@@ -92,36 +145,54 @@ FlightController::~FlightController()
     //socket
 }
 
-bool FlightController::GetPosition(float fLat, float fLon, int iTimeoutMS)
+bool FlightController::GetPosition(float& fLat, float& fLon)
 {
     if (pInstance == nullptr) return false;
-    char* sc = pInstance->SendRecXML("<pos_retrieve />", iTimeoutMS);
+    char* sc = pInstance->SendRecXML("<pos_retrieve />");
     if (sc == nullptr) return false;
     int i;
-    // string is in format "LAT LON"
+    // string is in format "LAT\nLON"
     for (i = 0; i < strlen(sc); i++) {
-        if (sc[i] = ' ') break;
+        if (sc[i] == '\n') break;
     }
     sc[i] = 0;
-    fLat = atof(sc);
-    fLon = atof(sc + i + 1);
+    fLat = float(atof(sc));
+    fLon = float(atof(sc + i + 1));
     delete[] sc;
     return true;
 }
 
-bool FlightController::GetHeading(float fHeading, int iTimeoutMS)
+bool FlightController::GetHeading(float& fHeading)
 {
     if (pInstance == nullptr) return false;
-    char* sc = pInstance->SendRecXML("<heading_retrieve />", iTimeoutMS);
+    char* sc = pInstance->SendRecXML("<heading_retrieve />");
     if (sc == nullptr) return false;
     fHeading = atof(sc);
     delete[] sc;
     return true;
 }
 
+bool FlightController::GetSpeed(float& fSpeedMS)
+{
+    char* sc = SendRecXML("<speed_retrieve />");
+    if (sc == nullptr) return false;
+    fSpeedMS = atof(sc);
+    delete[] sc;
+    return true;
+}
+
+bool FlightController::GetAltitude(float& fAltitude)
+{
+    char* sc = SendRecXML("<altitude_retrieve />");
+    if (sc == nullptr) return false;
+    fAltitude = atof(sc);
+    delete[] sc;
+    return true;
+}
+
 bool FlightController::GetMode(char* scMode, int iStrLen)
 {
-    char* sc = SendRecXML("<route_retrieve />");
+    char* sc = SendRecXML("<mode_retrieve />");
     if (sc == nullptr) return false;
     strncpy(scMode, sc, iStrLen);
     delete sc;
@@ -130,7 +201,7 @@ bool FlightController::GetMode(char* scMode, int iStrLen)
 
 int FlightController::GetBattery()
 {
-    char* sc = SendRecXML("<battery />");
+    char* sc = SendRecXML("<battery_retrieve />");
     if (sc == nullptr) return -1;
     int iBattery = atoi(sc);
     delete sc;
@@ -139,7 +210,37 @@ int FlightController::GetBattery()
 
 bool FlightController::CheckDirectionValid(float fDirection, time_t travelTime)
 {
-    return true;
+    // Home Location must exist and max distance must have been set
+    if ((fHomeLat == 0 && fHomeLon == 0) || iMaxDist == -1) {
+        return true;
+    }
+
+    // Get current position
+    float fLatCurrent = 0;
+    float fLonCurrent = 0;
+    if (!GetPosition(fLatCurrent, fLonCurrent)) {
+        printL("Failed to get position");
+        return true;
+    }
+
+    float fCurrentSpeedMS = 0;
+    // Get Current speed in m/s, use that to calculate distance traveled in m
+    if (!GetSpeed(fCurrentSpeedMS)) {
+        printL("Failed to get speed");
+        return true;
+    }
+    float fDistanceM = fCurrentSpeedMS * travelTime;
+
+    float fQueryLat = 0;
+    float fQueryLon = 0;
+    // Find the final position based on lat, long, distance
+    PointFromBearing(fLatCurrent, fLonCurrent, fDistanceM, fDirection, fQueryLat, fQueryLon);
+
+    // Now find distance between that and home
+    float fDistance = PointDistanceM(fHomeLat, fHomeLon, fQueryLat, fQueryLon);
+    printf("Current: [%.4f,%.4f]; Speed: %.1f; DistTravel: %.1f; Dest: [%.4f,%.4f]; Dest-Home Dist: %.1f\n", 
+        fLatCurrent, fLonCurrent, fCurrentSpeedMS, fDistanceM, fQueryLat, fQueryLon, fDistance);
+    return fDistance < iMaxDist;
 }
 
 void FlightController::SetDirection(float fHeadingOffsetDeg)
@@ -376,7 +477,7 @@ void FlightController::SendXML(const char* strMessage)
     #endif
 }
 
-char* FlightController::SendRecXML(const char* _scMessage, int iTimeoutMS)
+char* FlightController::SendRecXML(const char* _scMessage)
 {
     #ifdef FLIGHT_CONTROLLER_TCP
     //Send some data
@@ -418,11 +519,11 @@ char* FlightController::SendRecXML(const char* _scMessage, int iTimeoutMS)
     if (socketDesc < 0) ConnectMavLink();
     sendto(socketDesc, scMessage, iStrLen, MSG_CONFIRM, (const struct sockaddr*)&addressMavLink, sizeof(addressMavLink));
     char* scResponse = new char[512];
-    int iLength = recv(socketDesc, scResponse, 511, MSG_DONTWAIT);
+    int iLength = recv(socketDesc, scResponse, 511, 0);
     if (iLength < 0) {
         // It failed, give it __msec then try one more time
-        std::this_thread::sleep_for(std::chrono::milliseconds(iTimeoutMS));
-        iLength = recv(socketDesc, scResponse, 511, MSG_DONTWAIT);
+        std::this_thread::sleep_for(std::chrono::milliseconds(iUdpTimeoutUs / 1000));
+        iLength = recv(socketDesc, scResponse, 511, 0);
         if (iLength < 0) {
             // Still failed...give up
             delete[] scResponse;
@@ -475,6 +576,11 @@ void FlightController::ConnectMavLink()
     addressMavLink.sin_family = AF_INET; 
     addressMavLink.sin_port = htons(iMavlinkPort); 
     addressMavLink.sin_addr.s_addr = inet_addr(scMavLinkAddress);
+
+    struct timeval tv;
+    tv.tv_sec = 0;
+    tv.tv_usec = iUdpTimeoutUs;
+    setsockopt(socketDesc, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
     #endif
 }
 

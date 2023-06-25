@@ -467,13 +467,15 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
 	        if (segmenter.IsHabitatVisible()) {
                 // If it's in the same direction then do nothing
                 if (abs(segmenter.GetHabitatDirection()) < fMargin) {
-                    // Unless continuing that direction would be an invalid direction
-                    if (!control.CheckDirectionValid(fCurrentDirection, tMinTimeBetweenChanges)) {
-                        control.RestoreRouteNaive();
-                        logger.LogString("Good Habitat -> Grid Search (Invalid Direction)");
-                        bGridSearching = true;
-                        tLastChange = time(nullptr);
-                    }
+                    // // Unless continuing that direction would be an invalid direction
+                    // if (!control.CheckDirectionValid(fCurrentDirection, tMinTimeBetweenChanges)) {
+                    //     control.RestoreRouteNaive();
+                    //     logger.LogString("Good Habitat -> Grid Search (Invalid Direction)");
+                    //     bGridSearching = true;
+                    //     tLastChange = time(nullptr);
+                    // }
+                    
+                    //***The above can't happen because we verified before we set the direction (WITH DISTANCE)
                     continue;
                 }
                 char sc[64];
@@ -531,7 +533,7 @@ void Navigator::runBattery(StopSignal ss, StopSignal ssMainThread)
     //  but don't wait too long while tryin to stop this thread.
     uint8_t uCheckBattery = 0;
     while (!ss.shouldStop()) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         if (uCheckBattery++ != 0) continue;
 
         int iBattery = control.GetBattery();

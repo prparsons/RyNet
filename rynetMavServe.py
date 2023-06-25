@@ -16,29 +16,44 @@ from tsp import *
 """
 Command Documentation:
 
-<battery />
+<altitude_retrieve />
+    Get current altitude
+    --livetest enabled
+
+<battery_retrieve />
     Get current battery level, percent level from 0-100.
+    --livetest enabled
 
 <clean_dist>DISTANCE_M</clean_dist>
     Sets the distance from visited point that is close enough to remove a waypoint from mission list.
+    --livetest disabled
 
 <dir dist='200'>OFFSET_HEADING_DEGREES</dir>
     Sets mode to GUIDED, and then turns indicated amount
         dist -- distance to set waypoint in meters[default:1000]
+    --livetest disabled
+
+<heading_retrieve />
+    Get current vehicle heading
+    --livetest enabled
 
 <mode_retrieve />
     Retrieves the current mode and returns it to the client as a string ("AUTO", "GUIDED")
+    --livetest enabled
 
 <obs dir='30'>DISTANCE_CM</obs>
     Sends obstacle distance sensor message
         dir -- direction the sensor is facing
+    --livetest enabled
 
 <pos_retrieve />
     Gets the current position (lat,lon) and returns it back to the client separated by \n
+    --livetest enabled
 
 <route_load setauto='true'>MISSION_FILENAME</route_load>
     Loads a waypoints file as the current mission
         setauto -- if present and true, will set the autopilot's mode to auto after setting the route
+    --livetest disabled
 
 <route_restore loadsaved='true' lat='35.1' lon='-110.1' clean='simple' setauto='true' />
     Restores a route, optionally cleaning it and setting vehicle mode to AUTO
@@ -47,23 +62,33 @@ Command Documentation:
         clean -- [simple] will find closest waypoint and remove everything prior to it
                  [2opt] will remove visited waypoints and use 2opt to reconstruct route
         setauto -- if present and true, will set the autopilot's mode to auto after setting the route
+    --livetest disabled
 
 <route_retrieve />
     Gets current route and returns it back to client as a string
+    --livetest disabled
 
 <route_save />
     Saves current route to savedMission.txt
+    --livetest disabled
 
 <route_set setauto='true'>ROUTE</route_set>
     Sets the text of element as the current route
         setauto -- if present and true, will set the autopilot's mode to auto after setting the route
+    --livetest disabled
 
 <rtl />
     Sets vehicle mode to RTL
+    --livetest disabled
+
+<speed_retrieve />
+    Gets vehicle groundspeed in meters per second
+    --livetest enabled
 
 <takeoff setauto='true'>ALTITUDE_METERS</takeoff>
     Will arm and take off (simple example from dronekit)
         setauto -- will change the vehicle mode to AUTO 3 sec after takeoff
+    --livetest disabled
 
 
 SITL Testing instructions:
@@ -88,13 +113,13 @@ parser = argparse.ArgumentParser(description='UDP Dronekit server')
 parser.add_argument('--connect', 
                     help="Vehicle connection target string.\nMission Planner SITL example: 'tcp:127.0.0.1:5762'\nIf not specified, dronekit SITL used")
 parser.add_argument('--port', type=int, default=3636, help="Port to listen on [default:3636]")
-parser.add_argument('--livetest', default='False', help='If True, will only send <obs /> messages to the drone.')
+parser.add_argument('--livetest', default='False', action='store_true', help='If True, will only send <obs /> messages to the drone.')
 parser.add_argument('--clean_dist_visit', type=int, default=10, help='Distance between visited points that is close enough to consider them duplicates.')
 parser.add_argument('--clean_dist_way', type=int, default=100, help='Distance from visited point that is close enough to remove a waypoint from mission list.')
 parser.add_argument('--udp_hmac', type=str, default='', help='If specified, all udp commands will be verified. String key should be provided.')
 #args = parser.parse_args()
 #Testing without command line, use below
-args = parser.parse_args("--port 3636 --connect tcp:127.0.0.1:5762 --udp_hmac SecretKey".split())
+args = parser.parse_args("--port 3636 --connect tcp:127.0.0.1:5762 --udp_hmac SecretKey --livetest".split())
 visitedList = []
 
 def hmacVerifyMessage(signature, bytesSalt, bytesMessage, key):
@@ -503,6 +528,21 @@ def cmdModeRetrieve(vehicle, UDPServerSocket, address):
     strReply = vehicle.mode.name
     UDPServerSocket.sendto(str.encode(strReply), address)
 
+def cmdDirRetrieve(vehicle, UDPServerSocket, address):
+    heading = vehicle.heading
+    strReply = "%.1f" % heading
+    UDPServerSocket.sendto(str.encode(strReply), address)
+
+def cmdAltitudeRetrieve(vehicle, UDPServerSocket, address):
+    altitude = vehicle.location.global_relative_frame.alt
+    strReply = "%.3f" % altitude
+    UDPServerSocket.sendto(str.encode(strReply), address)
+
+def cmdSpeedRetrieve(vehicle, UDPServerSocket, address):
+    speed = vehicle.groundspeed
+    strReply = "%.1f" % speed
+    UDPServerSocket.sendto(str.encode(strReply), address)
+
 def cmdObs(vehicle, element): 
     if 'dir' in element.attrib:
         print("dir found")
@@ -560,6 +600,7 @@ def cmdRoutRetrieve(vehicle, UDPServerSocket, address):
 
 def cmdPosRetrieve(vehicle, UDPServerSocket, address):
     strReply = "%f\n%f\n" % (vehicle.location.global_frame.lat, vehicle.location.global_frame.lon)
+    print(strReply)
     UDPServerSocket.sendto(str.encode(strReply), address)
 
 def cmdBatteryRetrieve(vehicle, UDPServerSocket, address):
@@ -576,47 +617,74 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
         return
     
     #if element.tag == 'clean_dist':
+        #if args.livetest == True:
+            #return
         #NOT_IMPLEMENTED
 
-    if element.tag == 'battery':
+    if element.tag == 'battery_retrieve':
         cmdBatteryRetrieve(vehicle, UDPServerSocket, address)
         
     elif element.tag == 'takeoff':
+        if args.livetest == True:
+            return
         cmdTakeoff(vehicle, element)
 
     elif element.tag == 'dir':
+        if args.livetest == True:
+            return
         cmdDir(vehicle, element)
         #Reset the visited point list so we only have points visited while in Guided mode
 
     elif element.tag == 'mode_retrieve':
         cmdModeRetrieve(vehicle, UDPServerSocket, address)
 
+    elif element.tag == 'heading_retrieve':
+        cmdDirRetrieve(vehicle, UDPServerSocket, address)
+
     elif element.tag == 'obs':
         cmdObs(vehicle, element)
 
     elif element.tag == 'route_save':
+        if args.livetest == True:
+            return
         save_missionF('savedMission.txt', vehicle)
 
     elif element.tag == 'route_retrieve':
+        if args.livetest == True:
+            return
         cmdRoutRetrieve(vehicle, UDPServerSocket, address)
 
     elif element.tag == 'route_set':
+        if args.livetest == True:
+            return
         cmdRouteSet(vehicle, element)
 
     elif element.tag == 'route_load':
+        if args.livetest == True:
+            return
         cmdRouteLoad(vehicle, element)
 
     elif element.tag == 'pos_retrieve':
         cmdPosRetrieve(vehicle, UDPServerSocket, address)
         visitedList.append([vehicle.location.global_frame.lat, vehicle.location.global_frame.lon])
 
+    elif element.tag == 'altitude_retrieve':
+        cmdAltitudeRetrieve(vehicle, UDPServerSocket, address)
+
     #elif element.tag == 'altitude_set':
         #need to read through the whole route and set each one
 
     elif element.tag == 'rtl':
+        if args.livetest == True:
+            return
         vehicle.mode = VehicleMode("RTL")
+
+    elif element.tag == 'speed_retrieve':
+        cmdSpeedRetrieve(vehicle, UDPServerSocket, address)
         
     elif element.tag == 'route_restore':
+        if args.livetest == True:
+            return
         cmdRouteRestore(vehicle, element)
         visitedList = []
 
@@ -691,7 +759,7 @@ selectorDefault = selectors.DefaultSelector()
 # Create a datagram socket
 sockUDP = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
 # Bind to address and ip
-sockUDP.bind(("127.0.0.1", args.port))
+sockUDP.bind(("192.168.2.103", args.port))
 sockUDP.setblocking(False)
 selectorDefault.register(sockUDP, selectors.EVENT_READ, recvUDP)
 
