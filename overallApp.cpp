@@ -111,6 +111,7 @@ int main( int argc, char** argv )
                     }
                     bHmacUdp = true;
                     strncpy(scUdpKey, argv[i], 32);
+                } break;
                 case GEO_DIST: {
                     iGeoDist = atoi(argv[i]);
                     if (iGeoDist < 1 || iGeoDist > 9999) {
