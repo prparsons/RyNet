@@ -467,13 +467,15 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
 	        if (segmenter.IsHabitatVisible()) {
                 // If it's in the same direction then do nothing
                 if (abs(segmenter.GetHabitatDirection()) < fMargin) {
-                    // Unless continuing that direction would be an invalid direction
-                    if (!control.CheckDirectionValid(fCurrentDirection, tMinTimeBetweenChanges)) {
-                        control.RestoreRouteNaive();
-                        logger.LogString("Good Habitat -> Grid Search (Invalid Direction)");
-                        bGridSearching = true;
-                        tLastChange = time(nullptr);
-                    }
+                    // // Unless continuing that direction would be an invalid direction
+                    // if (!control.CheckDirectionValid(fCurrentDirection, tMinTimeBetweenChanges)) {
+                    //     control.RestoreRouteNaive();
+                    //     logger.LogString("Good Habitat -> Grid Search (Invalid Direction)");
+                    //     bGridSearching = true;
+                    //     tLastChange = time(nullptr);
+                    // }
+                    
+                    //***The above can't happen because we verified before we set the direction (WITH DISTANCE)
                     continue;
                 }
                 char sc[64];
