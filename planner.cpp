@@ -99,6 +99,7 @@ void FlightController::WaitForTakeoff(int iAltitude)
     if (GetPosition(fLat, fLon)) {
         fHomeLat = fLat;
         fHomeLon = fLon;
+        printf("Setting Home Pos: %.4f, %.4f\n", fHomeLat, fHomeLon);
     }
 }
 
@@ -216,7 +217,7 @@ bool FlightController::CheckDirectionValid(float fDirection, time_t travelTime)
     PointFromBearing(fLatCurrent, fLonCurrent, fDistanceM, fDirection, fQueryLat, fQueryLon);
 
     // Now find distance between that and home
-    float fDistance = PointDistance(fHomeLat, fHomeLon, fQueryLat, fQueryLon);
+    float fDistance = PointDistanceM(fHomeLat, fHomeLon, fQueryLat, fQueryLon);
     printf("Current: [%.4f,%.4f]; Speed: %.1f; DistTravel: %.1f; Dest: [%.4f,%.4f]; Dest-Home Dist: %.1f\n", 
         fLatCurrent, fLonCurrent, fCurrentSpeedMS, fDistanceM, fQueryLat, fQueryLon, fDistance);
     return fDistance < iMaxDist;

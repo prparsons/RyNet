@@ -15,7 +15,7 @@
 #define f180_PI 57.29578f
 #define RADIUS_EARTH 6371
 
-inline float PointDistance(float fLat1, float fLon1, float fLat2, float fLon2)
+inline float PointDistanceM(float fLat1, float fLon1, float fLat2, float fLon2)
 {
     float fLatDiff = (fLat2 - fLat1) * PI_180f;
     float fLonDiff = (fLon2 - fLon1) * PI_180f;
@@ -25,7 +25,7 @@ inline float PointDistance(float fLat1, float fLon1, float fLat2, float fLon2)
 
     float a = pow(sin(fLatDiff / 2), 2) + pow(sin(fLonDiff / 2), 2) * cos(fLat1) * cos(fLat2);
     float c = 2 * asin(sqrt(a));
-    return RADIUS_EARTH * c;
+    return RADIUS_EARTH * c * 1000; // Result was in km, x 1000 for meters
 }
 
 inline void PointFromBearing(float fLatCurrent, float fLonCurrent, float fDistanceM, float fBearingDeg, float& fLat, float& fLon)
