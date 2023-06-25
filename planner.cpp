@@ -13,6 +13,7 @@ FlightController::FlightController(DataLogger& _logger, CameraController& _camer
 , pThreadIr(nullptr)
 , sigCameraDepth(_camera.GetSignalDepth())
 , socketDesc(-1)
+, iUdpTimeoutUs(100000)
 , iMaxDist(-1)
 , fHomeLat(0)
 , fHomeLon(0)
@@ -103,6 +104,17 @@ void FlightController::WaitForTakeoff(int iAltitude)
     }
 }
 
+void FlightController::SetUdpTimout(int iTimeoutUs)
+{
+    iUdpTimeoutUs = iTimeoutUs;
+    if (socketDesc == -1) return;
+    // If socketDesc already exists, then we'll set the timeout now
+    struct timeval tv;
+    tv.tv_sec = 0;
+    tv.tv_usec = iUdpTimeoutUs;
+    setsockopt(socketDesc, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
+}
+
 FlightController::~FlightController()
 {
     printL("FlightController::~FlightController");
@@ -125,27 +137,31 @@ FlightController::~FlightController()
     //socket
 }
 
-bool FlightController::GetPosition(float& fLat, float& fLon, int iTimeoutMS)
+bool FlightController::GetPosition(float& fLat, float& fLon)
 {
     if (pInstance == nullptr) return false;
-    char* sc = pInstance->SendRecXML("<pos_retrieve />", iTimeoutMS);
+    char* sc = pInstance->SendRecXML("<pos_retrieve />");
     if (sc == nullptr) return false;
+    printf("FlightController::GetPosition sc: %s\n", sc);
     int i;
     // string is in format "LAT\nLON"
     for (i = 0; i < strlen(sc); i++) {
         if (sc[i] == '\n') break;
     }
     sc[i] = 0;
+    printf("FlightController::GetPosition sc_1: %s\n", sc);
+    printf("FlightController::GetPosition sc_2: %s\n", sc + i + 1);
     fLat = float(atof(sc));
     fLon = float(atof(sc + i + 1));
+    printf("FlightController::GetPosition lat: %.4f   lon: %.4f\n", fLat, fLon);
     delete[] sc;
     return true;
 }
 
-bool FlightController::GetHeading(float& fHeading, int iTimeoutMS)
+bool FlightController::GetHeading(float& fHeading)
 {
     if (pInstance == nullptr) return false;
-    char* sc = pInstance->SendRecXML("<heading_retrieve />", iTimeoutMS);
+    char* sc = pInstance->SendRecXML("<heading_retrieve />");
     if (sc == nullptr) return false;
     fHeading = atof(sc);
     delete[] sc;
@@ -166,6 +182,7 @@ bool FlightController::GetAltitude(float& fAltitude)
     char* sc = SendRecXML("<altitude_retrieve />");
     if (sc == nullptr) return false;
     fAltitude = atof(sc);
+    printf("FlightController::GetAltitude len:%u    sc: %s    fAlt: %.4f\n", strlen(sc), sc, fAltitude);
     delete[] sc;
     return true;
 }
@@ -175,6 +192,7 @@ bool FlightController::GetMode(char* scMode, int iStrLen)
     char* sc = SendRecXML("<mode_retrieve />");
     if (sc == nullptr) return false;
     strncpy(scMode, sc, iStrLen);
+    printf("FlightController::GetMode len:%u    sc: %s    fAlt: %.4f\n", strlen(sc), sc, fAltitude);
     delete sc;
     return true;
 }
@@ -452,7 +470,7 @@ void FlightController::SendXML(const char* strMessage)
     #endif
 }
 
-char* FlightController::SendRecXML(const char* strMessage, int iTimeoutMS)
+char* FlightController::SendRecXML(const char* strMessage)
 {
     #ifdef FLIGHT_CONTROLLER_TCP
     //Send some data
@@ -476,11 +494,11 @@ char* FlightController::SendRecXML(const char* strMessage, int iTimeoutMS)
     if (socketDesc < 0) ConnectMavLink();
     sendto(socketDesc, strMessage, strlen(strMessage), MSG_CONFIRM, (const struct sockaddr*)&addressMavLink, sizeof(addressMavLink));
     char* scResponse = new char[512];
-    int iLength = recv(socketDesc, scResponse, 511, MSG_DONTWAIT);
+    int iLength = recv(socketDesc, scResponse, 511, 0);
     if (iLength < 0) {
         // It failed, give it __msec then try one more time
-        std::this_thread::sleep_for(std::chrono::milliseconds(iTimeoutMS));
-        iLength = recv(socketDesc, scResponse, 511, MSG_DONTWAIT);
+        std::this_thread::sleep_for(std::chrono::milliseconds(iUdpTimeoutUs / 1000));
+        iLength = recv(socketDesc, scResponse, 511, 0);
         if (iLength < 0) {
             // Still failed...give up
             delete[] scResponse;
@@ -523,5 +541,10 @@ void FlightController::ConnectMavLink()
     addressMavLink.sin_family = AF_INET; 
     addressMavLink.sin_port = htons(iMavlinkPort); 
     addressMavLink.sin_addr.s_addr = inet_addr(scMavLinkAddress);
+
+    struct timeval tv;
+    tv.tv_sec = 0;
+    tv.tv_usec = iUdpTimeoutUs;
+    setsockopt(socketDesc, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
     #endif
 }

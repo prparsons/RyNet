@@ -20,6 +20,7 @@ enum OptionArgument {
     DETECT_NET,
     WAIT_TAKEOFF,
     GEO_DIST,
+    UDP_TIMEOUT,
     OPTION_NONE
 };
 
@@ -65,6 +66,7 @@ int main( int argc, char** argv )
     int iNumSlices = -1;
     int iTakeoffAltitude = -1;
     int iGeoDist = -1;
+    int iUdpTimeoutUs = -1;
     // Read all the command line arguments and options (--option argument)
     for (int i = 1; i < argc; i++) {
         if (bOptionArgument) {
@@ -106,6 +108,13 @@ int main( int argc, char** argv )
                         return -1;
                     }
                 } break;
+                case UDP_TIMEOUT: {
+                    iUdpTimeoutUs = atoi(argv[i]);
+                    if (iUdpTimeoutUs < 1 || iUdpTimeoutUs > 1000000) {
+                        printL("UDP timeout must be between 1-1000000 microseconds.");
+                        return -1;
+                    }
+                } break;
                 case WAIT_TAKEOFF: {
                     iTakeoffAltitude = atoi(argv[i]);
                     if (iTakeoffAltitude < 10 || iTakeoffAltitude > 120) {
@@ -137,6 +146,9 @@ int main( int argc, char** argv )
             } else if (strcmp("--wait_takeoff", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = WAIT_TAKEOFF;
+            } else if (strcmp("--udp_timeout", argv[i]) == 0) {
+                bOptionArgument = true;
+                OptionArgumentSelection = UDP_TIMEOUT;
             } else if (strcmp("--segment_net", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = SEGMENT_NET;
@@ -181,6 +193,7 @@ int main( int argc, char** argv )
         printL(">>>Getting Flight Controller");
         FlightController* pController = FlightController::GetFlightController(logger, *pCamera);
         if (bManualServerAddress) pController->SetServerAddress(scServerAddress);
+        if (iUdpTimeoutUs != -1) pController->SetUdpTimout(iUdpTimeoutUs);
 
         printL(">>>Creating Navigator");
         Navigator nav(*pController, logger, *pCamera, bBatteryMonitor);
@@ -285,6 +298,9 @@ void printHelp()
     printL(" --max_dist [XX]");
     printL("    Maximum distance allowed from takeoff position.");
     printL("    Target is number from 1-9999.\n");
+    printL(" --udp_timeout [XX]");
+    printL("    Timeout value for UDP packets in microseconds.");
+    printL("    Target is number from 1-1000000.\n");
 }
 
 void cleanupFailure()
