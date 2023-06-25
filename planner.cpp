@@ -142,18 +142,14 @@ bool FlightController::GetPosition(float& fLat, float& fLon)
     if (pInstance == nullptr) return false;
     char* sc = pInstance->SendRecXML("<pos_retrieve />");
     if (sc == nullptr) return false;
-    printf("FlightController::GetPosition sc: %s\n", sc);
     int i;
     // string is in format "LAT\nLON"
     for (i = 0; i < strlen(sc); i++) {
         if (sc[i] == '\n') break;
     }
     sc[i] = 0;
-    printf("FlightController::GetPosition sc_1: %s\n", sc);
-    printf("FlightController::GetPosition sc_2: %s\n", sc + i + 1);
     fLat = float(atof(sc));
     fLon = float(atof(sc + i + 1));
-    printf("FlightController::GetPosition lat: %.4f   lon: %.4f\n", fLat, fLon);
     delete[] sc;
     return true;
 }
@@ -182,7 +178,6 @@ bool FlightController::GetAltitude(float& fAltitude)
     char* sc = SendRecXML("<altitude_retrieve />");
     if (sc == nullptr) return false;
     fAltitude = atof(sc);
-    printf("FlightController::GetAltitude len:%u    sc: %s    fAlt: %.4f\n", strlen(sc), sc, fAltitude);
     delete[] sc;
     return true;
 }
@@ -192,7 +187,6 @@ bool FlightController::GetMode(char* scMode, int iStrLen)
     char* sc = SendRecXML("<mode_retrieve />");
     if (sc == nullptr) return false;
     strncpy(scMode, sc, iStrLen);
-    printf("FlightController::GetMode len:%u    sc: %s    fAlt: %.4f\n", strlen(sc), sc, fAltitude);
     delete sc;
     return true;
 }
