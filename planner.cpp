@@ -390,7 +390,7 @@ void FlightController::runDepth(Signal sig, StopSignal ss)
         uint16_t uResultLeft = vminvq_u16(u8Min);
         // Send each message (use the rs2 provided float to convert to meters * 100cm/m)
         char sc[128];
-        sprintf("<obs><dist dir='left'>%5d</dist><dist dir='center'>%5d</dist><dist dir='right'>%5d</dist></obs>",
+        sprintf(sc, "<obs><dist dir='left'>%5d</dist><dist dir='center'>%5d</dist><dist dir='right'>%5d</dist></obs>",
             int(uResultLeft * frameDepth.getMetersPerUnit() * 100),
             int(uResultMiddle * frameDepth.getMetersPerUnit() * 100),
             int(uResultRight * frameDepth.getMetersPerUnit() * 100));
