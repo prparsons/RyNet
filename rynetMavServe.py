@@ -10,6 +10,7 @@ import haversine as hs
 import selectors
 import argparse  
 from tsp import *
+import numpy as np
 
 """
 Command Documentation:
@@ -441,14 +442,10 @@ def mission_cleanBetter(missionList, nextWaypoint, fLat, fLon):
     return tsp2opt(missionList)
 
 def parseXML(message, vehicle, UDPServerSocket, address):
-    parser = ET.XMLPullParser()
-    parser.feed(message)
-    
     try:
-        for event, elem in parser.read_events():
-            print(elem)
-            handleCommand(elem, vehicle, UDPServerSocket, address)  
-        parser.close()
+        root = ET.fromstring(message)
+        print(root)
+        handleCommand(root, vehicle, UDPServerSocket, address)
     except:
         print("parseXML error")
         return
@@ -507,6 +504,16 @@ def cmdObs(vehicle, element):
     degreeIncrement = 45#1.875#(58.0 / 72.0)
     distances = np.ones((72,), dtype=np.uint16) * (depthMax_cm + 1)
     distances[3:72] = 65535
+    distances[0:3] = depthMax_cm + 1
+    for dist in element.iter(tag='dist'):
+        if dist.attrib['dir'] == 'left':
+            distances[0] = int(dist.text)
+        elif dist.attrib['dir'] == 'center':
+            distances[1] = int(dist.text)
+        elif dist.attrib['dir'] == 'right':
+            distances[2] = int(dist.text)
+        else:
+            print("Invalid <obs><dist> dir attribute" + dist.attrib['dir'])
 
     vehicle._master.mav.obstacle_distance_send(
             current_time_us,    # us Timestamp (UNIX time or time since system boot)
