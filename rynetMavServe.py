@@ -39,9 +39,13 @@ Command Documentation:
     Retrieves the current mode and returns it to the client as a string ("AUTO", "GUIDED")
     --livetest enabled
 
-<obs dir='30'>DISTANCE_CM</obs>
+<obs>
+    <dist dir='left'>DISTANCE_CM</dist>
+    <dist dir='center'>DISTANCE_CM</dist>
+    <dist dir='right'>DISTANCE_CM</dist>
+</obs>
     Sends obstacle distance sensor message
-        dir -- direction the sensor is facing
+        dir -- direction of the provided distance (valid: 'left', 'center', or 'right')
     --livetest enabled
 
 <pos_retrieve />
@@ -495,7 +499,28 @@ def cmdSpeedRetrieve(vehicle, UDPServerSocket, address):
 def cmdObs(vehicle, element): 
     if 'dir' in element.attrib:
         print("dir found")
-    vehicle._master.mav.distance_sensor_send(0, 30, 2000, 400, 0, 0, 0, 0)
+    current_time_us = np.uint64(time.time() * 1000000)
+    depthMin_cm = 15
+    depthMax_cm = 2000
+    # d435i fov: 87 × 58
+    degreeOffset = -45.0#-(58.0 / 2.0)
+    degreeIncrement = 45#1.875#(58.0 / 72.0)
+    distances = np.ones((72,), dtype=np.uint16) * (depthMax_cm + 1)
+    distances[3:72] = 65535
+
+    vehicle._master.mav.obstacle_distance_send(
+            current_time_us,    # us Timestamp (UNIX time or time since system boot)
+            0,                  # sensor_type, defined here: https://mavlink.io/en/messages/common.html#MAV_DISTANCE_SENSOR
+            distances,          # distances,    uint16_t[72],   cm
+            0,                  # increment,    uint8_t,        deg
+            depthMin_cm,        # min_distance, uint16_t,       cm
+            depthMax_cm,       # max_distance, uint16_t,       cm
+            degreeIncrement,   # increment_f,  float,          deg
+            degreeOffset,       # angle_offset, float,          deg
+            12                  # MAV_FRAME, vehicle-front aligned: https://mavlink.io/en/messages/common.html#MAV_FRAME_BODY_FRD    
+        )
+
+    #vehicle._master.mav.distance_sensor_send(0, 30, 2000, 400, 0, 0, 0, 0)
     #distance_sensor_send(ignored,min_depth, max_depth, cur_dist, ignored, ignored, cameraFacingAngleDeg/45, ignored
 
 def cmdRouteSet(vehicle, element):
