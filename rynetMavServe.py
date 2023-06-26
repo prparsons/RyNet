@@ -10,6 +10,7 @@ import haversine as hs
 import selectors
 import argparse  
 from tsp import *
+import numpy as np
 
 """
 Command Documentation:
@@ -441,14 +442,10 @@ def mission_cleanBetter(missionList, nextWaypoint, fLat, fLon):
     return tsp2opt(missionList)
 
 def parseXML(message, vehicle, UDPServerSocket, address):
-    parser = ET.XMLPullParser()
-    parser.feed(message)
-    
     try:
-        for event, elem in parser.read_events():
-            print(elem)
-            handleCommand(elem, vehicle, UDPServerSocket, address)  
-        parser.close()
+        root = ET.fromstring(message)
+        print(root)
+        handleCommand(root, vehicle, UDPServerSocket, address)
     except:
         print("parseXML error")
         return
