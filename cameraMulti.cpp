@@ -319,7 +319,6 @@ void CameraController::run_RS()
         pCameraRS->pipe.stop();
     } catch (rs2::error e) {
         printL("run_RS failed");
-        return;
         // If we get an exception, we aren't getting the camera working again (at least I've never
         //  been able too yet...)
     }
