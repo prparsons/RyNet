@@ -230,6 +230,12 @@ int main( int argc, char** argv )
             printL(">>>Sending stop signal to stop Nav");
             nav.SignalStop();
             ///***this has changed a bit since -> //**I got a seg fault once without --continue, I wonder if it's something to do with this? (datalogger wasn't cleaning up threads...)
+        } else {
+            // If depth was started but failed, and continue also specified...then currently we're about to wait on
+            //  nav.join, but pSignal_interrupt is set to the depth camera. So change it to nav so it will be stopped 
+            //  by the interrupt
+            printL(">>>Changing interrupt signal to nav");
+            pSignal_interrupt = &nav;
         }
 
         nav.Join();
