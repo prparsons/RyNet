@@ -22,7 +22,7 @@ public:
     static FlightController* GetFlightController(DataLogger& logger, CameraController& camera);
     static void DestroyFlightController();
 
-    void WaitForTakeoff(int iAltitude);
+    void WaitForTakeoff(int iAltitude, const bool& bAbort);
     void SetUdpTimout(int iTimeoutUs);
     void Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr, int iMaxDist);
     void Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr);
