@@ -230,6 +230,7 @@ int main( int argc, char** argv )
             // If depth was started but failed, and continue also specified...then currently we're about to wait on
             //  nav.join, but pSignal_interrupt is set to the depth camera. So change it to nav so it will be stopped 
             //  by the interrupt
+            printL(">>>Changing interrupt signal to nav");
             pSignal_interrupt = &nav;
         }
 
