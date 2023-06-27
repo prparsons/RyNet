@@ -37,6 +37,7 @@ void handle_segfault(int iSigNum);
 // Or, if we used --continue then need to signal nav to stop
 InterruptStop* pSignal_interrupt = nullptr;
 bool* pSignal_bStopNavOnDepthFail = nullptr;
+bool* pSignal_bAbortTakeoff = nullptr;
 
 int main( int argc, char** argv )
 {
@@ -226,7 +227,10 @@ int main( int argc, char** argv )
         if (iGeoDist != -1) pController->Start(bRunDepth, bStartPointLogger, bRunFlir, iGeoDist);
         else pController->Start(bRunDepth, bStartPointLogger, bRunFlir);
         if (iTakeoffAltitude != -1) {
-            pController->WaitForTakeoff(iTakeoffAltitude);
+            bool bAbort = false;
+            pSignal_bAbortTakeoff = &bAbort;
+            pController->WaitForTakeoff(iTakeoffAltitude, bAbort);
+            pSignal_bAbortTakeoff = nullptr;
         }
         printL(">>>Starting Navigator");
         nav.Start();
@@ -241,6 +245,12 @@ int main( int argc, char** argv )
             printL(">>>Sending stop signal to stop Nav");
             nav.SignalStop();
             ///***this has changed a bit since -> //**I got a seg fault once without --continue, I wonder if it's something to do with this? (datalogger wasn't cleaning up threads...)
+        } else {
+            // If depth was started but failed, and continue also specified...then currently we're about to wait on
+            //  nav.join, but pSignal_interrupt is set to the depth camera. So change it to nav so it will be stopped 
+            //  by the interrupt
+            printL(">>>Changing interrupt signal to nav");
+            pSignal_interrupt = &nav;
         }
 
         nav.Join();
@@ -346,6 +356,9 @@ void handle_interrupt(int iSigNum)
     if (pSignal_interrupt == nullptr) {
         printL("interrupt pCamera not set, unable to close program gracefully.");
         exit(iSigNum);
+    }
+    if (pSignal_bAbortTakeoff != nullptr) {
+        *pSignal_bAbortTakeoff = true;
     }
     *pSignal_bStopNavOnDepthFail = true;
     pSignal_interrupt->SignalStop();

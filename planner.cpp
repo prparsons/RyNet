@@ -80,7 +80,7 @@ void FlightController::Start(bool bStartDepth, bool bStartPointLogger, bool bSta
     }
 }
 
-void FlightController::WaitForTakeoff(int iAltitude)
+void FlightController::WaitForTakeoff(int iAltitude, const bool& bAbort)
 {
     float fCurrentAltitude = 0;
     char scMode[32];
@@ -88,6 +88,8 @@ void FlightController::WaitForTakeoff(int iAltitude)
     bool bTakeoffMessage = true;
     while (fCurrentAltitude < float(iAltitude)) {
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        if (bAbort) return; // Check abort flag (set by ctrl+c interrupt)
+
         // Want to wait until AUTO mode has been entered before checking altitude
         if (GetMode(scMode, 31)) {
             if (strcmp("AUTO", scMode) == 0) {
