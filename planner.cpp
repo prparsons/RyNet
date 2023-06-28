@@ -505,8 +505,7 @@ char* FlightController::SendRecXML(const char* _scMessage)
     int iStrLen = strlen(scMessage);
     if (scKey[0] != 0) {
         if (!hmacMessage(scMessage, scKey, iSalt++, &scHmac, &scSaltedMessage)) {
-            //cleanup and return
-            printL("Failure!!!");
+            printL("Failed to HMAC message");
             return nullptr;
         }
         scHmacMessage = new char[32 + 4 + iStrLen];
@@ -714,7 +713,10 @@ bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** s
 
     if (!bReturn) {
         printf("Failed to hmac things\n");
-        delete scSaltAndMessage;
+        delete[] scSaltAndMessage;
+        if (*scHmac != nullptr) {
+            OPENSSL_free(*scHmac);
+        }
     } else {
         *scSaltAndMessageOut = scSaltAndMessage;
     }
