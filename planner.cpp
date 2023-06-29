@@ -471,10 +471,33 @@ void FlightController::SendXML(const char* strMessage)
         }
     }
     #else
+    char* scSaltedMessage = nullptr;
+    char* scHmac = nullptr;
+    char* scHmacMessage = nullptr;
+    const char* scMessage = _scMessage;
+    int iStrLen = strlen(scMessage);
+    if (scKey[0] != 0) {
+        if (!hmacMessage(scMessage, scKey, iSalt++, &scHmac, &scSaltedMessage)) {
+            printL("Failed to HMAC message");
+            return nullptr;
+        }
+        scHmacMessage = new char[32 + 4 + iStrLen];
+        memcpy(scHmacMessage, scHmac, 32);
+        memcpy(scHmacMessage + 32, scSaltedMessage, 4 + iStrLen);
+        scMessage = scHmacMessage;
+        iStrLen += 32 + 4;
+    }
+
     mtXML.lock();
     if (socketDesc < 0) ConnectMavLink();
-    sendto(socketDesc, strMessage, strlen(strMessage), MSG_CONFIRM, (const struct sockaddr*) &addressMavLink, sizeof(addressMavLink));
+    sendto(socketDesc, scMessage, iStrLen, MSG_CONFIRM, (const struct sockaddr*)&addressMavLink, sizeof(addressMavLink));
     mtXML.unlock();
+
+    if (scKey[0] != 0) {
+        OPENSSL_free(scHmac);
+        delete[] scSaltedMessage;
+        delete[] scHmacMessage;
+    }
     #endif
 }
 
