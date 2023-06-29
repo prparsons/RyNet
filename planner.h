@@ -34,8 +34,9 @@ public:
     bool GetMode(char* scMode, int iStrLen);
     int GetBattery();
 
-    // Can we travel in the indicated direction for the indicated time
-    bool CheckDirectionValid(float fDirection, time_t travelTime);
+    // Can we travel in the indicated direction for the indicated time.
+    //  0 == No. Positive number is distance direction is valid for.
+    int CheckDirectionValid(float fDirection, time_t travelTime);
 
     void SetDirection(float fHeadingOffsetDeg); // Store the currently programmed route, adjust heading
     void SetDestination(float fHeadingOffsetDeg, float fDistance); // Store route, adjust heading, after distance will automatically restore route

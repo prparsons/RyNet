@@ -210,11 +210,18 @@ int FlightController::GetBattery()
     return iBattery;
 }
 
-bool FlightController::CheckDirectionValid(float fDirection, time_t travelTime)
+int FlightController::CheckDirectionValid(float fDirection, time_t travelTime)
 {
+    float fCurrentSpeedMS = 0;
+    // Get Current speed in m/s, use that to calculate distance traveled in m
+    if (!GetSpeed(fCurrentSpeedMS)) {
+        printL("Failed to get speed");
+        return -1;
+    }
+    float fDistanceM = fCurrentSpeedMS * travelTime;
     // Home Location must exist and max distance must have been set
     if ((fHomeLat == 0 && fHomeLon == 0) || iMaxDist == -1) {
-        return true;
+        return int(fDistanceM);
     }
 
     // Get current position
@@ -222,16 +229,9 @@ bool FlightController::CheckDirectionValid(float fDirection, time_t travelTime)
     float fLonCurrent = 0;
     if (!GetPosition(fLatCurrent, fLonCurrent)) {
         printL("Failed to get position");
-        return true;
+        return -1;
     }
 
-    float fCurrentSpeedMS = 0;
-    // Get Current speed in m/s, use that to calculate distance traveled in m
-    if (!GetSpeed(fCurrentSpeedMS)) {
-        printL("Failed to get speed");
-        return true;
-    }
-    float fDistanceM = fCurrentSpeedMS * travelTime;
 
     float fQueryLat = 0;
     float fQueryLon = 0;
@@ -242,7 +242,10 @@ bool FlightController::CheckDirectionValid(float fDirection, time_t travelTime)
     float fDistance = PointDistanceM(fHomeLat, fHomeLon, fQueryLat, fQueryLon);
     printf("Current: [%.4f,%.4f]; Speed: %.1f; DistTravel: %.1f; Dest: [%.4f,%.4f]; Dest-Home Dist: %.1f\n", 
         fLatCurrent, fLonCurrent, fCurrentSpeedMS, fDistanceM, fQueryLat, fQueryLon, fDistance);
-    return fDistance < iMaxDist;
+    if (fDistance < iMaxDist) {
+        return int(fDistanceM);
+    }
+    return -1;
 }
 
 void FlightController::SetDirection(float fHeadingOffsetDeg)
@@ -459,7 +462,7 @@ void FlightController::runIr(Signal sig, StopSignal ss)
     }
 }
 
-void FlightController::SendXML(const char* strMessage)
+void FlightController::SendXML(const char* _scMessage)
 {
     #ifdef FLIGHT_CONTROLLER_TCP
     //Send some data
@@ -479,7 +482,7 @@ void FlightController::SendXML(const char* strMessage)
     if (scKey[0] != 0) {
         if (!hmacMessage(scMessage, scKey, iSalt++, &scHmac, &scSaltedMessage)) {
             printL("Failed to HMAC message");
-            return nullptr;
+            return;
         }
         scHmacMessage = new char[32 + 4 + iStrLen];
         memcpy(scHmacMessage, scHmac, 32);

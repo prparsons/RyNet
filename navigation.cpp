@@ -448,8 +448,9 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
                 if (time(nullptr) - tLastChange > tMinTimeBetweenChanges) {
                     float fDir = segmenter.GetHabitatDirection();
                     // Verify direction is valid before we switch to guided
-                    if (control.CheckDirectionValid(fDir, tMinTimeBetweenChanges)) {
-                        control.SetDirection(fDir);
+                    int iDistanceM = control.CheckDirectionValid(fDir, tMinTimeBetweenChanges);
+                    if (iDistanceM >= 0) {
+                        control.SetDestination(fDir, iDistanceM);
                         fCurrentDirection = fDir;
                         sprintf(sc, "Grid Search -> Good Habitat %1.3f", segmenter.GetHabitatDirection());
                         bGridSearching = false;
@@ -476,6 +477,8 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
                     // }
                     
                     //***The above can't happen because we verified before we set the direction (WITH DISTANCE)
+                    //***BUT, we could get stuck at 0mph when it reaches the end of the last destination and won't
+                    //***go back to grid search
                     continue;
                 }
                 char sc[64];
@@ -483,8 +486,9 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
                 if (time(nullptr) - tLastChange > tMinTimeBetweenChanges) {
                     float fDir = segmenter.GetHabitatDirection();
                     // Verify that the change won't take us in an invalid direction
-                    if (control.CheckDirectionValid(fDir, tMinTimeBetweenChanges)) {
-                        control.SetDirection(fDir);
+                    int iDistanceM = control.CheckDirectionValid(fDir, tMinTimeBetweenChanges);
+                    if (iDistanceM >= 0) {
+                        control.SetDestination(fDir, iDistanceM);
                         sprintf(sc, "Good Habitat Change -> %1.3f", segmenter.GetHabitatDirection());
                         tLastChange = time(nullptr);
                     } else {
