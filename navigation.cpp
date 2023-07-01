@@ -456,10 +456,7 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
                         bGridSearching = false;
                         tLastChange = time(nullptr);
                     } else {
-                        control.RestoreRouteNaive();
                         sprintf(sc, "Grid Search X Good Habitat %1.3f (Invalid Direction)", segmenter.GetHabitatDirection());
-                        bGridSearching = true;
-                        tLastChange = time(nullptr);
                     }
                 } else {
                     sprintf(sc, "[delay]Grid Search -> Good Habitat %1.3f", segmenter.GetHabitatDirection());
