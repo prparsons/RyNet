@@ -245,7 +245,7 @@ int FlightController::CheckDirectionValid(float fDirection, time_t travelTime)
     if (fDistance < iMaxDist) {
         return int(fDistanceM);
     }
-    return -1;
+    return 0;
 }
 
 void FlightController::SetDirection(float fHeadingOffsetDeg)

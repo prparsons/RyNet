@@ -449,14 +449,17 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
                     float fDir = segmenter.GetHabitatDirection();
                     // Verify direction is valid before we switch to guided
                     int iDistanceM = control.CheckDirectionValid(fDir, tMinTimeBetweenChanges);
-                    if (iDistanceM >= 0) {
+                    if (iDistanceM > 0) {
                         control.SetDestination(fDir, iDistanceM);
                         fCurrentDirection = fDir;
                         sprintf(sc, "Grid Search -> Good Habitat %1.3f", segmenter.GetHabitatDirection());
                         bGridSearching = false;
                         tLastChange = time(nullptr);
                     } else {
+                        control.RestoreRouteNaive();
                         sprintf(sc, "Grid Search X Good Habitat %1.3f (Invalid Direction)", segmenter.GetHabitatDirection());
+                        bGridSearching = true;
+                        tLastChange = time(nullptr);
                     }
                 } else {
                     sprintf(sc, "[delay]Grid Search -> Good Habitat %1.3f", segmenter.GetHabitatDirection());
@@ -468,13 +471,13 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
 	        if (segmenter.IsHabitatVisible()) {
                 // If it's in the same direction then do nothing
                 if (abs(segmenter.GetHabitatDirection()) < fMargin) {
-                    // // Unless continuing that direction would be an invalid direction
-                    // if (!control.CheckDirectionValid(fCurrentDirection, tMinTimeBetweenChanges)) {
-                    //     control.RestoreRouteNaive();
-                    //     logger.LogString("Good Habitat -> Grid Search (Invalid Direction)");
-                    //     bGridSearching = true;
-                    //     tLastChange = time(nullptr);
-                    // }
+                    // Unless continuing that direction would be an invalid direction
+                    if (control.CheckDirectionValid(fCurrentDirection, tMinTimeBetweenChanges) == 0) {
+                        control.RestoreRouteNaive();
+                        logger.LogString("Good Habitat -> Grid Search (Invalid Direction)");
+                        bGridSearching = true;
+                        tLastChange = time(nullptr);
+                    }
                     
                     //***The above can't happen because we verified before we set the direction (WITH DISTANCE)
                     //***BUT, we could get stuck at 0mph when it reaches the end of the last destination and won't
@@ -487,7 +490,7 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
                     float fDir = segmenter.GetHabitatDirection();
                     // Verify that the change won't take us in an invalid direction
                     int iDistanceM = control.CheckDirectionValid(fDir, tMinTimeBetweenChanges);
-                    if (iDistanceM >= 0) {
+                    if (iDistanceM > 0) {
                         control.SetDestination(fDir, iDistanceM);
                         sprintf(sc, "Good Habitat Change -> %1.3f", segmenter.GetHabitatDirection());
                         tLastChange = time(nullptr);
