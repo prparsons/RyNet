@@ -259,7 +259,7 @@ void FlightController::SetDestination(float fHeadingOffsetDeg, float fDistance)
 {
     char sc[128];
     // Distance for obstacles is in cm, assuming that's the case for everything
-    snprintf(sc, 128, "<dir dist=%6f>%3.3f</dir>", fDistance, fHeadingOffsetDeg);
+    snprintf(sc, 128, "<dir dist=\"%6f\">%3.3f</dir>", fDistance, fHeadingOffsetDeg);
     SendXML(sc);
 }
 
