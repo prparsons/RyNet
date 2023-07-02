@@ -83,5 +83,7 @@ private:
     int iSalt;
     float fHomeLat;
     float fHomeLon;
+    int iMissionSpeedMS;
+    float fPercentExtraGuidedPoints;
 };
 

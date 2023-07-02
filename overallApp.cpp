@@ -22,6 +22,9 @@ enum OptionArgument {
     WAIT_TAKEOFF,
     GEO_DIST,
     UDP_TIMEOUT,
+    GUIDE_TIME,
+    GUIDE_SPEED,
+    GUIDE_PERCENT,
     OPTION_NONE
 };
 
@@ -158,6 +161,15 @@ int main( int argc, char** argv )
             } else if (strcmp("--max_dist", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = GEO_DIST;
+            } else if (strcmp("--guide_time", argv[i]) == 0) {
+                bOptionArgument = true;
+                OptionArgumentSelection = GUIDE_TIME;
+            } else if (strcmp("--guide_speed", argv[i]) == 0) {
+                bOptionArgument = true;
+                OptionArgumentSelection = GUIDE_SPEED;
+            } else if (strcmp("--guide_percent", argv[i]) == 0) {
+                bOptionArgument = true;
+                OptionArgumentSelection = GUIDE_PERCENT;
             } else if (strcmp("--wait_takeoff", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = WAIT_TAKEOFF;
@@ -310,7 +322,8 @@ void printHelp()
     printL("    Target is number from 0-255.\n");
     printL(" --img_slices [XX]");
     printL("    Number of horizontal slices of the RGB image before it is used for");
-    printL("    detection and segmentation. Target is number from 0-9; default is 3.\n");
+    printL("    detection and segmentation.");
+    printL("    Target is number from 0-9; default is 3.\n");
     printL(" --detection_net [ABCDE]");
     printL("    Network model to be used with object detection network. Valid choices are");
     printL("    \"SSD_MOBILENET_V1\", \"SSD_MOBILENET_V2\", \"SSD_INCEPTION_V2\".\n");
@@ -329,6 +342,20 @@ void printHelp()
     printL(" --udp_timeout [XX]");
     printL("    Timeout value for UDP packets in microseconds.");
     printL("    Target is number from 1-1000000.\n");
+    printL(" --guide_speed [XX]");
+    printL("    Speed in meters per second to use when calculating points in guided mode.");
+    printL("    Target is number from 1-99. Default is read from Mission List.\n");
+    printL(" --guide_percent [XX]");
+    printL("    To calculate distance for a guided point mission, waypoint speed and");
+    printL("    guide_time is used to calculate. Then this percentage is applied to that");
+    printL("    distance so the drone doesn't start slowing down (and pitching up)");
+    printL("    before having the chance to calculate new point or resume AUTO");
+    printL("    Target is number >= 1.0 and <= 2.0. Default is 1.10.\n");
+    printL(" --guide_time [XX]");
+    printL("    Time in seconds between allowed changes in mission. This time must pass");
+    printL("    before mode will be changed to/from AUTO, or before a new GUIDED point");
+    printL("    will be entered.");
+    printL("    Target is number from 1-60.\n");
 }
 
 void cleanupFailure()
