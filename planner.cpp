@@ -240,11 +240,13 @@ int FlightController::CheckDirectionValid(float fDirection, time_t travelTime)
 
     // Now find distance between that and home
     float fDistance = PointDistanceM(fHomeLat, fHomeLon, fQueryLat, fQueryLon);
-    printf("Current: [%.4f,%.4f]; Speed: %.1f; DistTravel: %.1f; Dest: [%.4f,%.4f]; Dest-Home Dist: %.1f\n", 
-        fLatCurrent, fLonCurrent, fCurrentSpeedMS, fDistanceM, fQueryLat, fQueryLon, fDistance);
     if (fDistance < iMaxDist) {
+        printf("DirectionChange:\nCurrent: [%.4f,%.4f]; Speed: %.1f; DistTravel: %.1f; Dest: [%.4f,%.4f]; Dest-Home Dist: %.1f\n\n", 
+            fLatCurrent, fLonCurrent, fCurrentSpeedMS, fDistanceM, fQueryLat, fQueryLon, fDistance);
         return int(fDistanceM);
     }
+    printf("Invalid:\nCurrent: [%.4f,%.4f]; Speed: %.1f; DistTravel: %.1f; Dest: [%.4f,%.4f]; Dest-Home Dist: %.1f\n\n", 
+        fLatCurrent, fLonCurrent, fCurrentSpeedMS, fDistanceM, fQueryLat, fQueryLon, fDistance);
     return 0;
 }
 
@@ -278,7 +280,7 @@ void FlightController::SetAltitude(float fAltitudeMeters)
 void FlightController::RestoreRouteNaive()
 {
     char sc[128];
-    strcpy(sc, "<route_restore />");
+    strcpy(sc, "<route_restore setauto='true'/>");
     SendXML(sc);
 }
 

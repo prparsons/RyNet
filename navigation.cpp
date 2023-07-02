@@ -473,9 +473,8 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
                         control.RestoreRouteNaive();
                         logger.LogString("Good Habitat -> Grid Search (Invalid Direction)");
                         bGridSearching = true;
-                        tLastChange = time(nullptr);
                     }
-                    
+                    tLastChange = time(nullptr);
                     //***The above can't happen because we verified before we set the direction (WITH DISTANCE)
                     //***BUT, we could get stuck at 0mph when it reaches the end of the last destination and won't
                     //***go back to grid search
