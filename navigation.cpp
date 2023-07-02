@@ -466,20 +466,6 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
         } else { // Habitat already visible
             // Good terrain still visible?
 	        if (segmenter.IsHabitatVisible()) {
-                // If it's in the same direction then do nothing
-                if (abs(segmenter.GetHabitatDirection()) < fMargin) {
-                    // Unless continuing that direction would be an invalid direction
-                    if (control.CheckDirectionValid(fCurrentDirection, tMinTimeBetweenChanges) == 0) {
-                        control.RestoreRouteNaive();
-                        logger.LogString("Good Habitat -> Grid Search (Invalid Direction)");
-                        bGridSearching = true;
-                    }
-                    tLastChange = time(nullptr);
-                    //***The above can't happen because we verified before we set the direction (WITH DISTANCE)
-                    //***BUT, we could get stuck at 0mph when it reaches the end of the last destination and won't
-                    //***go back to grid search
-                    continue;
-                }
                 char sc[64];
                 // If enough time since last command, then we can change
                 if (time(nullptr) - tLastChange > tMinTimeBetweenChanges) {
