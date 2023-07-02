@@ -124,7 +124,7 @@ parser.add_argument('--clean_dist_way', type=int, default=100, help='Distance fr
 parser.add_argument('--udp_hmac', type=str, default='', help='If specified, all udp commands will be verified. String key should be provided.')
 #args = parser.parse_args()
 #Testing without command line, use below
-args = parser.parse_args("--port 3636 --connect tcp:127.0.0.1:5762 --udp_hmac SecretKey --livetest".split())
+args = parser.parse_args("--port 3636 --connect tcp:127.0.0.1:5762 --udp_hmac SecretKey".split())#  --livetest
 visitedList = []
 
 def hmacVerifyMessage(signature, bytesSalt, bytesMessage, key):
@@ -133,11 +133,10 @@ def hmacVerifyMessage(signature, bytesSalt, bytesMessage, key):
 
     intSalt = int.from_bytes(bytesSalt, "little")
     if intSalt <= hmacVerifyMessage.salt:
-        print("salt reuse")
+        print("salt reuse; Current: %d, received: %d" % (hmacVerifyMessage.salt, intSalt))
         return False
         
     h = hmac.new(key.encode(), bytesSalt + bytesMessage, hashlib.sha256)
-    print("Verification Digest: " + h.hexdigest())
     retValue = h.digest() == signature
     if retValue == True:
         hmacVerifyMessage.salt = intSalt
@@ -632,7 +631,6 @@ def cmdRoutRetrieve(vehicle, UDPServerSocket, address):
 
 def cmdPosRetrieve(vehicle, UDPServerSocket, address):
     strReply = "%f\n%f\n" % (vehicle.location.global_frame.lat, vehicle.location.global_frame.lon)
-    print(strReply)
     UDPServerSocket.sendto(str.encode(strReply), address)
 
 def cmdBatteryRetrieve(vehicle, UDPServerSocket, address):
@@ -760,6 +758,7 @@ def recvUDP(sock, vehicle):
         if args.udp_hmac != '':
             if len(message) < 32:
                 print('message verification, too short failure')
+                print(message)
                 return
             if hmacVerifyMessage(message[:32], message[32:36], message[36:], args.udp_hmac) == False:
                 print('message verification failure')
