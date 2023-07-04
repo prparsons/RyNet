@@ -24,6 +24,9 @@ public:
 
     void WaitForTakeoff(int iAltitude, const bool& bAbort);
     void SetUdpTimout(int iTimeoutUs);
+    void SetMissionSpeed(int iMissionSpeedMS);
+    void SetPercentExtraDistance(float fPercentExtraGuidedPoints);
+    
     void Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr, int iMaxDist);
     void Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr);
 

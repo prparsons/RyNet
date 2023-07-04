@@ -415,6 +415,11 @@ void Navigator::SetNumberImageSlices(int iNumSlices)
     segmenter.SetNumberImageSlices(iNumSlices);
 }
 
+void Navigator::SetTimeBetweenChanges(int iTime)
+{
+    tMinTimeBetweenChanges = time_t(iTime);
+}
+
 void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
 {
     printL("Navigator::runNavigator");

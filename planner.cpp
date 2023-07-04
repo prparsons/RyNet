@@ -127,6 +127,16 @@ void FlightController::SetUdpTimout(int iTimeoutUs)
     setsockopt(socketDesc, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
 }
 
+void FlightController::SetMissionSpeed(int _iMissionSpeedMS)
+{
+    iMissionSpeedMS = _iMissionSpeedMS;
+}
+
+void FlightController::SetPercentExtraDistance(float _fPercentExtraGuidedPoints)
+{
+    fPercentExtraGuidedPoints = _fPercentExtraGuidedPoints;
+}
+
 FlightController::~FlightController()
 {
     printL("FlightController::~FlightController");
