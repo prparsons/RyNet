@@ -25,8 +25,8 @@ public:
     void WaitForTakeoff(int iAltitude, const bool& bAbort);
     void SetUdpTimout(int iTimeoutUs);
     void SetMissionSpeed(int iMissionSpeedMS);
-    void SetPercentExtraDistance(float fPercentExtraGuidedPoints);
-    
+    void SetExtraDistance(int iExtraGuidedDistance);
+
     void Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr, int iMaxDist);
     void Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr);
 
@@ -87,6 +87,6 @@ private:
     float fHomeLat;
     float fHomeLon;
     int iMissionSpeedMS;
-    float fPercentExtraGuidedPoints;
+    int iExtraGuidedDistance;
 };
 

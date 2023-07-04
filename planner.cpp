@@ -25,7 +25,7 @@ FlightController::FlightController(DataLogger& _logger, CameraController& _camer
 , fHomeLat(0)
 , fHomeLon(0)
 , iMissionSpeedMS(8)
-, fPercentExtraGuidedPoints(1.10f)
+, iExtraGuidedDistance(10)
 {
     scKey[0] = 0;
     strcpy(scMavLinkAddress, "127.0.0.1");
@@ -132,9 +132,9 @@ void FlightController::SetMissionSpeed(int _iMissionSpeedMS)
     iMissionSpeedMS = _iMissionSpeedMS;
 }
 
-void FlightController::SetPercentExtraDistance(float _fPercentExtraGuidedPoints)
+void FlightController::SetExtraDistance(int _iExtraGuidedDistance)
 {
-    fPercentExtraGuidedPoints = _fPercentExtraGuidedPoints;
+    iExtraGuidedDistance = _iExtraGuidedDistance;
 }
 
 FlightController::~FlightController()
@@ -231,7 +231,7 @@ int FlightController::CheckDirectionValid(float fDirection, time_t travelTime)
         return -1;
     }
     if (float(iMissionSpeedMS) > fCurrentSpeedMS) fCurrentSpeedMS = float(iMissionSpeedMS);
-    float fDistanceM = fCurrentSpeedMS * travelTime * fPercentExtraGuidedPoints;
+    float fDistanceM = (fCurrentSpeedMS * travelTime) + iExtraGuidedDistance;
     // Home Location must exist and max distance must have been set
     if ((fHomeLat == 0 && fHomeLon == 0) || iMaxDist == -1) {
         return int(fDistanceM);

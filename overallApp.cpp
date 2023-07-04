@@ -24,7 +24,7 @@ enum OptionArgument {
     UDP_TIMEOUT,
     GUIDE_TIME,
     GUIDE_SPEED,
-    GUIDE_PERCENT,
+    GUIDE_DISTANCE,
     OPTION_NONE
 };
 
@@ -76,7 +76,7 @@ int main( int argc, char** argv )
     int iUdpTimeoutUs = -1;
     int iGuideSpeed = -1;
     int iGuideTime = -1;
-    float fGuideExtraPercent = 0;
+    int iGuideExtraDistance = 0;
     // Read all the command line arguments and options (--option argument)
     for (int i = 1; i < argc; i++) {
         if (bOptionArgument) {
@@ -147,13 +147,13 @@ int main( int argc, char** argv )
                         return -1;
                     }
                 } break;
-                case GUIDE_PERCENT: {
-                    fGuideExtraPercent = atoi(argv[i]);
-                    if (fGuideExtraPercent < 1.0 || fGuideExtraPercent > 2.0) {
-                        printL("Guided extra percent must be between 1.0 and 2.0.");
+                case GUIDE_DISTANCE: {
+                    iGuideExtraDistance = atoi(argv[i]);
+                    if (iGuideExtraDistance < 0 || iGuideExtraDistance > 100) {
+                        printL("Guided extra distance must be between 0 and 100.");
                         return -1;
                     }
-                }
+                } break;
                 case WAIT_TAKEOFF: {
                     iTakeoffAltitude = atoi(argv[i]);
                     if (iTakeoffAltitude < 10 || iTakeoffAltitude > 120) {
@@ -247,7 +247,7 @@ int main( int argc, char** argv )
         if (bHmacUdp) pController->SetUdpKey(scUdpKey);
         if (iUdpTimeoutUs != -1) pController->SetUdpTimout(iUdpTimeoutUs);
         if (iGuideSpeed != -1) pController->SetMissionSpeed(iGuideSpeed);
-        if (fGuideExtraPercent != 0.0) pController->SetPercentExtraDistance(fGuideExtraPercent);
+        if (iGuideExtraDistance != -1) pController->SetExtraDistance(iGuideExtraDistance);
 
         printL(">>>Creating Navigator");
         Navigator nav(*pController, logger, *pCamera, bBatteryMonitor);
@@ -372,12 +372,12 @@ void printHelp()
     printL(" --guide_speed [XX]");
     printL("    Speed in meters per second to use when calculating points in guided mode.");
     printL("    Target is number from 1-99. Default is read from Mission List.\n");
-    printL(" --guide_percent [XX]");
+    printL(" --guide_distance [XX]");
     printL("    To calculate distance for a guided point mission, waypoint speed and");
-    printL("    guide_time is used to calculate. Then this percentage is applied to that");
+    printL("    guide_time is used to calculate. Then this distance is added to that");
     printL("    distance so the drone doesn't start slowing down (and pitching up)");
     printL("    before having the chance to calculate new point or resume AUTO");
-    printL("    Target is number >= 1.0 and <= 2.0. Default is 1.10.\n");
+    printL("    Target is number from 0-100. Default is 10.\n");
     printL(" --guide_time [XX]");
     printL("    Time in seconds between allowed changes in mission. This time must pass");
     printL("    before mode will be changed to/from AUTO, or before a new GUIDED point");
