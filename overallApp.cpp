@@ -191,9 +191,9 @@ int main( int argc, char** argv )
             } else if (strcmp("--guide_speed", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = GUIDE_SPEED;
-            } else if (strcmp("--guide_percent", argv[i]) == 0) {
+            } else if (strcmp("--guide_distance", argv[i]) == 0) {
                 bOptionArgument = true;
-                OptionArgumentSelection = GUIDE_PERCENT;
+                OptionArgumentSelection = GUIDE_DISTANCE;
             } else if (strcmp("--wait_takeoff", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = WAIT_TAKEOFF;
