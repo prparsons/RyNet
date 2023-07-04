@@ -507,7 +507,7 @@ def cmdTakeoff(vehicle, element):
     if 'setauto' in element.attrib:
         if element.attrib['setauto'] == 'true':
             vehicle.mode = VehicleMode("AUTO")
-            while not vehicle.mode.name=='AUTO':
+            while not vehicle.mode.name =='AUTO':
                 time.sleep(0.01)
 
 def cmdDir(vehicle, element):
@@ -519,7 +519,7 @@ def cmdDir(vehicle, element):
     dirRad = dirDeg * 3.14159 / 180;
     latNew, lonNew = hs.inverse_haversine(ptCurrent, distanceM*.001, dirRad)
     vehicle.mode = VehicleMode("GUIDED")
-    while not vehicle.mode.name=='GUIDED':
+    while not vehicle.mode.name =='GUIDED':
         time.sleep(0.01)
     locationNew = LocationGlobal(latNew, lonNew, vehicle.location.global_frame.alt)
     vehicle.simple_goto(locationNew)
@@ -585,7 +585,7 @@ def cmdRouteSet(vehicle, element):
     if 'setauto' in element.attrib:
         if element.attrib['setauto'] == 'true':
             vehicle.mode = VehicleMode("AUTO")
-            while not vehicle.mode.name=='AUTO':
+            while not vehicle.mode.name =='AUTO':
                 time.sleep(0.01)
 
 def cmdRouteLoad(vehicle, element):
@@ -595,7 +595,7 @@ def cmdRouteLoad(vehicle, element):
     if 'setauto' in element.attrib:
         if element.attrib['setauto'] == 'true':
             vehicle.mode = VehicleMode("AUTO")
-            while not vehicle.mode.name=='AUTO':
+            while not vehicle.mode.name =='AUTO':
                 time.sleep(0.01)
 
 def cmdRouteRestore(vehicle, element):
@@ -657,10 +657,16 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
     elif element.tag == 'takeoff':
         if args.livetest == True:
             return
+        if vehicle.mode.name == 'RTL':
+            print("Current mode is RTL, not setting direction");
+            return
         cmdTakeoff(vehicle, element)
 
     elif element.tag == 'dir':
         if args.livetest == True:
+            return
+        if vehicle.mode.name == 'RTL':
+            print("Current mode is RTL, not setting direction");
             return
         cmdDir(vehicle, element)
         #Reset the visited point list so we only have points visited while in Guided mode
@@ -687,10 +693,16 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
     elif element.tag == 'route_set':
         if args.livetest == True:
             return
+        if vehicle.mode.name =='RTL':
+            print("Current mode is RTL, not setting route");
+            return
         cmdRouteSet(vehicle, element)
 
     elif element.tag == 'route_load':
         if args.livetest == True:
+            return
+        if vehicle.mode.name =='RTL':
+            print("Current mode is RTL, not setting route file");
             return
         cmdRouteLoad(vehicle, element)
 
@@ -715,6 +727,9 @@ def handleCommand(element, vehicle, UDPServerSocket, address):
     elif element.tag == 'route_restore':
         if args.livetest == True:
             return
+        if vehicle.mode.name =='RTL':
+            print("Current mode is RTL, not restoring route");
+            return
         cmdRouteRestore(vehicle, element)
         visitedList = []
 
@@ -731,8 +746,8 @@ def arm_and_takeoff(vehicle, aTargetAltitude):
 
     print("Arming motors")
     # Copter should arm in GUIDED mode
-    vehicle.mode    = VehicleMode("GUIDED")
-    vehicle.armed   = True
+    vehicle.mode = VehicleMode("GUIDED")
+    vehicle.armed = True
 
     # Confirm vehicle armed before attempting to take off
     while not vehicle.armed:
