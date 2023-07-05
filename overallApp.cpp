@@ -22,6 +22,9 @@ enum OptionArgument {
     WAIT_TAKEOFF,
     GEO_DIST,
     UDP_TIMEOUT,
+    GUIDE_TIME,
+    GUIDE_SPEED,
+    GUIDE_DISTANCE,
     OPTION_NONE
 };
 
@@ -71,6 +74,9 @@ int main( int argc, char** argv )
     int iTakeoffAltitude = -1;
     int iGeoDist = -1;
     int iUdpTimeoutUs = -1;
+    int iGuideSpeed = -1;
+    int iGuideTime = -1;
+    int iGuideExtraDistance = 0;
     // Read all the command line arguments and options (--option argument)
     for (int i = 1; i < argc; i++) {
         if (bOptionArgument) {
@@ -127,6 +133,27 @@ int main( int argc, char** argv )
                         return -1;
                     }
                 } break;
+                case GUIDE_SPEED: {
+                    iGuideSpeed = atoi(argv[i]);
+                    if (iGuideSpeed < 1 || iGuideSpeed > 99) {
+                        printL("Guided speed must be between 1 and 99.");
+                        return -1;
+                    }
+                } break;
+                case GUIDE_TIME: {
+                    iGuideTime = atoi(argv[i]);
+                    if (iGuideTime < 1 || iGuideTime > 60) {
+                        printL("Guided time between changes must be between 1 and 60.");
+                        return -1;
+                    }
+                } break;
+                case GUIDE_DISTANCE: {
+                    iGuideExtraDistance = atoi(argv[i]);
+                    if (iGuideExtraDistance < 0 || iGuideExtraDistance > 100) {
+                        printL("Guided extra distance must be between 0 and 100.");
+                        return -1;
+                    }
+                } break;
                 case WAIT_TAKEOFF: {
                     iTakeoffAltitude = atoi(argv[i]);
                     if (iTakeoffAltitude < 10 || iTakeoffAltitude > 120) {
@@ -158,6 +185,15 @@ int main( int argc, char** argv )
             } else if (strcmp("--max_dist", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = GEO_DIST;
+            } else if (strcmp("--guide_time", argv[i]) == 0) {
+                bOptionArgument = true;
+                OptionArgumentSelection = GUIDE_TIME;
+            } else if (strcmp("--guide_speed", argv[i]) == 0) {
+                bOptionArgument = true;
+                OptionArgumentSelection = GUIDE_SPEED;
+            } else if (strcmp("--guide_distance", argv[i]) == 0) {
+                bOptionArgument = true;
+                OptionArgumentSelection = GUIDE_DISTANCE;
             } else if (strcmp("--wait_takeoff", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = WAIT_TAKEOFF;
@@ -210,6 +246,8 @@ int main( int argc, char** argv )
         if (bManualServerAddress) pController->SetServerAddress(scServerAddress);
         if (bHmacUdp) pController->SetUdpKey(scUdpKey);
         if (iUdpTimeoutUs != -1) pController->SetUdpTimout(iUdpTimeoutUs);
+        if (iGuideSpeed != -1) pController->SetMissionSpeed(iGuideSpeed);
+        if (iGuideExtraDistance != -1) pController->SetExtraDistance(iGuideExtraDistance);
 
         printL(">>>Creating Navigator");
         Navigator nav(*pController, logger, *pCamera, bBatteryMonitor);
@@ -218,6 +256,7 @@ int main( int argc, char** argv )
         // If we specified a target class, need to set that now
         if (iTargetClass != -1) nav.SetTargetClass(uint8_t(iTargetClass));
         if (iNumSlices != -1) nav.SetNumberImageSlices(iNumSlices);
+        if (iGuideTime != -1) nav.SetTimeBetweenChanges(iGuideTime);
 
         printL(">>>Starting DataLogger");
         logger.Start();
@@ -310,7 +349,8 @@ void printHelp()
     printL("    Target is number from 0-255.\n");
     printL(" --img_slices [XX]");
     printL("    Number of horizontal slices of the RGB image before it is used for");
-    printL("    detection and segmentation. Target is number from 0-9; default is 3.\n");
+    printL("    detection and segmentation.");
+    printL("    Target is number from 0-9; default is 3.\n");
     printL(" --detection_net [ABCDE]");
     printL("    Network model to be used with object detection network. Valid choices are");
     printL("    \"SSD_MOBILENET_V1\", \"SSD_MOBILENET_V2\", \"SSD_INCEPTION_V2\".\n");
@@ -329,6 +369,20 @@ void printHelp()
     printL(" --udp_timeout [XX]");
     printL("    Timeout value for UDP packets in microseconds.");
     printL("    Target is number from 1-1000000.\n");
+    printL(" --guide_speed [XX]");
+    printL("    Speed in meters per second to use when calculating points in guided mode.");
+    printL("    Target is number from 1-99. Default is read from Mission List.\n");
+    printL(" --guide_distance [XX]");
+    printL("    To calculate distance for a guided point mission, waypoint speed and");
+    printL("    guide_time is used to calculate. Then this distance is added to that");
+    printL("    distance so the drone doesn't start slowing down (and pitching up)");
+    printL("    before having the chance to calculate new point or resume AUTO");
+    printL("    Target is number from 0-100. Default is 10.\n");
+    printL(" --guide_time [XX]");
+    printL("    Time in seconds between allowed changes in mission. This time must pass");
+    printL("    before mode will be changed to/from AUTO, or before a new GUIDED point");
+    printL("    will be entered.");
+    printL("    Target is number from 1-60.\n");
 }
 
 void cleanupFailure()

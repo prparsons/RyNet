@@ -92,6 +92,7 @@ public:
 
     void SetTargetClass(uint8_t uTarget) { segmenter.SetTargetClass(uTarget); }
     void SetNumberImageSlices(int iNumSlices);
+    void SetTimeBetweenChanges(int iTime);
 
 private:
     void runBattery(StopSignal ss, StopSignal ssMainThread);
