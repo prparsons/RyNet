@@ -11,6 +11,46 @@ bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** s
 
 FlightController* pInstance = nullptr;
 
+CoordNode::CoordNode()
+: bIsLeaf(true)
+, fLat(0)
+, fLon(0)
+, nw(nullptr)
+, ne(nullptr)
+, se(nullptr)
+, sw(nullptr)
+{
+}
+
+const CoordNode& CoordNode::GetClosest(float fLatQuery, float fLonQuery)
+{
+    if (bIsLeaf) return *this;
+    if (fLatQuery > fLat) {
+        // It's north of this node center
+        if (fLonQuery > fLon) {
+            // It's west of this node center
+            if (nw != nullptr) return nw->GetClosest();
+            //***What now?
+        }
+        if (ne != nullptr) return ne->GetClosest();
+        //***what now?
+    }
+    // It's south of this node center
+    if (fLonQuery > fLon) {
+        // It's west of this node center
+        if (sw != nullptr) return sw->GetClosest();
+        //***what now?
+    }
+    if (se != nullptr) return se->GetClosest();
+    //***what now?
+}
+
+void CoordNode::InsertPoint(float fLat, float fLon)
+{
+
+}
+
+
 FlightController::FlightController(DataLogger& _logger, CameraController& _camera)
 : logger(_logger)
 , camera(_camera)

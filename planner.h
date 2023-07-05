@@ -15,6 +15,24 @@
 
 */
 
+class CoordNode {
+public:
+    CoordNode();
+
+    const CoordNode& GetClosest(float fLat, float fLon);
+    void InsertPoint(float fLat, float fLon);
+
+private:
+    bool bIsLeaf;
+    float fLat;
+    float fLon;
+
+    CoordNode* nw;
+    CoordNode* ne;
+    CoordNode* se;
+    CoordNode* sw;
+};
+
 class FlightController {
 public:
     ~FlightController();
