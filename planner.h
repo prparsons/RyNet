@@ -14,18 +14,28 @@
     downloading the route to this program...can let the script handle the saving/loading of waypoints.
 
 */
-
+/*
+Node will have 4 children, won't be a point itself
+Leaf that exists will have no children and a point
+Leaf that doesn't exist will have no children and no point
+*/
 class CoordNode {
 public:
-    CoordNode();
+    CoordNode(float fLeft, float fTop, float fRight, float fBottom);
 
-    const CoordNode& GetClosest(float fLat, float fLon);
+    const CoordNode* GetClosest(float fLat, float fLon);
     void InsertPoint(float fLat, float fLon);
 
 private:
     bool bIsLeaf;
     float fLat;
     float fLon;
+    const float fLeft;
+    const float fTop;
+    const float fRight;
+    const float fBottom;
+    const float fCenterX;
+    const float fCenterY;
 
     CoordNode* nw;
     CoordNode* ne;
