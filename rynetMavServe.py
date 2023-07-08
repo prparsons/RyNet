@@ -122,9 +122,9 @@ parser.add_argument('--livetest', default='False', action='store_true', help='If
 parser.add_argument('--clean_dist_visit', type=int, default=10, help='Distance between visited points that is close enough to consider them duplicates.')
 parser.add_argument('--clean_dist_way', type=int, default=100, help='Distance from visited point that is close enough to remove a waypoint from mission list.')
 parser.add_argument('--udp_hmac', type=str, default='', help='If specified, all udp commands will be verified. String key should be provided.')
-#args = parser.parse_args()
+args = parser.parse_args()
 #Testing without command line, use below
-args = parser.parse_args("--port 3636 --connect tcp:127.0.0.1:5762 --udp_hmac SecretKey".split())#  --livetest
+#args = parser.parse_args("--port 3636 --connect tcp:127.0.0.1:5762 --udp_hmac SecretKey".split())#  --livetest
 visitedList = []
 
 def hmacVerifyMessage(signature, bytesSalt, bytesMessage, key):
@@ -779,7 +779,7 @@ if not connection_string:
     connection_string = sitl.connection_string()
 # Connect to the Vehicle
 print('Connecting to vehicle on: %s' % connection_string)
-vehicle = connect(connection_string, wait_ready=True, timeout=360)
+vehicle = connect(connection_string, wait_ready=True, timeout=360, baud=57600)
 # Check that vehicle is armable. 
 # This ensures home_location is set (needed when saving WP file)
 while not vehicle.is_armable:
@@ -790,7 +790,7 @@ selectorDefault = selectors.DefaultSelector()
 # Create a datagram socket
 sockUDP = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
 # Bind to address and ip
-sockUDP.bind(("192.168.2.103", args.port))
+sockUDP.bind(("127.0.0.1", args.port))
 sockUDP.setblocking(False)
 selectorDefault.register(sockUDP, selectors.EVENT_READ, recvUDP)
 
