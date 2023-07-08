@@ -63,6 +63,7 @@ int main( int argc, char** argv )
     bool bRunFlir = false;
     bool bDownsampleDepth = false;
     bool bHmacUdp = false;
+    bool bDepthLowRes = false;
     // Command line arguments
     OptionArgument OptionArgumentSelection = OPTION_NONE;
     char scVideoSimPath[512];
@@ -175,6 +176,7 @@ int main( int argc, char** argv )
             else if (strcmp("--downsample_depth", argv[i]) == 0) bDownsampleDepth = true;
             else if (strcmp("--run_accel", argv[i]) == 0) bRunAccel = true;
             else if (strcmp("--battery_monitor", argv[i]) == 0) bBatteryMonitor = true;
+            else if (strcmp("--depth_lowres", argv[i]) == 0) bDepthLowRes = true;
             else if (strcmp("--run_flir", argv[i]) == 0) bRunFlir = true;
             else if (strcmp("--hmac_udp", argv[i]) == 0) {
                 bOptionArgument = true;
@@ -236,6 +238,7 @@ int main( int argc, char** argv )
         else if (bRunRGB) uCameraFeatures += CameraController_RGB;
         if (bRunDepth) uCameraFeatures += CameraController_Depth;
         if (bRunAccel) uCameraFeatures += CameraController_Accel;
+        if (bDepthLowRes) uCameraFeatures += CameraController_LowResDepth;
         if (bDownsampleDepth) uCameraFeatures += CameraController_DownsampleDepth;
         if (bRunFlir) uCameraFeatures += CameraController_IR;
         if (bSimulateVideo) pCamera = CameraController::OpenCamera(uCameraFeatures, scVideoSimPath);
@@ -383,6 +386,9 @@ void printHelp()
     printL("    before mode will be changed to/from AUTO, or before a new GUIDED point");
     printL("    will be entered.");
     printL("    Target is number from 1-60.\n");
+    printL(" --depth_lowres");
+    printL("    Specify if using USB2 cord to connect to depth camera. 640x480 resolution");
+    printL("    will be used instead of default 1280x720.\n");
 }
 
 void cleanupFailure()

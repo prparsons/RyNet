@@ -44,6 +44,7 @@ public:
 #define CameraController_DownsampleDepth 0x08
 #define CameraController_RGBSimulation 0x10
 #define CameraController_Accel 0x20
+#define CameraController_LowResDepth 0x40
 
 class CameraController:public InterruptStop {
 public:
