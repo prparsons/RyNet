@@ -493,13 +493,13 @@ def mission_cleanBetter(missionList, nextWaypoint, fLat, fLon):
     return tsp2opt(missionList)
 
 def parseXML(message, vehicle, UDPServerSocket, address):
-    #try:
-    root = ET.fromstring(message)
-    print(root)
-    handleCommand(root, vehicle, UDPServerSocket, address)
-    #except:
-    #    print("parseXML error")
-    #    return
+    try:
+        root = ET.fromstring(message)
+        print(root)
+        handleCommand(root, vehicle, UDPServerSocket, address)
+    except:
+        print("parseXML error")
+        return
 
 def cmdTakeoff(vehicle, element):
     arm_and_takeoff(vehicle, float(element.text))
@@ -577,24 +577,7 @@ def cmdObs(vehicle, element):
             12                  # MAV_FRAME, vehicle-front aligned: https://mavlink.io/en/messages/common.html#MAV_FRAME_BODY_FRD    
         )
     time.sleep(0.01)
-    #master.mav.send(msg)   # or use vehicle.send_mavlink(msg)
-    vehicle.send_mavlink(msg)
-    """
-    vehicle._master.mav.obstacle_distance_send(
-            current_time_us,    # us Timestamp (UNIX time or time since system boot)
-            0,                  # sensor_type, defined here: https://mavlink.io/en/messages/common.html#MAV_DISTANCE_SENSOR
-            distances,          # distances,    uint16_t[72],   cm
-            0,                  # increment,    uint8_t,        deg
-            depthMin_cm,        # min_distance, uint16_t,       cm
-            depthMax_cm,       # max_distance, uint16_t,       cm
-            degreeIncrement,   # increment_f,  float,          deg
-            degreeOffset,       # angle_offset, float,          deg
-            12                  # MAV_FRAME, vehicle-front aligned: https://mavlink.io/en/messages/common.html#MAV_FRAME_BODY_FRD    
-        )
-    """
-
-    #vehicle._master.mav.distance_sensor_send(0, 30, 2000, 400, 0, 0, 0, 0)
-    #distance_sensor_send(ignored,min_depth, max_depth, cur_dist, ignored, ignored, cameraFacingAngleDeg/45, ignored
+    vehicle.send_mavlink(msg) # _master.mav.send(msg) alternate way of sending?
 
 def cmdRouteSet(vehicle, element):
     upload_missionStr(element.text, vehicle)
@@ -784,21 +767,21 @@ def arm_and_takeoff(vehicle, aTargetAltitude):
         time.sleep(1)
 
 def recvUDP(sock, vehicle):
-    #try:
-    message,address = sock.recvfrom(1024)
-    if args.udp_hmac != '':
-        if len(message) < 32:
-            print('message verification, too short failure')
-            print(message)
-            return
-        if hmacVerifyMessage(message[:32], message[32:36], message[36:], args.udp_hmac) == False:
-            print('message verification failure')
-            return
-        parseXML(message[36:], vehicle, sock, address)
-    else:
-        parseXML(message, vehicle, sock, address)
-    #except:
-    #    print('recv failure')
+    try:
+        message,address = sock.recvfrom(1024)
+        if args.udp_hmac != '':
+            if len(message) < 32:
+                print('message verification, too short failure')
+                print(message)
+                return
+            if hmacVerifyMessage(message[:32], message[32:36], message[36:], args.udp_hmac) == False:
+                print('message verification failure')
+                return
+            parseXML(message[36:], vehicle, sock, address)
+        else:
+            parseXML(message, vehicle, sock, address)
+    except:
+        print('recv failure')
 
 # Set up connection string to the drone
 connection_string = args.connect
