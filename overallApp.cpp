@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <signal.h>
 
+#include <sstream>
+#include <fstream>
 #include <string.h>
 #include <thread>
 
@@ -28,6 +30,47 @@ enum OptionArgument {
     OPTION_NONE
 };
 
+class Arguments
+{
+public:
+    Arguments();
+    ~Arguments();
+    bool ParseArgs(int& _argc, char** _argv);
+
+    // Bools for the various command line options
+    bool bBatteryMonitor = false;
+    bool bStopNavOnDepthFail = true;
+    bool bSendRTL = false;
+    bool bStartPointLogger = false;
+    bool bSimulateVideo = false;
+    bool bManualServerAddress = false;
+    bool bRunRGB = true;
+    bool bRunDepth = true;
+    bool bRunAccel = false;
+    bool bRunFlir = false;
+    bool bDownsampleDepth = false;
+    bool bHmacUdp = false;
+    char scVideoSimPath[512];
+    char scServerAddress[32];
+    char scUdpKey[33];
+    int iTargetClass = -1;
+    int iNumSlices = -1;
+    int iTakeoffAltitude = -1;
+    int iGeoDist = -1;
+    int iUdpTimeoutUs = -1;
+    int iGuideSpeed = -1;
+    int iGuideTime = -1;
+    int iGuideExtraDistance = 0;
+
+private:
+    bool LoadFile(const char* scFilePath);
+    bool Parse();
+
+    int argc;
+    char** argv;
+    void* argvBuffer;
+};
+
 // Command line help (display and explain options)
 void printHelp();
 // Failure cleanup
@@ -42,41 +85,190 @@ InterruptStop* pSignal_interrupt = nullptr;
 bool* pSignal_bStopNavOnDepthFail = nullptr;
 bool* pSignal_bAbortTakeoff = nullptr;
 
-int main( int argc, char** argv )
+int main(int argc, char** argv)
 {
     // Handle signals
     signal(SIGINT, handle_interrupt);
     signal(SIGSEGV, handle_segfault);
+    Arguments args;
+    if (!args.ParseArgs(argc, argv)) {
+        return 1;
+    }
+    
+    try {
+        DataLogger logger;
 
-    // Bools for the various command line options
-    bool bOptionArgument = false;
-    bool bBatteryMonitor = false;
-    bool bStopNavOnDepthFail = true;
-    pSignal_bStopNavOnDepthFail = &bStopNavOnDepthFail;
-    bool bSendRTL = false;
-    bool bStartPointLogger = false;
-    bool bSimulateVideo = false;
-    bool bManualServerAddress = false;
-    bool bRunRGB = true;
-    bool bRunDepth = true;
-    bool bRunAccel = false;
-    bool bRunFlir = false;
-    bool bDownsampleDepth = false;
-    bool bHmacUdp = false;
-    // Command line arguments
-    OptionArgument OptionArgumentSelection = OPTION_NONE;
-    char scVideoSimPath[512];
+        CameraController* pCamera;
+        printL(">>>Opening Camera");
+        uint32_t uCameraFeatures = 0;
+        if (args.bSimulateVideo) uCameraFeatures += CameraController_RGBSimulation;
+        else if (args.bRunRGB) uCameraFeatures += CameraController_RGB;
+        if (args.bRunDepth) uCameraFeatures += CameraController_Depth;
+        if (args.bRunAccel) uCameraFeatures += CameraController_Accel;
+        if (args.bDownsampleDepth) uCameraFeatures += CameraController_DownsampleDepth;
+        if (args.bRunFlir) uCameraFeatures += CameraController_IR;
+        if (args.bSimulateVideo) pCamera = CameraController::OpenCamera(uCameraFeatures, args.scVideoSimPath);
+        else pCamera = CameraController::OpenCamera(uCameraFeatures);
+
+        printL(">>>Getting Flight Controller");
+        FlightController* pController = FlightController::GetFlightController(logger, *pCamera);
+        if (args.bManualServerAddress) pController->SetServerAddress(args.scServerAddress);
+        if (args.bHmacUdp) pController->SetUdpKey(args.scUdpKey);
+        if (args.iUdpTimeoutUs != -1) pController->SetUdpTimout(args.iUdpTimeoutUs);
+        if (args.iGuideSpeed != -1) pController->SetMissionSpeed(args.iGuideSpeed);
+        if (args.iGuideExtraDistance != -1) pController->SetExtraDistance(args.iGuideExtraDistance);
+
+        printL(">>>Creating Navigator");
+        Navigator nav(*pController, logger, *pCamera, args.bBatteryMonitor);
+        if (args.bRunDepth) pSignal_interrupt = pCamera;
+        else pSignal_interrupt = &nav;
+        // If we specified a target class, need to set that now
+        if (args.iTargetClass != -1) nav.SetTargetClass(uint8_t(args.iTargetClass));
+        if (args.iNumSlices != -1) nav.SetNumberImageSlices(args.iNumSlices);
+        if (args.iGuideTime != -1) nav.SetTimeBetweenChanges(args.iGuideTime);
+
+        printL(">>>Starting DataLogger");
+        logger.Start();
+        printL(">>>Starting Camera");
+        pCamera->Start(); // Camera starts all it's own threads
+        printL(">>>Starting Flight Controller");
+        if (args.iGeoDist != -1) pController->Start(args.bRunDepth, args.bStartPointLogger, args.bRunFlir, args.iGeoDist);
+        else pController->Start(args.bRunDepth, args.bStartPointLogger, args.bRunFlir);
+        if (args.iTakeoffAltitude != -1) {
+            bool bAbort = false;
+            pSignal_bAbortTakeoff = &bAbort;
+            pController->WaitForTakeoff(args.iTakeoffAltitude, bAbort);
+            pSignal_bAbortTakeoff = nullptr;
+        }
+        printL(">>>Starting Navigator");
+        nav.Start();
+
+        // std::system_error if the thread could not be started.
+        //**I think there might be issues with shutdown of stuff...need to trace through it all and double check
+        printL(">>>Threads Started, waiting on camera.join()");        
+        pCamera->JoinDepth();
+        printL(">>>Camera Depth joined");
+        // If we get here, depth failed 
+        if (args.bStopNavOnDepthFail) {
+            printL(">>>Sending stop signal to stop Nav");
+            nav.SignalStop();
+            ///***this has changed a bit since -> //**I got a seg fault once without --continue, I wonder if it's something to do with this? (datalogger wasn't cleaning up threads...)
+        } else {
+            // If depth was started but failed, and continue also specified...then currently we're about to wait on
+            //  nav.join, but pSignal_interrupt is set to the depth camera. So change it to nav so it will be stopped 
+            //  by the interrupt
+            printL(">>>Changing interrupt signal to nav");
+            pSignal_interrupt = &nav;
+        }
+
+        nav.Join();
+        printL(">>>Navigator Stopped");
+        if (args.bSendRTL) pController->SetRTL();
+        logger.Stop();
+        printL(">>>Datalogger Stopped");
+        pController->DestroyFlightController();
+        pController = nullptr;
+        printL(">>>Flight Controller destroyed");
+        delete pCamera;
+    } catch (std::exception e) {
+        std::cout << "Exception: " << e.what() << std::endl;
+        std::cout << "Sending RTL";
+        cleanupFailure();
+    }
+    return 0;
+}
+
+Arguments::Arguments()
+: bBatteryMonitor(false)
+, bStopNavOnDepthFail(true)
+, bSendRTL(false)
+, bStartPointLogger(false)
+, bSimulateVideo(false)
+, bManualServerAddress(false)
+, bRunRGB(true)
+, bRunDepth(true)
+, bRunAccel(false)
+, bRunFlir(false)
+, bDownsampleDepth(false)
+, bHmacUdp(false)
+, iTargetClass(-1)
+, iNumSlices(-1)
+, iTakeoffAltitude(-1)
+, iGeoDist(-1)
+, iUdpTimeoutUs(-1)
+, iGuideSpeed(-1)
+, iGuideTime(-1)
+, iGuideExtraDistance(0)
+, argc(0)
+, argv(nullptr)
+, argvBuffer(nullptr)
+{
     scVideoSimPath[0] = 0;
-    char scServerAddress[32];
-    char scUdpKey[33];
-    int iTargetClass = -1;
-    int iNumSlices = -1;
-    int iTakeoffAltitude = -1;
-    int iGeoDist = -1;
-    int iUdpTimeoutUs = -1;
-    int iGuideSpeed = -1;
-    int iGuideTime = -1;
-    int iGuideExtraDistance = 0;
+    scServerAddress[0] = 0;
+    scUdpKey[0] = 0;
+    
+    pSignal_bStopNavOnDepthFail = &bStopNavOnDepthFail;
+}
+
+Arguments::~Arguments()
+{
+    if (argvBuffer != nullptr)
+    {
+        free(argvBuffer);
+    }
+    pSignal_bStopNavOnDepthFail = nullptr;
+}
+
+bool Arguments::ParseArgs(int& _argc, char** _argv)
+{
+    if (_argc < 1) return false;
+    if (_argv[1][0] == '-') {
+        argc = _argc;
+        argv = _argv;
+        return Parse();
+    }
+
+    if (!LoadFile(_argv[1])) return false;
+
+    return Parse();
+}
+
+bool Arguments::LoadFile(const char* scFilePath)
+{
+    std::ifstream infile(scFilePath);
+    if (!infile.is_open()) return false;
+    std::vector<std::string> vWords;
+    
+    std::string line;
+    while (std::getline(infile, line))
+    {
+        size_t spaceLocation = line.find(' ');
+        if (spaceLocation == std::string::npos) {
+            vWords.push_back("--" + line);
+            continue;
+        }
+        std::string first = "--" + line.substr(0, spaceLocation);
+        std::string last = line.substr(spaceLocation);
+        vWords.push_back(first);
+        vWords.push_back(last);
+    }
+    argc = vWords.size() + 1;
+    argvBuffer = malloc(sizeof(char*) * (argc));
+    argv = (char**)argvBuffer;
+    for (int i = 0; i < argc - 1; i++) {
+        argv[i+1] = new char[vWords[i].size() + 1];
+        strcpy(argv[i+1], vWords[i].c_str());
+    }
+
+    return true;
+}
+
+bool Arguments::Parse()
+{
+    bool bOptionArgument = false;
+    OptionArgument OptionArgumentSelection = OPTION_NONE;
+    printf("argc = %d\n", argc);
+
     // Read all the command line arguments and options (--option argument)
     for (int i = 1; i < argc; i++) {
         if (bOptionArgument) {
@@ -88,33 +280,33 @@ int main( int argc, char** argv )
                 case DETECT_NET: {
                     if (!ObjectDetection::SetNetwork(argv[i])) {
                         printL("Invalid Detection network specified");
-                        return -1;
+                        return false;
                     }
                 } break;
                 case SEGMENT_NET: {
                     if (!TerrainSegmentation::SetNetwork(argv[i])) {
                         printL("Invalid Segmentation network specified");
-                        return -1;
+                        return false;
                     }
                 } break;
                 case NAV_TARGET: {
                     iTargetClass = atoi(argv[i]);
                     if (iTargetClass < 0 || iTargetClass > 255) {
                         printL("Target Class must be number between 0 and 255");
-                        return -1;
+                        return false;
                     }
                 } break;
                 case IMG_SLICES: {
                     iNumSlices = atoi(argv[i]);
                     if (iNumSlices < 0 || iNumSlices > 9) {
                         printL("Number of slices must be number between 0 and 9");
-                        return -1;
+                        return false;
                     }
                 } break;
                 case UDP_KEY: {
                     if (strlen(argv[i]) > 32) {
                         printL("Key is too long, it must not be more than 32 characters");
-                        return -1;
+                        return false;
                     }
                     bHmacUdp = true;
                     strncpy(scUdpKey, argv[i], 32);
@@ -123,47 +315,47 @@ int main( int argc, char** argv )
                     iGeoDist = atoi(argv[i]);
                     if (iGeoDist < 1 || iGeoDist > 9999) {
                         printL("Maximum distance from takeoff must be between 1 and 9999.");
-                        return -1;
+                        return false;
                     }
                 } break;
                 case UDP_TIMEOUT: {
                     iUdpTimeoutUs = atoi(argv[i]);
                     if (iUdpTimeoutUs < 1 || iUdpTimeoutUs > 1000000) {
                         printL("UDP timeout must be between 1-1000000 microseconds.");
-                        return -1;
+                        return false;
                     }
                 } break;
                 case GUIDE_SPEED: {
                     iGuideSpeed = atoi(argv[i]);
                     if (iGuideSpeed < 1 || iGuideSpeed > 99) {
                         printL("Guided speed must be between 1 and 99.");
-                        return -1;
+                        return false;
                     }
                 } break;
                 case GUIDE_TIME: {
                     iGuideTime = atoi(argv[i]);
                     if (iGuideTime < 1 || iGuideTime > 60) {
                         printL("Guided time between changes must be between 1 and 60.");
-                        return -1;
+                        return false;
                     }
                 } break;
                 case GUIDE_DISTANCE: {
                     iGuideExtraDistance = atoi(argv[i]);
                     if (iGuideExtraDistance < 0 || iGuideExtraDistance > 100) {
                         printL("Guided extra distance must be between 0 and 100.");
-                        return -1;
+                        return false;
                     }
                 } break;
                 case WAIT_TAKEOFF: {
                     iTakeoffAltitude = atoi(argv[i]);
                     if (iTakeoffAltitude < 10 || iTakeoffAltitude > 120) {
                         printL("Takeoff wait altitude must be between 10 and 120");
-                        return -1;
+                        return false;
                     }
                 } break;
                 default:
                     printL("OptionArgumentSelection Invalid");
-                    return -1;
+                    return false;
             }
             OptionArgumentSelection = OPTION_NONE;
         } else {
@@ -222,91 +414,11 @@ int main( int argc, char** argv )
                     printf("Invalid option [%s]\n", argv[i]);
                 }
                 printHelp();
-                return 0;
+                return false;
             }
         }
     }
-    try {
-        DataLogger logger;
-
-        CameraController* pCamera;
-        printL(">>>Opening Camera");
-        uint32_t uCameraFeatures = 0;
-        if (bSimulateVideo) uCameraFeatures += CameraController_RGBSimulation;
-        else if (bRunRGB) uCameraFeatures += CameraController_RGB;
-        if (bRunDepth) uCameraFeatures += CameraController_Depth;
-        if (bRunAccel) uCameraFeatures += CameraController_Accel;
-        if (bDownsampleDepth) uCameraFeatures += CameraController_DownsampleDepth;
-        if (bRunFlir) uCameraFeatures += CameraController_IR;
-        if (bSimulateVideo) pCamera = CameraController::OpenCamera(uCameraFeatures, scVideoSimPath);
-        else pCamera = CameraController::OpenCamera(uCameraFeatures);
-
-        printL(">>>Getting Flight Controller");
-        FlightController* pController = FlightController::GetFlightController(logger, *pCamera);
-        if (bManualServerAddress) pController->SetServerAddress(scServerAddress);
-        if (bHmacUdp) pController->SetUdpKey(scUdpKey);
-        if (iUdpTimeoutUs != -1) pController->SetUdpTimout(iUdpTimeoutUs);
-        if (iGuideSpeed != -1) pController->SetMissionSpeed(iGuideSpeed);
-        if (iGuideExtraDistance != -1) pController->SetExtraDistance(iGuideExtraDistance);
-
-        printL(">>>Creating Navigator");
-        Navigator nav(*pController, logger, *pCamera, bBatteryMonitor);
-        if (bRunDepth) pSignal_interrupt = pCamera;
-        else pSignal_interrupt = &nav;
-        // If we specified a target class, need to set that now
-        if (iTargetClass != -1) nav.SetTargetClass(uint8_t(iTargetClass));
-        if (iNumSlices != -1) nav.SetNumberImageSlices(iNumSlices);
-        if (iGuideTime != -1) nav.SetTimeBetweenChanges(iGuideTime);
-
-        printL(">>>Starting DataLogger");
-        logger.Start();
-        printL(">>>Starting Camera");
-        pCamera->Start(); // Camera starts all it's own threads
-        printL(">>>Starting Flight Controller");
-        if (iGeoDist != -1) pController->Start(bRunDepth, bStartPointLogger, bRunFlir, iGeoDist);
-        else pController->Start(bRunDepth, bStartPointLogger, bRunFlir);
-        if (iTakeoffAltitude != -1) {
-            bool bAbort = false;
-            pSignal_bAbortTakeoff = &bAbort;
-            pController->WaitForTakeoff(iTakeoffAltitude, bAbort);
-            pSignal_bAbortTakeoff = nullptr;
-        }
-        printL(">>>Starting Navigator");
-        nav.Start();
-
-        // std::system_error if the thread could not be started.
-        //**I think there might be issues with shutdown of stuff...need to trace through it all and double check
-        printL(">>>Threads Started, waiting on camera.join()");        
-        pCamera->JoinDepth();
-        printL(">>>Camera Depth joined");
-        // If we get here, depth failed 
-        if (bStopNavOnDepthFail) {
-            printL(">>>Sending stop signal to stop Nav");
-            nav.SignalStop();
-            ///***this has changed a bit since -> //**I got a seg fault once without --continue, I wonder if it's something to do with this? (datalogger wasn't cleaning up threads...)
-        } else {
-            // If depth was started but failed, and continue also specified...then currently we're about to wait on
-            //  nav.join, but pSignal_interrupt is set to the depth camera. So change it to nav so it will be stopped 
-            //  by the interrupt
-            printL(">>>Changing interrupt signal to nav");
-            pSignal_interrupt = &nav;
-        }
-
-        nav.Join();
-        printL(">>>Navigator Stopped");
-        if (bSendRTL) pController->SetRTL();
-        logger.Stop();
-        printL(">>>Datalogger Stopped");
-        pController->DestroyFlightController();
-        pController = nullptr;
-        printL(">>>Flight Controller destroyed");
-        delete pCamera;
-    } catch (std::exception e) {
-        std::cout << "Exception: " << e.what() << std::endl;
-        std::cout << "Sending RTL";
-        cleanupFailure();
-    }
-    return 0;
+    return true;
 }
 
 void printHelp()
@@ -315,6 +427,11 @@ void printHelp()
     printL(" SERVER_ADDRESS");
     printL("    In the event of failure (seg fault, unhandled exception, etc.) an RTL will");
     printL("    be sent to this address. If empty, 127.0.0.1 will be used instead.\n\n");
+    printL("Parameter File");
+    printL("    Instead of manually typing command line options, the user may store all");
+    printL("    all options in a file, each option on its own line.");
+    printL("    Pass that filename as a command when running the program:");
+    printL("        $ overallApp parameterFileName");
     printL("Command line options:");
     printL(" --continue");
     printL("    Program will not stop if the depth camera fails. Otherwise, if the depth");
