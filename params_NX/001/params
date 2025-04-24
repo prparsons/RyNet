@@ -1,0 +1,6 @@
+--simulate_video
+--server_address
+--no_rgb
+--no_depth
+--continue
+--depth_lowres

@@ -1,0 +1,15 @@
+{
+    "ComputerSetup" : {
+        "HardwareApp" : "NX",
+        "MavlinkUdpIp" : "ip"
+    },
+    "CameraSetup" : {
+        "DepthEnabled" : true,
+        "RgbEnabled" : false,
+        "VideoFile" : "path/to/file.vid"
+    },
+    "DroneSetup" : {
+        "SitlAddress" : "laptopip",
+        "MavlinkConnectionString" : null
+    }
+}
