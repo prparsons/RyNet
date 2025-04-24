@@ -1,7 +1,11 @@
 {
     "ComputerSetup" : {
         "HardwareApp" : "NX",
-        "MavlinkUdpIp" : "ip"
+        "HardwareScript" : "laptop",
+        "MavServeIp" : "ip",
+        "MavServePort" : 3636,
+        "MavServeOnlyObsDist" : false,
+        "UdpHmac" : "SecretKey"
     },
     "CameraSetup" : {
         "DepthEnabled" : true,
@@ -10,6 +14,7 @@
     },
     "DroneSetup" : {
         "SitlAddress" : "laptopip",
-        "MavlinkConnectionString" : null
+        "MavServeConnectionString" : null,
+        "MissionFile" : "path/to/mission.file"
     }
 }
