@@ -197,7 +197,8 @@ bool FlightController::GetSpeed(float& fSpeedMS)
 
 bool FlightController::GetAltitude(float& fAltitude)
 {
-    char* sc = SendRecXML("<altitude_retrieve />");
+    if (pInstance == nullptr) return false;
+    char* sc = pInstance->SendRecXML("<altitude_retrieve />");
     if (sc == nullptr) return false;
     fAltitude = atof(sc);
     delete[] sc;

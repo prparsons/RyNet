@@ -13,6 +13,7 @@ import hashlib
 import hmac
 from tsp import *
 import numpy as np
+from pymavlink.dialects.v20 import ardupilotmega as mavlink2
 
 """
 Command Documentation:
@@ -124,7 +125,7 @@ parser.add_argument('--clean_dist_way', type=int, default=100, help='Distance fr
 parser.add_argument('--udp_hmac', type=str, default='', help='If specified, all udp commands will be verified. String key should be provided.')
 #args = parser.parse_args()
 #Testing without command line, use below
-args = parser.parse_args("--port 3636 --connect tcp:127.0.0.1:5762 --udp_hmac SecretKey".split())#  --livetest
+args = parser.parse_args("--port 3636 --connect /dev/ttyTHS0 --livetest".split())#  --livetest --udp_hmac SecretKey
 visitedList = []
 
 def hmacVerifyMessage(signature, bytesSalt, bytesMessage, key):
@@ -564,8 +565,7 @@ def cmdObs(vehicle, element):
             distances[2] = int(dist.text)
         else:
             print("Invalid <obs><dist> dir attribute" + dist.attrib['dir'])
-
-    vehicle._master.mav.obstacle_distance_send(
+    msg = mavlink2.MAVLink_obstacle_distance_message(
             current_time_us,    # us Timestamp (UNIX time or time since system boot)
             0,                  # sensor_type, defined here: https://mavlink.io/en/messages/common.html#MAV_DISTANCE_SENSOR
             distances,          # distances,    uint16_t[72],   cm
@@ -576,9 +576,8 @@ def cmdObs(vehicle, element):
             degreeOffset,       # angle_offset, float,          deg
             12                  # MAV_FRAME, vehicle-front aligned: https://mavlink.io/en/messages/common.html#MAV_FRAME_BODY_FRD    
         )
-
-    #vehicle._master.mav.distance_sensor_send(0, 30, 2000, 400, 0, 0, 0, 0)
-    #distance_sensor_send(ignored,min_depth, max_depth, cur_dist, ignored, ignored, cameraFacingAngleDeg/45, ignored
+    time.sleep(0.01)
+    vehicle.send_mavlink(msg) # _master.mav.send(msg) alternate way of sending?
 
 def cmdRouteSet(vehicle, element):
     upload_missionStr(element.text, vehicle)
@@ -794,7 +793,7 @@ if not connection_string:
     connection_string = sitl.connection_string()
 # Connect to the Vehicle
 print('Connecting to vehicle on: %s' % connection_string)
-vehicle = connect(connection_string, wait_ready=True, timeout=360)
+vehicle = connect(connection_string, wait_ready=True, timeout=360, baud=57600)
 # Check that vehicle is armable. 
 # This ensures home_location is set (needed when saving WP file)
 while not vehicle.is_armable:
@@ -805,7 +804,7 @@ selectorDefault = selectors.DefaultSelector()
 # Create a datagram socket
 sockUDP = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
 # Bind to address and ip
-sockUDP.bind(("192.168.2.103", args.port))
+sockUDP.bind(("127.0.0.1", args.port))
 sockUDP.setblocking(False)
 selectorDefault.register(sockUDP, selectors.EVENT_READ, recvUDP)
 

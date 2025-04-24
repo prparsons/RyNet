@@ -167,6 +167,9 @@ void DataLogger::LogImage(CameraFrame& frm, std::string strIdSource)
     if (!FlightController::GetHeading(data.fHeading)) {
         data.fHeading = 999; // Obvious incorrect value
     }
+    if (!FlightController::GetAltitude(data.fAltitude)) {
+        data.fAltitude = -999;
+    }
     
     mt.lock();
     image = frm.matrix.clone();
@@ -190,6 +193,9 @@ void DataLogger::LogImageIr(CameraFrame& frm)
     }
     if (!FlightController::GetHeading(data.fHeading)) {
         data.fHeading = 999; // Obvious incorrect value
+    }
+    if (!FlightController::GetAltitude(data.fAltitude)) {
+        data.fAltitude = -999;
     }
     
     mt.lock();
@@ -238,8 +244,8 @@ void DataLogger::WriteImageData(cv::Mat& image, ImageLogData& imageData)
     // Now write stuff at the bottom, 2 rows, 5 pixel padding
     double dFontSize = cv::getFontScaleFromHeight(cv::FONT_HERSHEY_SIMPLEX, 20, 1);
     char sc[512];
-    snprintf(sc, 511, "Image:%d Lat:%.7f Lon:%.7f Alt:%.1fm Head:%.2f Pit:%.2f",
-                imageData.id, imageData.fLat, imageData.fLon, 3.0, imageData.fHeading, imageData.fPitch);
+    snprintf(sc, 511, "Image:%d Lat:%.7f Lon:%.7f Alt:%.1fm Head:%.2f",
+                imageData.id, imageData.fLat, imageData.fLon, imageData.fAltitude, imageData.fHeading);
     cv::putText(imageLarger, 
                 sc,
                 cv::Point(5, image.rows + 25),
