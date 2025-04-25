@@ -250,7 +250,7 @@ bool Arguments::LoadFile(const char* scFilePath)
             continue;
         }
         std::string first = "--" + line.substr(0, spaceLocation);
-        std::string last = line.substr(spaceLocation);
+        std::string last = line.substr(spaceLocation+1);
         vWords.push_back(first);
         vWords.push_back(last);
     }
@@ -287,7 +287,7 @@ bool Arguments::Parse()
                 } break;
                 case SEGMENT_NET: {
                     if (!TerrainSegmentation::SetNetwork(argv[i])) {
-                        printL("Invalid Segmentation network specified");
+                        printf("Invalid Segmentation network specified [%s]\n", argv[i]);
                         return false;
                     }
                 } break;
