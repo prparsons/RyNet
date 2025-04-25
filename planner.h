@@ -33,7 +33,7 @@ public:
     static bool GetPosition(float& fLat, float& fLon);
     static bool GetHeading(float& fHeading);
     bool GetSpeed(float& fSpeedMS); 
-    bool GetAltitude(float& fAltitude);
+    static bool GetAltitude(float& fAltitude);
     bool GetMode(char* scMode, int iStrLen);
     int GetBattery();
 
