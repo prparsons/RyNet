@@ -1,5 +1,6 @@
-no_depth
+depth_lowres
 continue
 segment_net FCN_RESNET18_DEEPSCENE_576x320
 img_slices 1
 nav_target 0
+hmac_udp loggerSecret
