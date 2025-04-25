@@ -431,6 +431,8 @@ void FlightController::runDepth(Signal sig, StopSignal ss)
         SendXML(sc);
 
         delete pFrameDepth;
+        // Limit distance messages to 20hz
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 }
 
