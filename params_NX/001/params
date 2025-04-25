@@ -1,6 +1,5 @@
---simulate_video
---server_address
---no_rgb
---no_depth
---continue
---depth_lowres
+no_depth
+continue
+segment_net FCN_RESNET18_DEEPSCENE_576x320
+img_slices 1
+nav_target 0
