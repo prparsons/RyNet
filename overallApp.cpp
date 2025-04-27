@@ -269,7 +269,6 @@ bool Arguments::Parse()
 {
     bool bOptionArgument = false;
     OptionArgument OptionArgumentSelection = OPTION_NONE;
-    printf("argc = %d\n", argc);
 
     // Read all the command line arguments and options (--option argument)
     for (int i = 1; i < argc; i++) {

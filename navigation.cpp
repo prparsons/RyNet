@@ -7,6 +7,8 @@
 detectNet::NetworkType networkDetection = detectNet::SSD_MOBILENET_V2;
 segNet::NetworkType networkSegmentation = segNet::FCN_RESNET18_VOC_512x320;
 
+#define SEGMENT_VALID_PIXELS 1
+
 // ** ObjectDetection
 
 ObjectDetection::ObjectDetection(DataLogger& _logger)
@@ -317,7 +319,7 @@ bool TerrainSegmentation::ProcessImage(CameraFrame& frm)
             //  So as soon as we find our target, then just stop scanning
             bRet = true;
             char sc[64];
-            sprintf(sc, "ScanMask Success slice %d", s);
+            sprintf(sc, "ScanMask: slice %d", s);
             logger.LogString(sc);
             break;
         }
@@ -343,7 +345,7 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iImageId, int iWidth, int
         }
     }
 
-    if (iAngleAvgCount == 0) {
+    if (iAngleAvgCount < SEGMENT_VALID_PIXELS) {
         mt.lock();
         bHabitatVisible = false;
         mt.unlock();
@@ -362,6 +364,9 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iImageId, int iWidth, int
     fBestDirection = fAngleAvgSum / iAngleAvgCount;
     bHabitatVisible = true;
     mt.unlock();
+    char sc[64];
+    sprintf(sc, "ScanMask: count %d", iAngleAvgCount);
+    logger.LogString(sc);
     return true;
 }
 
