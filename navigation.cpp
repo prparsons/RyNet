@@ -345,7 +345,7 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iImageId, uint32_t uWidth
     float fAngleAvgSum = 0;
     uint32_t uAngleAvgCount = 0;
     uint8_t pixel;
-    // Should be able to SIMD this
+    // Count up how many valid pixels are in the mask, and average out the direction they come from
     for (size_t u = 0; u < size; u++) {
         pixel = pMask[u];
         if (pixel == uTargetClass) {
@@ -355,6 +355,7 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iImageId, uint32_t uWidth
         }
     }
 
+    // Log the count, and if less than valid pixel count, we return false
     char sc[64];
     sprintf(sc, "ScanMask: count %u[%u %u]", uAngleAvgCount, uWidth, uHeight);
     logger.LogString(sc);
@@ -364,7 +365,7 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iImageId, uint32_t uWidth
         mt.unlock();
         return false;
     }
-    // We've found the desired category
+    // We've found the desired category, so log the mask
     int maskWidth = uWidth * 4;
     int maskHeight = uHeight * 4;
     float4* imgMask;
@@ -373,6 +374,7 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iImageId, uint32_t uWidth
         logger.LogMask(imgMask, iImageId, maskWidth, maskHeight);
         cudaFreeHost(imgMask);
     }
+    // Set direction and that we found something
     mt.lock();
     fBestDirection = fAngleAvgSum / uAngleAvgCount;
     bHabitatVisible = true;
