@@ -27,6 +27,7 @@ enum OptionArgument {
     GUIDE_TIME,
     GUIDE_SPEED,
     GUIDE_DISTANCE,
+    VALID_PIXELS,
     OPTION_NONE
 };
 
@@ -62,6 +63,7 @@ public:
     int iGuideSpeed = -1;
     int iGuideTime = -1;
     int iGuideExtraDistance = 0;
+    int iValidPixels = -1;
 
 private:
     bool LoadFile(const char* scFilePath);
@@ -128,6 +130,7 @@ int main(int argc, char** argv)
         if (args.iTargetClass != -1) nav.SetTargetClass(uint8_t(args.iTargetClass));
         if (args.iNumSlices != -1) nav.SetNumberImageSlices(args.iNumSlices);
         if (args.iGuideTime != -1) nav.SetTimeBetweenChanges(args.iGuideTime);
+        if (args.iValidPixels != -1) nav.SetValidPixels(uint32_t(args.iValidPixels));
 
         printL(">>>Starting DataLogger");
         logger.Start();
@@ -201,6 +204,7 @@ Arguments::Arguments()
 , iGuideSpeed(-1)
 , iGuideTime(-1)
 , iGuideExtraDistance(0)
+, iValidPixels(-1)
 , argc(0)
 , argv(nullptr)
 , argvBuffer(nullptr)
@@ -347,6 +351,13 @@ bool Arguments::Parse()
                         return false;
                     }
                 } break;
+                case VALID_PIXELS: {
+                    iValidPixels = atoi(argv[i]);
+                    if (iValidPixels < 0) {
+                        printL("Valid Pixels must be greater than 0;");
+                        return false;
+                    }
+                } break;
                 case WAIT_TAKEOFF: {
                     iTakeoffAltitude = atoi(argv[i]);
                     if (iTakeoffAltitude < 10 || iTakeoffAltitude > 120) {
@@ -388,6 +399,9 @@ bool Arguments::Parse()
             } else if (strcmp("--guide_distance", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = GUIDE_DISTANCE;
+            } else if (strcmp("--valid_pixels", argv[i]) == 0) {
+                bOptionArgument = true;
+                OptionArgumentSelection = VALID_PIXELS;
             } else if (strcmp("--wait_takeoff", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = WAIT_TAKEOFF;
@@ -505,6 +519,10 @@ void printHelp()
     printL(" --depth_lowres");
     printL("    Specify if using USB2 cord to connect to depth camera. 640x480 resolution");
     printL("    will be used instead of default 1280x720.\n");
+    printL(" --valid_pixels [XX]");
+    printL("    When running terrain segmentation, this is the number of pixels needed");
+    printL("    before considered a positive match.");
+    printL("    Target is positive number > 0 and < total size of network's output mask.\n");
 }
 
 void cleanupFailure()
