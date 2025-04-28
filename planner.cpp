@@ -26,6 +26,7 @@ FlightController::FlightController(DataLogger& _logger, CameraController& _camer
 , fHomeLon(0)
 , iMissionSpeedMS(8)
 , iExtraGuidedDistance(10)
+, iRouteCleanType(0)
 {
     scKey[0] = 0;
     strcpy(scMavLinkAddress, "127.0.0.1");
@@ -135,6 +136,11 @@ void FlightController::SetMissionSpeed(int _iMissionSpeedMS)
 void FlightController::SetExtraDistance(int _iExtraGuidedDistance)
 {
     iExtraGuidedDistance = _iExtraGuidedDistance;
+}
+
+void FlightController::SetRouteClean(int iClean)
+{
+    iRouteCleanType = iClean;
 }
 
 FlightController::~FlightController()
@@ -309,7 +315,13 @@ void FlightController::RestoreRouteClean()
 
     // Simple version: search list for closest point in waypoint list, make that first by
     //  deleting everything before it
-    SendXML("<route_restore clean='simple' />");
+    const char* scRouteString = "<route_restore setauto='true'/>";
+    if (iRouteCleanType = 1) {
+        scRouteString = "<route_restore setauto='true' clean='simple'/>";
+    } else if (iRouteCleanType == 2) {
+        scRouteString = "<route_restore setauto='true' clean='2opt'/>";
+    }
+    SendXML(scRouteString);
 }
 
 void FlightController::SetServerAddress(const char* scServerAddress)

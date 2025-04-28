@@ -28,6 +28,7 @@ enum OptionArgument {
     GUIDE_SPEED,
     GUIDE_DISTANCE,
     VALID_PIXELS,
+    CLEAN_ROUTE,
     OPTION_NONE
 };
 
@@ -64,6 +65,7 @@ public:
     int iGuideTime = -1;
     int iGuideExtraDistance = 0;
     int iValidPixels = -1;
+    int iCleanRoute = 0; // simple = 1, 2opt = 2
 
 private:
     bool LoadFile(const char* scFilePath);
@@ -121,6 +123,7 @@ int main(int argc, char** argv)
         if (args.iUdpTimeoutUs != -1) pController->SetUdpTimout(args.iUdpTimeoutUs);
         if (args.iGuideSpeed != -1) pController->SetMissionSpeed(args.iGuideSpeed);
         if (args.iGuideExtraDistance != -1) pController->SetExtraDistance(args.iGuideExtraDistance);
+        if (args.iCleanRoute != 0) pController->SetRouteClean(args.iCleanRoute);
 
         printL(">>>Creating Navigator");
         Navigator nav(*pController, logger, *pCamera, args.bBatteryMonitor);
@@ -205,6 +208,7 @@ Arguments::Arguments()
 , iGuideTime(-1)
 , iGuideExtraDistance(0)
 , iValidPixels(-1)
+, iCleanRoute(0)
 , argc(0)
 , argv(nullptr)
 , argvBuffer(nullptr)
@@ -358,6 +362,16 @@ bool Arguments::Parse()
                         return false;
                     }
                 } break;
+                case CLEAN_ROUTE: {
+                    if (strcmp("simple", argv[i]) == 0) {
+                        iCleanRoute = 1;
+                    } else if (strcmp("2opt", argv[i]) == 0) {
+                        iCleanRoute = 2;
+                    } else {
+                        printL("Valid clean options are \"simple\" or \"2opt\".");
+                        return false;
+                    }
+                } break;
                 case WAIT_TAKEOFF: {
                     iTakeoffAltitude = atoi(argv[i]);
                     if (iTakeoffAltitude < 10 || iTakeoffAltitude > 120) {
@@ -402,6 +416,9 @@ bool Arguments::Parse()
             } else if (strcmp("--valid_pixels", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = VALID_PIXELS;
+            } else if (strcmp("--clean", argv[i]) == 0) {
+                bOptionArgument = true;
+                OptionArgumentSelection = CLEAN_ROUTE;
             } else if (strcmp("--wait_takeoff", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = WAIT_TAKEOFF;
@@ -523,6 +540,10 @@ void printHelp()
     printL("    When running terrain segmentation, this is the number of pixels needed");
     printL("    before considered a positive match.");
     printL("    Target is positive number > 0 and < total size of network's output mask.\n");
+    printL(" --clean [simple/2opt]");
+    printL("    When restoring a route, either run a simple cleaning algorithm, or a 2opt");
+    printL("    algorithm.");
+    printL("    Target is either \"simple\" or \"2opt\".\n");
 }
 
 void cleanupFailure()
