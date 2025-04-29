@@ -1,0 +1,10 @@
+no_depth
+continue
+rtlfinish
+simulate_video DJI_0535.MP4
+segment_net FCN_RESNET18_DEEPSCENE_576x320
+img_slices 1
+nav_target 0
+hmac_udp SecretKey
+valid_pixels 20
+clean simple

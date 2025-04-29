@@ -148,6 +148,9 @@ TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
 , logger(_logger)
 , pMask(nullptr)
 , pThread(nullptr)
+, uMaskWidth(0)
+, uMaskHeight(0)
+, uValidNumPixels(18)
 {
     pNetwork = segNet::Create(networkSegmentation);//FCN_RESNET18_SUNRGB_640x512);//segNet::FCN_RESNET18_DEEPSCENE_576x320);FCN_ALEXNET_AERIAL_FPV_720p
 //  static segNet* Create( NetworkType networkType=FCN_ALEXNET_CITYSCAPES_SD, uint32_t maxBatchSize=DEFAULT_MAX_BATCH_SIZE,
@@ -234,6 +237,12 @@ void TerrainSegmentation::SetNumberImageSlices(int _iNumSlices)
     iNumSlices = _iNumSlices;
 }
 
+
+void TerrainSegmentation::SetNumberPixelsValid(uint32_t uValid)
+{
+    uValidNumPixels = uValid;
+}
+
 bool TerrainSegmentation::SetNetwork(const char* scNetwork)
 {
     if (strcmp("FCN_RESNET18_CITYSCAPES_512x256", scNetwork) == 0) {
@@ -304,20 +313,23 @@ bool TerrainSegmentation::ProcessImage(CameraFrame& frm)
             return false;
         }
 
+        // Get mask output resolution for the mask size
         if (pMask == nullptr) {
-            pMask = new uint8_t[imgWidth*iSliceHeight];
+            uMaskWidth = pNetwork->GetGridWidth();
+            uMaskHeight = pNetwork->GetGridHeight();
+            pMask = new uint8_t[uMaskWidth * uMaskHeight];
         }
-        if(!pNetwork->Mask(pMask, imgWidth, iSliceHeight)) {
+        if(!pNetwork->Mask(pMask, uMaskWidth, uMaskHeight)) {
             printL("TerrainSegmentation::ProcessImage mask fail");
             cudaFree(u3Img);
             return false;
         }
-        if (ScanMask(pMask, frm.GetId(), imgWidth, iSliceHeight)) {
+        if (ScanMask(pMask, frm.GetId(), uMaskWidth, uMaskHeight)) {
             // We're starting at the top, which would be the furthest away.
             //  So as soon as we find our target, then just stop scanning
             bRet = true;
             char sc[64];
-            sprintf(sc, "ScanMask Success slice %d", s);
+            sprintf(sc, "ScanMask success: slice %d", s);
             logger.LogString(sc);
             break;
         }
@@ -327,39 +339,44 @@ bool TerrainSegmentation::ProcessImage(CameraFrame& frm)
     return bRet;
 }
 
-bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iImageId, int iWidth, int iHeight)
+bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iImageId, uint32_t uWidth, uint32_t uHeight)
 {
-    int size = iWidth * iHeight;
+    size_t size = uWidth * uHeight;
     float fAngleAvgSum = 0;
-    int iAngleAvgCount = 0;
+    uint32_t uAngleAvgCount = 0;
     uint8_t pixel;
-    // Should be able to SIMD this
-    for (int i = 0; i < size; i++) {
-        pixel = pMask[i];
+    // Count up how many valid pixels are in the mask, and average out the direction they come from
+    for (size_t u = 0; u < size; u++) {
+        pixel = pMask[u];
         if (pixel == uTargetClass) {
-            int x = i / iWidth;
-            fAngleAvgSum += (abs(x - (iWidth * .5)) / (iWidth * .5)) * (fImageFOV * .5);
-            iAngleAvgCount++;
+            uint32_t x = u / uWidth;
+            fAngleAvgSum += (abs(x - (uWidth * .5)) / (uWidth * .5)) * (fImageFOV * .5);
+            uAngleAvgCount++;
         }
     }
 
-    if (iAngleAvgCount == 0) {
+    // Log the count, and if less than valid pixel count, we return false
+    char sc[64];
+    sprintf(sc, "ScanMask: count %u[%u %u]", uAngleAvgCount, uWidth, uHeight);
+    logger.LogString(sc);
+    if (uAngleAvgCount < uValidNumPixels) {
         mt.lock();
         bHabitatVisible = false;
         mt.unlock();
         return false;
     }
-    // We've found the desired category
-    int maskWidth = iWidth / 2;
-    int maskHeight = iHeight / 2;
+    // We've found the desired category, so log the mask
+    int maskWidth = uWidth * 4;
+    int maskHeight = uHeight * 4;
     float4* imgMask;
     if (!CUDA_FAILED(cudaHostAlloc(&imgMask, maskWidth*maskHeight*16, cudaHostAllocMapped))) {
         pNetwork->Mask(imgMask, maskWidth, maskHeight, segNet::FILTER_POINT);
         logger.LogMask(imgMask, iImageId, maskWidth, maskHeight);
         cudaFreeHost(imgMask);
     }
+    // Set direction and that we found something
     mt.lock();
-    fBestDirection = fAngleAvgSum / iAngleAvgCount;
+    fBestDirection = fAngleAvgSum / uAngleAvgCount;
     bHabitatVisible = true;
     mt.unlock();
     return true;
@@ -418,6 +435,11 @@ void Navigator::SetNumberImageSlices(int iNumSlices)
 void Navigator::SetTimeBetweenChanges(int iTime)
 {
     tMinTimeBetweenChanges = time_t(iTime);
+}
+
+void Navigator::SetValidPixels(uint32_t uValidPixels)
+{
+    segmenter.SetNumberPixelsValid(uValidPixels);
 }
 
 void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
@@ -483,7 +505,7 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
                         tLastChange = time(nullptr);
                     } else {
                         // If it would be an invalid direction, then go back to grid search
-                        control.RestoreRouteNaive();
+                        control.RestoreRoute();
                         sprintf(sc, "Good Habitat (Invalid Direction) -> %1.3f", segmenter.GetHabitatDirection());
                         bGridSearching = true;
                         tLastChange = time(nullptr);
@@ -495,7 +517,7 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
             } else { // No good terrain is visible right now
                 // So if there's been enough time we'll switch back to grid
                 if (time(nullptr) - tLastChange > tMinTimeBetweenChanges) {
-                    control.RestoreRouteNaive();
+                    control.RestoreRoute();
                     logger.LogString("Good Habitat -> Grid Search");
                     bGridSearching = true;
                     tLastChange = time(nullptr);

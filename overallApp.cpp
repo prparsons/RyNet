@@ -27,6 +27,8 @@ enum OptionArgument {
     GUIDE_TIME,
     GUIDE_SPEED,
     GUIDE_DISTANCE,
+    VALID_PIXELS,
+    CLEAN_ROUTE,
     OPTION_NONE
 };
 
@@ -62,6 +64,8 @@ public:
     int iGuideSpeed = -1;
     int iGuideTime = -1;
     int iGuideExtraDistance = 0;
+    int iValidPixels = -1;
+    int iCleanRoute = 0; // simple = 1, 2opt = 2
 
 private:
     bool LoadFile(const char* scFilePath);
@@ -119,6 +123,7 @@ int main(int argc, char** argv)
         if (args.iUdpTimeoutUs != -1) pController->SetUdpTimout(args.iUdpTimeoutUs);
         if (args.iGuideSpeed != -1) pController->SetMissionSpeed(args.iGuideSpeed);
         if (args.iGuideExtraDistance != -1) pController->SetExtraDistance(args.iGuideExtraDistance);
+        if (args.iCleanRoute != 0) pController->SetRouteClean(args.iCleanRoute);
 
         printL(">>>Creating Navigator");
         Navigator nav(*pController, logger, *pCamera, args.bBatteryMonitor);
@@ -128,6 +133,7 @@ int main(int argc, char** argv)
         if (args.iTargetClass != -1) nav.SetTargetClass(uint8_t(args.iTargetClass));
         if (args.iNumSlices != -1) nav.SetNumberImageSlices(args.iNumSlices);
         if (args.iGuideTime != -1) nav.SetTimeBetweenChanges(args.iGuideTime);
+        if (args.iValidPixels != -1) nav.SetValidPixels(uint32_t(args.iValidPixels));
 
         printL(">>>Starting DataLogger");
         logger.Start();
@@ -201,6 +207,8 @@ Arguments::Arguments()
 , iGuideSpeed(-1)
 , iGuideTime(-1)
 , iGuideExtraDistance(0)
+, iValidPixels(-1)
+, iCleanRoute(0)
 , argc(0)
 , argv(nullptr)
 , argvBuffer(nullptr)
@@ -269,7 +277,6 @@ bool Arguments::Parse()
 {
     bool bOptionArgument = false;
     OptionArgument OptionArgumentSelection = OPTION_NONE;
-    printf("argc = %d\n", argc);
 
     // Read all the command line arguments and options (--option argument)
     for (int i = 1; i < argc; i++) {
@@ -348,6 +355,23 @@ bool Arguments::Parse()
                         return false;
                     }
                 } break;
+                case VALID_PIXELS: {
+                    iValidPixels = atoi(argv[i]);
+                    if (iValidPixels < 0) {
+                        printL("Valid Pixels must be greater than 0;");
+                        return false;
+                    }
+                } break;
+                case CLEAN_ROUTE: {
+                    if (strcmp("simple", argv[i]) == 0) {
+                        iCleanRoute = 1;
+                    } else if (strcmp("2opt", argv[i]) == 0) {
+                        iCleanRoute = 2;
+                    } else {
+                        printL("Valid clean options are \"simple\" or \"2opt\".");
+                        return false;
+                    }
+                } break;
                 case WAIT_TAKEOFF: {
                     iTakeoffAltitude = atoi(argv[i]);
                     if (iTakeoffAltitude < 10 || iTakeoffAltitude > 120) {
@@ -389,6 +413,12 @@ bool Arguments::Parse()
             } else if (strcmp("--guide_distance", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = GUIDE_DISTANCE;
+            } else if (strcmp("--valid_pixels", argv[i]) == 0) {
+                bOptionArgument = true;
+                OptionArgumentSelection = VALID_PIXELS;
+            } else if (strcmp("--clean", argv[i]) == 0) {
+                bOptionArgument = true;
+                OptionArgumentSelection = CLEAN_ROUTE;
             } else if (strcmp("--wait_takeoff", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = WAIT_TAKEOFF;
@@ -506,6 +536,14 @@ void printHelp()
     printL(" --depth_lowres");
     printL("    Specify if using USB2 cord to connect to depth camera. 640x480 resolution");
     printL("    will be used instead of default 1280x720.\n");
+    printL(" --valid_pixels [XX]");
+    printL("    When running terrain segmentation, this is the number of pixels needed");
+    printL("    before considered a positive match.");
+    printL("    Target is positive number > 0 and < total size of network's output mask.\n");
+    printL(" --clean [simple/2opt]");
+    printL("    When restoring a route, either run a simple cleaning algorithm, or a 2opt");
+    printL("    algorithm.");
+    printL("    Target is either \"simple\" or \"2opt\".\n");
 }
 
 void cleanupFailure()

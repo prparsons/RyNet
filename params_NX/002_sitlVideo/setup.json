@@ -1,0 +1,20 @@
+{
+    "ComputerSetup" : {
+        "HardwareApp" : "NX",
+        "HardwareScript" : "laptop",
+        "MavServeIp" : "ip",
+        "MavServePort" : 3636,
+        "MavServeOnlyObsDist" : false,
+        "UdpHmac" : "SecretKey"
+    },
+    "CameraSetup" : {
+        "DepthEnabled" : true,
+        "RgbEnabled" : false,
+        "VideoFile" : "path/to/file.vid"
+    },
+    "DroneSetup" : {
+        "SitlAddress" : "laptopip",
+        "MavServeConnectionString" : null,
+        "MissionFile" : "path/to/mission.file"
+    }
+}

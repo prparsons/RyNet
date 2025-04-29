@@ -49,6 +49,7 @@ public:
 
     void SetTargetClass(uint8_t uTarget);
     void SetNumberImageSlices(int iNumSlices);
+    void SetNumberPixelsValid(uint32_t uValid);
     static bool SetNetwork(const char* scNetwork);
 
     enum Classes {
@@ -61,7 +62,7 @@ public:
 
 private:
     bool ProcessImage(CameraFrame& frm);
-    bool ScanMask(uint8_t* pMask, int iImageId, int iWidth, int iHeight);
+    bool ScanMask(uint8_t* pMask, int iImageId, uint32_t uWidth, uint32_t uHeight);
     void run(Signal sig, StopSignal ss);
 
     bool bHabitatVisible;
@@ -70,6 +71,9 @@ private:
     float fBestDirection;
     float fImageFOV; // should get this from camera
     uint8_t* pMask; // only access from thread (this really doesn't even need to be a class member)
+    uint32_t uMaskWidth;
+    uint32_t uMaskHeight;
+    uint32_t uValidNumPixels;
 
     DataLogger& logger;
     segNet* pNetwork;
@@ -93,6 +97,7 @@ public:
     void SetTargetClass(uint8_t uTarget) { segmenter.SetTargetClass(uTarget); }
     void SetNumberImageSlices(int iNumSlices);
     void SetTimeBetweenChanges(int iTime);
+    void SetValidPixels(uint32_t uValidPixels);
 
 private:
     void runBattery(StopSignal ss, StopSignal ssMainThread);
