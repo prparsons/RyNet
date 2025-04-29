@@ -608,9 +608,9 @@ def cmdRouteRestore(vehicle, element):
         fLon = vehicle.location.global_frame.lon
     if 'clean' in element.attrib:
         if element.attrib['clean'] == 'simple':
-            missionList = mission_cleanSimple(missionList, 0, fLat, fLon)#vehicle.commands.next, fLat, fLon)
+            missionList = mission_cleanSimple(missionList, 0, fLat, fLon)
         elif element.attrib['clean'] == '2opt':
-            missionList = mission_cleanBetter(missionList, 0, fLat, fLon)#vehicle.commands.next, fLat, fLon)
+            missionList = mission_cleanBetter(missionList, 0, fLat, fLon)
 
     upload_mission(missionList, vehicle)
     if 'setauto' in element.attrib:
