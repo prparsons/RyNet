@@ -123,9 +123,9 @@ parser.add_argument('--livetest', default='False', action='store_true', help='If
 parser.add_argument('--clean_dist_visit', type=int, default=10, help='Distance between visited points that is close enough to consider them duplicates.')
 parser.add_argument('--clean_dist_way', type=int, default=100, help='Distance from visited point that is close enough to remove a waypoint from mission list.')
 parser.add_argument('--udp_hmac', type=str, default='', help='If specified, all udp commands will be verified. String key should be provided.')
-#args = parser.parse_args()
+args = parser.parse_args()
 #Testing without command line, use below
-args = parser.parse_args("--port 3636 --connect /dev/ttyTHS0 --livetest".split())#  --livetest --udp_hmac SecretKey
+#args = parser.parse_args("--port 3636 --connect /dev/ttyTHS0 --livetest".split())#  --livetest --udp_hmac SecretKey
 visitedList = []
 
 def hmacVerifyMessage(signature, bytesSalt, bytesMessage, key):
@@ -251,8 +251,7 @@ def upload_missionStr(strMission, vehicle):
     vehicle.commands.upload()
 
 def upload_mission(missionlist, vehicle):
-    print("\nUpload mission from a list")
-    print(' Clear mission')
+    print(" Upload mission from a list[%d]" % len(missionlist))
     cmds = vehicle.commands
     cmds.clear()
     for command in missionlist:
@@ -262,20 +261,17 @@ def upload_mission(missionlist, vehicle):
 
 # Download current mission and return it in a list
 def download_mission(vehicle, skipVisited=False):
-    print(" Download mission from vehicle")
     missionlist=[]
     cmds = vehicle.commands
     cmds.download()
     cmds.wait_ready()
+    print(" Download mission from vehicle[%d]" % len(cmds))
     #from docs, https://dronekit-python.readthedocs.io/en/stable/automodule.html, cmds.next will return the index of current waypoint
-    i = 0
-    for cmd in cmds:
-        if skipVisited:
-            if i >= cmds.next:
-                missionlist.append(cmd)
-            i += 1
-        else:
-            missionlist.append(cmd)
+    if skipVisited:
+        missionlist = cmds[cmds.next:]
+    else:
+        missionlist = cmds[:]
+    print(" Downloaded %d" % len(missionlist))
     return missionlist
 
 def save_missionF(aFileName, vehicle):
@@ -612,9 +608,9 @@ def cmdRouteRestore(vehicle, element):
         fLon = vehicle.location.global_frame.lon
     if 'clean' in element.attrib:
         if element.attrib['clean'] == 'simple':
-            missionList = mission_cleanSimple(missionList, vehicle.commands.next, fLat, fLon)
+            missionList = mission_cleanSimple(missionList, 0, fLat, fLon)#vehicle.commands.next, fLat, fLon)
         elif element.attrib['clean'] == '2opt':
-            missionList = mission_cleanBetter(missionList, vehicle.commands.next, fLat, fLon)
+            missionList = mission_cleanBetter(missionList, 0, fLat, fLon)#vehicle.commands.next, fLat, fLon)
 
     upload_mission(missionList, vehicle)
     if 'setauto' in element.attrib:

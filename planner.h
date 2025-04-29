@@ -46,8 +46,7 @@ public:
     void SetDestination(float fHeadingOffsetDeg, float fDistance); // Store route, adjust heading, after distance will automatically restore route
     void SetRTL();
     void SetAltitude(float fAltitudeMeters);
-    void RestoreRouteNaive();
-    void RestoreRouteClean();
+    void RestoreRoute();
 
     void SetServerAddress(const char* scServerAddress);
     void SetUdpKey(const char* scUdpKey);

@@ -505,7 +505,7 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
                         tLastChange = time(nullptr);
                     } else {
                         // If it would be an invalid direction, then go back to grid search
-                        control.RestoreRouteNaive();
+                        control.RestoreRoute();
                         sprintf(sc, "Good Habitat (Invalid Direction) -> %1.3f", segmenter.GetHabitatDirection());
                         bGridSearching = true;
                         tLastChange = time(nullptr);
@@ -517,7 +517,7 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
             } else { // No good terrain is visible right now
                 // So if there's been enough time we'll switch back to grid
                 if (time(nullptr) - tLastChange > tMinTimeBetweenChanges) {
-                    control.RestoreRouteNaive();
+                    control.RestoreRoute();
                     logger.LogString("Good Habitat -> Grid Search");
                     bGridSearching = true;
                     tLastChange = time(nullptr);
