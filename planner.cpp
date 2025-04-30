@@ -345,6 +345,11 @@ int FlightController::GetBattery()
     return iBattery;
 }
 
+Route* FlightController::GetRoute()
+{
+    return nullptr;
+}
+
 int FlightController::CheckDirectionValid(float fDirection, time_t travelTime)
 {
     float fCurrentSpeedMS = 0;
@@ -422,6 +427,13 @@ void FlightController::RestoreRoute()
         scRouteString = "<route_restore setauto='true' clean='2opt'/>";
     }
     SendXML(scRouteString);
+}
+
+void FlightController::SetRoute(Route* pNewRoute, bool bSetAuto)
+{
+    if (pNewRoute == nullptr) return;
+
+    delete pNewRoute;
 }
 
 void FlightController::SetServerAddress(const char* scServerAddress)

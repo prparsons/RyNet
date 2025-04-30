@@ -37,6 +37,13 @@ private:
     CoordNode* sw;
 };
 
+class Route
+{
+    float fLat;
+    float fLon;
+    Route* pNext;
+};
+
 class FlightController {
 public:
     ~FlightController();
@@ -59,6 +66,8 @@ public:
     static bool GetAltitude(float& fAltitude);
     bool GetMode(char* scMode, int iStrLen);
     int GetBattery();
+    Route* GetRoute(); // Returns the current route. Caller owns object
+
 
     // Can we travel in the indicated direction for the indicated time.
     //  0 == No. Positive number is distance direction is valid for.
@@ -69,6 +78,7 @@ public:
     void SetRTL();
     void SetAltitude(float fAltitudeMeters);
     void RestoreRoute();
+    void SetRoute(Route* pNewRoute, bool bSetAuto); // Replaces current route with this one, will takeover ownership.
 
     void SetServerAddress(const char* scServerAddress);
     void SetUdpKey(const char* scUdpKey);
