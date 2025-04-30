@@ -11,16 +11,9 @@ bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** s
 
 FlightController* pInstance = nullptr;
 
-CoordNode::CoordNode(float _fLeft, float _fTop, float _fRight, float _fBottom)
-: bIsLeaf(true)
-, fLat(0)
-, fLon(0)
-, fLeft(_fLeft)
-, fTop(_fTop)
-, fRight(_fRight)
-, fBottom(_fBottom)
-, fCenterX((fRight - fLeft) / 2)
-, fCenterY((fTop - fBottom) / 2)
+CoordNode::CoordNode(float _fLat, float _fLon)
+: fLat(_fLat)
+, fLon(_fLon)
 , nw(nullptr)
 , ne(nullptr)
 , se(nullptr)
@@ -28,94 +21,109 @@ CoordNode::CoordNode(float _fLeft, float _fTop, float _fRight, float _fBottom)
 {
 }
 
-const CoordNode* CoordNode::GetClosest(float fLatQuery, float fLonQuery)
+CoordNode::~CoordNode()
 {
-    if (bIsLeaf) {
-        if (fLat != 0 && fLon != 0) return this;
-        return nullptr;
-    }
+    DestroyChildren();
+}
 
-    bool bTriedNE = false;
-    bool bTriedSE = false;
-    bool bTriedSW = false;
-    bool bTriedNW = false;
-    // If this isn't a leaf, then all 4 pointers will be valid
-    if (fLatQuery > fCenterY) {
+float CoordNode::GetDistance(float fLatQuery, float fLonQuery) const
+{
+    return 1.0;
+}
+
+const CoordNode* CoordNode::GetClosest(float fLatQuery, float fLonQuery, float& fDistance) const
+{
+    fDistance = GetDistance(fLatQuery, fLonQuery);
+    float fClosestChild = 9999999;
+    const CoordNode* pNode = nullptr;
+
+    if (fLatQuery > fLat) {
         // It's north of this node center
-        if (fLonQuery > fCenterX) {
+        if (fLonQuery > fLon) {
             // It's west of this node center
-            bTriedNW = true;
-            CoordNode* pNode = nw->GetClosest();
-            if (pNode != nullptr) return pNode;
+            pNode = nw->GetClosest(fLatQuery, fLonQuery, fClosestChild);
+            
         } else {
             // It's east of this node center
-            bTriedNE = true;
-            CoordNode* pNode = ne->GetClosest();
-            if (pNode != nullptr) return pNode;
+            pNode = ne->GetClosest(fLatQuery,fLonQuery, fClosestChild);
         }
     } else {
         // It's south of this node center
-        if (fLonQuery > fCenterX) {
+        if (fLonQuery > fLon) {
             // It's west of this node center
-            bTriedSW = true;
-            CoordNode* pNode = return sw->GetClosest();
-            if (pNode != nullptr) return pNode;
+            pNode = sw->GetClosest(fLatQuery, fLonQuery, fClosestChild);
         } else {
             // It's east of this node center
-            bTriedSE = true;
-            CoordNode* pNode = return se->GetClosest();
-            if (pNode != nullptr) return pNode;
-        }
-    }
-    
-    // Leaf didn't exist in desired quad, so now check the other 3 and find the smallest
-    //This isn't ideal..............Need to figure out which quad it's closest to and just try that,
-    // returning result if it exists. Rinse and repeat (there must be at least 2 quads with points)
-    float fDistMin = 9999999;
-    CoordNode* pNodeMin = nullptr;
-    if (!bTriedNE) {
-        pNodeMin = ne->GetClosest();
-        if (pNodeMin != nullptr) {
-            fDistMin = 1;
-        }
-    }
-    if (!bTriedSE) {
-        CoordNode* pSE = se->GetClosest();
-        if (pSE != nullptr) {
-            float fDist;
-            if (fDist < fDistMin) {
-                fDistMin = fDist;
-                pNodeMin = pSE;
-            }
-        }
-    }
-    if (!bTriedSW) {
-        CoordNode* pSW = sw->GetClosest();
-        if (pSW != nullptr) {
-            float fDist;
-            if (fDist < fDistMin) {
-                fDistMin = fDist;
-                pNodeMin = pSW;
-            }
-        }
-    }
-    if (!bTriedNW) {
-        CoordNode* pNW = nw->GetClosest();
-        if (pNW != nullptr) {
-            float fDist;
-            if (fDist < fDistMin) {
-                fDistMin = fDist;
-                pNodeMin = pNW;
-            }
+            pNode = se->GetClosest(fLatQuery, fLonQuery, fClosestChild);
         }
     }
 
-    return pNodeMin;
+    if (pNode != nullptr) {
+        if (fClosestChild < fDistance) {
+            fDistance = fClosestChild;
+            return pNode;
+        }
+    }
+    return this;
 }
 
-void CoordNode::InsertPoint(float fLat, float fLon)
+void CoordNode::InsertPoint(float fLatNew, float fLonNew)
 {
+  if (fLatNew > fLat) {
+        // It's north of this node center
+        if (fLonNew > fLon) {
+            // It's west of this node center
+            if (nw == nullptr) {
+                nw = new CoordNode(fLatNew, fLonNew);
+            } else {
+                nw->InsertPoint(fLatNew, fLonNew);
+            }
+        } else {
+            // It's east of this node center
+            if (ne == nullptr) {
+                ne = new CoordNode(fLatNew, fLonNew);
+            } else {
+                ne->InsertPoint(fLatNew, fLonNew);
+            }
+        }
+    } else {
+        // It's south of this node center
+        if (fLonNew > fLon) {
+            // It's west of this node center
+            if (sw == nullptr) {
+                sw = new CoordNode(fLatNew, fLonNew);
+            } else {
+                sw->InsertPoint(fLatNew, fLonNew);
+            }
+        } else {
+            // It's east of this node center
+            if (se == nullptr) {
+                se = new CoordNode(fLatNew, fLonNew);
+            } else {
+                se->InsertPoint(fLatNew, fLonNew);
+            }
+        }
+    }
+}
 
+void CoordNode::DestroyChildren()
+{
+    if (ne != nullptr) {
+        delete ne;
+        ne = nullptr;
+    }
+    if (se != nullptr) {
+        delete se;
+        se = nullptr;
+    }
+    if (sw != nullptr) {
+        delete sw;
+        sw = nullptr;
+    }
+    if (nw != nullptr) {
+        delete nw;
+        nw = nullptr;
+    }
 }
 
 
