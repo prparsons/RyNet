@@ -54,6 +54,7 @@ public:
     void SetUdpTimout(int iTimeoutUs);
     void SetMissionSpeed(int iMissionSpeedMS);
     void SetExtraDistance(int iExtraGuidedDistance);
+    void SetRouteClean(int iClean); // 1 = simple, 2 = 2opt
 
     void Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr, int iMaxDist);
     void Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr);
@@ -61,7 +62,7 @@ public:
     static bool GetPosition(float& fLat, float& fLon);
     static bool GetHeading(float& fHeading);
     bool GetSpeed(float& fSpeedMS); 
-    bool GetAltitude(float& fAltitude);
+    static bool GetAltitude(float& fAltitude);
     bool GetMode(char* scMode, int iStrLen);
     int GetBattery();
 
@@ -73,8 +74,7 @@ public:
     void SetDestination(float fHeadingOffsetDeg, float fDistance); // Store route, adjust heading, after distance will automatically restore route
     void SetRTL();
     void SetAltitude(float fAltitudeMeters);
-    void RestoreRouteNaive();
-    void RestoreRouteClean();
+    void RestoreRoute();
 
     void SetServerAddress(const char* scServerAddress);
     void SetUdpKey(const char* scUdpKey);
@@ -116,5 +116,6 @@ private:
     float fHomeLon;
     int iMissionSpeedMS;
     int iExtraGuidedDistance;
+    int iRouteCleanType;
 };
 

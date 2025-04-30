@@ -10,7 +10,7 @@ def hmacVerifyMessage(signature, bytesSalt, bytesMessage, key):
     try: hmacVerifyMessage.salt
     except AttributeError: hmacVerifyMessage.salt = -1
 
-    intSalt = int.from_bytes(bytesSalt, "big")
+    intSalt = int.from_bytes(bytesSalt, "little")
     print("Verification Salt %d" % intSalt)
     if intSalt <= hmacVerifyMessage.salt:
         print("salt reuse")
@@ -56,7 +56,7 @@ try:
         if len(message) < 32:
             print('message verification, too short failure')
             continue
-        if hmacVerifyMessage(message[:32], message[32:36], message[36:], args.udp_hmac) == False:
+        if hmacVerifyMessage(message[:32], message[32:36], message[36:], 'loggerSecret') == False:
             print('message verification failure')
             continue
 
@@ -74,6 +74,12 @@ try:
             strReply = "%f\n%f\n" % (lat, lon)
             lat += 0.001
             lon += 0.001
+            UDPServerSocket.sendto(str.encode(strReply), address)
+        elif message == "<speed_retrieve />":
+            strReply = "%.1f" % 3.14159
+            UDPServerSocket.sendto(str.encode(strReply), address)
+        elif message == "<heading_retrieve />":
+            strReply = "%.1f" % -361
             UDPServerSocket.sendto(str.encode(strReply), address)
 except:
     print("done")

@@ -134,6 +134,7 @@ FlightController::FlightController(DataLogger& _logger, CameraController& _camer
 , fHomeLon(0)
 , iMissionSpeedMS(8)
 , iExtraGuidedDistance(10)
+, iRouteCleanType(0)
 {
     scKey[0] = 0;
     strcpy(scMavLinkAddress, "127.0.0.1");
@@ -245,6 +246,11 @@ void FlightController::SetExtraDistance(int _iExtraGuidedDistance)
     iExtraGuidedDistance = _iExtraGuidedDistance;
 }
 
+void FlightController::SetRouteClean(int iClean)
+{
+    iRouteCleanType = iClean;
+}
+
 FlightController::~FlightController()
 {
     printL("FlightController::~FlightController");
@@ -305,7 +311,8 @@ bool FlightController::GetSpeed(float& fSpeedMS)
 
 bool FlightController::GetAltitude(float& fAltitude)
 {
-    char* sc = SendRecXML("<altitude_retrieve />");
+    if (pInstance == nullptr) return false;
+    char* sc = pInstance->SendRecXML("<altitude_retrieve />");
     if (sc == nullptr) return false;
     fAltitude = atof(sc);
     delete[] sc;
@@ -398,25 +405,15 @@ void FlightController::SetAltitude(float fAltitudeMeters)
     SendXML(sc);
 }
 
-void FlightController::RestoreRouteNaive()
+void FlightController::RestoreRoute()
 {
-    char sc[128];
-    strcpy(sc, "<route_restore setauto='true'/>");
-    SendXML(sc);
-}
-
-void FlightController::RestoreRouteClean()
-{
-    // The plan is to somehow track where we've been while not on the pre-planned route,
-    //  and then when we restore the route we remove any waypoints that have us flying
-    //  in the same areas we've already been.
-    // So...do we add stuff to this to keep track of where we've been? or leave it to
-    //  the python script
-    // This needs to because we need to avoid looping on ourselves anyways
-
-    // Simple version: search list for closest point in waypoint list, make that first by
-    //  deleting everything before it
-    SendXML("<route_restore clean='simple' />");
+    const char* scRouteString = "<route_restore setauto='true'/>";
+    if (iRouteCleanType == 1) {
+        scRouteString = "<route_restore setauto='true' clean='simple'/>";
+    } else if (iRouteCleanType == 2) {
+        scRouteString = "<route_restore setauto='true' clean='2opt'/>";
+    }
+    SendXML(scRouteString);
 }
 
 void FlightController::SetServerAddress(const char* scServerAddress)
@@ -538,6 +535,8 @@ void FlightController::runDepth(Signal sig, StopSignal ss)
         SendXML(sc);
 
         delete pFrameDepth;
+        // Limit distance messages to 20hz
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 }
 

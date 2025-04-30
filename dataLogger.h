@@ -14,6 +14,7 @@ struct ImageLogData {
     float fLat;
     float fLon;
     float fHeading;
+    float fAltitude;
     float fPitch;
     //d435i has an accelerometer. So we can figure out camera pitch from that,
     //  though if the drone is accelerating it would skew that measurement. We

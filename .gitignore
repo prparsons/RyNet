@@ -1,0 +1,11 @@
+#Build directory
+build/
+
+#Log files
+logUDP.txt
+
+#VSCode files
+settings.json
+
+#python cache stuff
+__pycache__/
