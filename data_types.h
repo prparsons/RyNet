@@ -59,24 +59,3 @@ private:
 
     int id;
 };
-
-class coord {
-public:
-    coord();
-    coord(const coord& other);
-
-    float fLatitude;
-    float fLongitude;
-};
-
-inline coord::coord()
-{
-    fLatitude = 0;
-    fLongitude = 0;
-}
-
-inline coord::coord(const coord& other)
-: fLatitude(other.fLatitude)
-, fLongitude(other.fLongitude)
-{
-}

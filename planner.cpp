@@ -106,6 +106,13 @@ void CoordNode::InsertPoint(float fLatNew, float fLonNew)
     }
 }
 
+void CoordNode::ResetPosition(float _fLat, float _fLon)
+{
+    DestroyChildren();
+    fLat = _fLat;
+    fLon = _fLon;
+}
+
 void CoordNode::DestroyChildren()
 {
     if (ne != nullptr) {
@@ -585,15 +592,18 @@ void FlightController::runPointLogger(StopSignal ss)
 {
     printL("FlightController::runPointLogger");
     bool bGuided = false;
-    std::vector<coord> vecVisitedPoints;
-    coord currentPosition;
     char scMode[32];
+
+    float fLat = 0;
+    float fLon = 0;
+    GetPosition(fLat, fLon);
+    CoordNode startLocation(fLat, fLon);
 
     while (!ss.shouldStop()) {
         if (bGuided) { // In GUIDED
             // Get the current position, add it to the list of visited points
-            if (GetPosition(currentPosition.fLatitude, currentPosition.fLongitude)) {
-                vecVisitedPoints.push_back(currentPosition);
+            if (GetPosition(fLat, fLon)) {
+                startLocation.InsertPoint(fLat, fLon);
             }
             // See if we're in guided or auto
             if (GetMode(scMode, 32)) {
@@ -601,7 +611,8 @@ void FlightController::runPointLogger(StopSignal ss)
             }
             if (!bGuided) {
                 // Just switched to guided from auto, so clear visited points
-                vecVisitedPoints.clear();
+                GetPosition(fLat, fLon); // Doesn't matter if it fails...we still need to reset position
+                startLocation.ResetPosition(fLat, fLon);
             }
         } else { // in AUTO            
             // See if we're in guided or auto

@@ -24,6 +24,7 @@ public:
     const CoordNode* GetClosest(float fLatQuery, float fLonQuery) const;
     const CoordNode* GetClosest(float fLatQuery, float fLonQuery, float& fDistance) const;
     void InsertPoint(float fLatNew, float fLonNew);
+    void ResetPosition(float fLat, float fLon); // Clears list and reset position
 
     void DestroyChildren();
     void Print() const;
