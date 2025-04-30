@@ -542,6 +542,7 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
             }
         }
     }
+    locationTree.Print();
 
     printL("Navigator::runNavigator loop done, stopping segmenter and detector");
     // Handle all the cleanup

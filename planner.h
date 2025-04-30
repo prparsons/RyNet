@@ -26,6 +26,7 @@ public:
     void InsertPoint(float fLatNew, float fLonNew);
 
     void DestroyChildren();
+    void Print() const;
 
 private:
     float fLat;

@@ -126,6 +126,27 @@ void CoordNode::DestroyChildren()
     }
 }
 
+void CoordNode::Print() const
+{
+    printf("{%.3f,%.3f\nNE:", fLat, fLon);
+    if (ne != nullptr) ne->Print();
+    else printf("nullptr\n");
+    
+    printf("SE:");
+    if (se != nullptr) se->Print();
+    else printf("nullptr\n");
+    
+    printf("SW:");
+    if (sw != nullptr) sw->Print();
+    else printf("nullptr\n");
+    
+    printf("NW:");
+    if (nw != nullptr) nw->Print();
+    else printf("nullptr\n");
+
+    printf("}\n");
+}
+
 
 FlightController::FlightController(DataLogger& _logger, CameraController& _camera)
 : logger(_logger)
