@@ -449,9 +449,6 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
     bool bGridSearching = true;
     float fMargin = 5;
     float fCurrentDirection = 0;
-    float fLat = 0;
-    float fLon = 0;
-    uint32_t counter = 0;
 
     StopSignal ssBattery;
     std::thread* pThrBattery = nullptr;
@@ -462,9 +459,6 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
 
     while (!ss.shouldStop()) {
         sigRGB.wait(1000);
-        counter++;
-
-        // Get new image and process it
         CameraFrame frameNew;
         if (!camera.GetFrameRGB(frameNew)) {
             printL("runNavigator frame was not valid");
