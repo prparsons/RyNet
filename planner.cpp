@@ -315,13 +315,14 @@ bool FlightController::GetPosition(float& fLat, float& fLon)
     char* sc = pInstance->SendRecXML("<pos_retrieve />");
     if (sc == nullptr) return false;
     int i;
+    char* scPos = sc + 4;
     // string is in format "LAT\nLON"
-    for (i = 0; i < strlen(sc); i++) {
-        if (sc[i] == '\n') break;
+    for (i = 0; i < strlen(scPos); i++) {
+        if (scPos[i] == '\n') break;
     }
-    sc[i] = 0;
-    fLat = float(atof(sc));
-    fLon = float(atof(sc + i + 1));
+    scPos[i] = 0;
+    fLat = float(atof(scPos));
+    fLon = float(atof(scPos + i + 1));
     delete[] sc;
     return true;
 }
@@ -331,7 +332,7 @@ bool FlightController::GetHeading(float& fHeading)
     if (pInstance == nullptr) return false;
     char* sc = pInstance->SendRecXML("<heading_retrieve />");
     if (sc == nullptr) return false;
-    fHeading = atof(sc);
+    fHeading = atof(sc + 4);
     delete[] sc;
     return true;
 }
@@ -340,7 +341,7 @@ bool FlightController::GetSpeed(float& fSpeedMS)
 {
     char* sc = SendRecXML("<speed_retrieve />");
     if (sc == nullptr) return false;
-    fSpeedMS = atof(sc);
+    fSpeedMS = atof(sc + 4);
     delete[] sc;
     return true;
 }
@@ -350,7 +351,7 @@ bool FlightController::GetAltitude(float& fAltitude)
     if (pInstance == nullptr) return false;
     char* sc = pInstance->SendRecXML("<altitude_retrieve />");
     if (sc == nullptr) return false;
-    fAltitude = atof(sc);
+    fAltitude = atof(sc + 4);
     delete[] sc;
     return true;
 }
@@ -359,7 +360,7 @@ bool FlightController::GetMode(char* scMode, int iStrLen)
 {
     char* sc = SendRecXML("<mode_retrieve />");
     if (sc == nullptr) return false;
-    strncpy(scMode, sc, iStrLen);
+    strncpy(scMode, sc + 4, iStrLen);
     delete sc;
     return true;
 }
@@ -368,7 +369,7 @@ int FlightController::GetBattery()
 {
     char* sc = SendRecXML("<battery_retrieve />");
     if (sc == nullptr) return -1;
-    int iBattery = atoi(sc);
+    int iBattery = atoi(sc + 4);
     delete sc;
     return iBattery;
 }
