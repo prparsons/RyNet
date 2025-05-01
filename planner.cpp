@@ -315,13 +315,23 @@ bool FlightController::GetPosition(float& fLat, float& fLon)
     char* sc = pInstance->SendRecXML("<pos_retrieve />");
     if (sc == nullptr) return false;
     int i;
-    // string is in format "LAT\nLON"
-    for (i = 0; i < strlen(sc); i++) {
-        if (sc[i] == '\n') break;
+    // string is in format "0x00000000LAT\nLON"; 4 byte uint of total message size is first
+    uint32_t size = *((uint32_t*)sc);
+    if (strlen(sc + 4) + 4 != size) {
+        // Going to leave this message in place until I fix the underlying issue
+        printf(" Invalid GetPosition Length %u  %d\n", size, int(strlen(sc + 4)));
+        delete[] sc;
+        return false;
+    } else {
+        printL("Good Position");
     }
-    sc[i] = 0;
-    fLat = float(atof(sc));
-    fLon = float(atof(sc + i + 1));
+    char* scNum = sc + 4;
+    for (i = 0; i < strlen(scNum); i++) {
+        if (scNum[i] == '\n') break;
+    }
+    scNum[i] = 0;
+    fLat = float(atof(scNum));
+    fLon = float(atof(scNum + i + 1));
     delete[] sc;
     return true;
 }

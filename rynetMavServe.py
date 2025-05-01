@@ -626,7 +626,8 @@ def cmdRoutRetrieve(vehicle, UDPServerSocket, address):
 
 def cmdPosRetrieve(vehicle, UDPServerSocket, address):
     strReply = "%f\n%f\n" % (vehicle.location.global_frame.lat, vehicle.location.global_frame.lon)
-    UDPServerSocket.sendto(str.encode(strReply), address)
+    strlen = len(strReply) + 4
+    UDPServerSocket.sendto(strlen.to_bytes(4, 'little') + str.encode(strReply), address)
 
 def cmdBatteryRetrieve(vehicle, UDPServerSocket, address):
     strReply = "%d\n" % (vehicle.battery.level)
