@@ -54,6 +54,7 @@ Command Documentation:
 
 <pos_retrieve />
     Gets the current position (lat,lon) and returns it back to the client separated by \n
+    ***Currently prepends message with a little endian uint32_t of the whole message size
     --livetest enabled
 
 <route_load setauto='true'>MISSION_FILENAME</route_load>
