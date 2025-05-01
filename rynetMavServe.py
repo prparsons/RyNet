@@ -524,22 +524,26 @@ def cmdDir(vehicle, element):
 
 def cmdModeRetrieve(vehicle, UDPServerSocket, address):
     strReply = vehicle.mode.name
-    UDPServerSocket.sendto(str.encode(strReply), address)
+    strlen = len(strReply) + 4
+    UDPServerSocket.sendto(strlen.to_bytes(4, 'little') + str.encode(strReply), address)
 
 def cmdDirRetrieve(vehicle, UDPServerSocket, address):
     heading = vehicle.heading
     strReply = "%.1f" % heading
-    UDPServerSocket.sendto(str.encode(strReply), address)
+    strlen = len(strReply) + 4
+    UDPServerSocket.sendto(strlen.to_bytes(4, 'little') + str.encode(strReply), address)
 
 def cmdAltitudeRetrieve(vehicle, UDPServerSocket, address):
     altitude = vehicle.location.global_relative_frame.alt
     strReply = "%.3f" % altitude
-    UDPServerSocket.sendto(str.encode(strReply), address)
+    strlen = len(strReply) + 4
+    UDPServerSocket.sendto(strlen.to_bytes(4, 'little') + str.encode(strReply), address)
 
 def cmdSpeedRetrieve(vehicle, UDPServerSocket, address):
     speed = vehicle.groundspeed
     strReply = "%.1f" % speed
-    UDPServerSocket.sendto(str.encode(strReply), address)
+    strlen = len(strReply) + 4
+    UDPServerSocket.sendto(strlen.to_bytes(4, 'little') + str.encode(strReply), address)
 
 def cmdObs(vehicle, element): 
     if 'dir' in element.attrib:
@@ -632,7 +636,8 @@ def cmdPosRetrieve(vehicle, UDPServerSocket, address):
 
 def cmdBatteryRetrieve(vehicle, UDPServerSocket, address):
     strReply = "%d\n" % (vehicle.battery.level)
-    UDPServerSocket.sendto(str.encode(strReply), address)
+    strlen = len(strReply) + 4
+    UDPServerSocket.sendto(strlen.to_bytes(4, 'little') + str.encode(strReply), address)
 
 def handleCommand(element, vehicle, UDPServerSocket, address):
     global visitedList

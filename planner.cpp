@@ -315,23 +315,13 @@ bool FlightController::GetPosition(float& fLat, float& fLon)
     char* sc = pInstance->SendRecXML("<pos_retrieve />");
     if (sc == nullptr) return false;
     int i;
-    // string is in format "0x00000000LAT\nLON"; 4 byte uint of total message size is first
-    uint32_t size = *((uint32_t*)sc);
-    if (strlen(sc + 4) + 4 != size) {
-        // Going to leave this message in place until I fix the underlying issue
-        printf(" Invalid GetPosition Length %u  %d\n", size, int(strlen(sc + 4)));
-        delete[] sc;
-        return false;
-    } else {
-        printL("Good Position");
+    // string is in format "LAT\nLON"
+    for (i = 0; i < strlen(sc); i++) {
+        if (sc[i] == '\n') break;
     }
-    char* scNum = sc + 4;
-    for (i = 0; i < strlen(scNum); i++) {
-        if (scNum[i] == '\n') break;
-    }
-    scNum[i] = 0;
-    fLat = float(atof(scNum));
-    fLon = float(atof(scNum + i + 1));
+    sc[i] = 0;
+    fLat = float(atof(sc));
+    fLon = float(atof(sc + i + 1));
     delete[] sc;
     return true;
 }
@@ -729,23 +719,41 @@ char* FlightController::SendRecXML(const char* _scMessage)
     if (socketDesc < 0) ConnectMavLink();
     sendto(socketDesc, scMessage, iStrLen, MSG_CONFIRM, (const struct sockaddr*)&addressMavLink, sizeof(addressMavLink));
     char* scResponse = new char[512];
-    int iLength = recv(socketDesc, scResponse, 511, 0);
-    if (iLength < 0) {
-        // It failed, give it __msec then try one more time
-        std::this_thread::sleep_for(std::chrono::milliseconds(iUdpTimeoutUs / 1000));
-        iLength = recv(socketDesc, scResponse, 511, 0);
+    char* scBufferStart = scResponse;
+    uint32_t* size = (uint32_t*)scResponse; // Mesage length is beginning of message
+    int iLength = 0;
+    int iCount = 0;
+    bool bSuccess = true;
+    do {
+        iLength = recv(socketDesc, scBufferStart, 511, 0);
         if (iLength < 0) {
-            // Still failed...give up
-            delete[] scResponse;
-            mtXML.unlock();
-            if (scKey[0] != 0) {
-                OPENSSL_free(scHmac);
-                delete[] scSaltedMessage;
-                delete[] scHmacMessage;
+            // It failed, give it __msec then try one more time
+            std::this_thread::sleep_for(std::chrono::milliseconds(iUdpTimeoutUs / 1000));
+            iLength = recv(socketDesc, scBufferStart, 511, 0);
+            if (iLength < 0) {
+                // Still failed...give up
+                bSuccess = false;
+                break;
             }
-            return nullptr;
         }
+        // If we didn't get 4 byte, we don't have a valid message length, so fail
+        if (iLength < 4) {
+            bSuccess = false;
+            break;
+        }
+        scBufferStart += iLength;
+    } while (iLength < *size && iCount++ < 1);
+    if (!bSuccess) {
+        delete[] scResponse;
+        mtXML.unlock();
+        if (scKey[0] != 0) {
+            OPENSSL_free(scHmac);
+            delete[] scSaltedMessage;
+            delete[] scHmacMessage;
+        }
+        return nullptr;
     }
+    
     scResponse[iLength] = 0;
     mtXML.unlock();
     if (scKey[0] != 0) {
