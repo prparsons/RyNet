@@ -314,6 +314,12 @@ FlightController::~FlightController()
         delete pThreadIr;
     }
 
+    // Clear out any unwanted, unclaimed or orphaned messages.
+    for (std::map<uint32_t, char*>::iterator iter(mapRecv.begin()); iter != mapRecv.end(); iter++)
+    {
+        delete[] iter->second;
+    }
+
     //socket
 }
 
@@ -683,8 +689,9 @@ void FlightController::runRecv(StopSignal ss)
     while (!ss.shouldStop()) {
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
+        // Get a valid frame (size right, unverified)
+        // Frame layout: { uint32_t size, char[32] digest, uint32_t salt, char[] message}
         buffer = recvUdp();
-
         if (buffer) {
             // Verify that the message is valid
             if (!VerifyMessage(buffer + 4)) {
@@ -692,11 +699,13 @@ void FlightController::runRecv(StopSignal ss)
                 delete[] buffer;
                 continue;
             }
+            // Set up salt variable at right point in message
             pSalt = (uint32_t*)(buffer + 4 + 32);
-
+            // Then add it to the receive map
             mtRecv.lock();
             mapRecv[*pSalt] = buffer;
             mtRecv.unlock();
+            // Whatever gets it will clean it up
             buffer = nullptr;
         }
     }
@@ -942,24 +951,28 @@ char* FlightController::GetUdp(uint32_t uSalt, int iTimeoutMs)
     char* buffer = nullptr;
     do {
         mtRecv.lock();
+        // .at() will throw exception if it doesn't exist, so try and get it
         try{
             buffer = mapRecv.at(uSalt);
         } catch (std::out_of_range e)
         {
+            // Only thing to really do here
             buffer = nullptr;
         }
         if (buffer != nullptr) {
+            // If we got a buffer, clear it from the list and exit the loop
             mapRecv.erase(uSalt);
             mtRecv.unlock();
             bFound = true;
         } else {
+            // Didn't find anything, so unlock mutex and check timeout. If time left, then wait.
             mtRecv.unlock();
             if (iTimeoutMs <= 0) return nullptr;
             std::this_thread::sleep_for(std::chrono::milliseconds(iTimeoutMs));
             iTimeoutMs -= 10;
         }
     } while (!bFound);
-
+    // Return whatever was found(nullptr for timeout)
     return buffer;
 }
 
