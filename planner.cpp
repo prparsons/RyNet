@@ -5,6 +5,9 @@
 #include <openssl/evp.h>
 #include <openssl/err.h>
 
+// Messages: uint32_t(size of mesage)32_bytes(hmac digest)uint32_t(salt)
+#define RECV_OFFSET (4 + 32 + 4)
+
 
 EVP_PKEY* hmacCreateKey(const char* _scKey);
 bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** scHmac, char** scSaltAndMessageOut);
@@ -313,19 +316,13 @@ bool FlightController::GetPosition(float& fLat, float& fLon)
 {
     if (pInstance == nullptr) return false;
     char* sc = pInstance->SendRecXML("<pos_retrieve />");
-    if (sc == nullptr) return false;
-    int i;
-    // string is in format "0x00000000LAT\nLON"; 4 byte uint of total message size is first
-    uint32_t size = *((uint32_t*)sc);
-    if (strlen(sc + 4) + 4 != size) {
-        // Going to leave this message in place until I fix the underlying issue
-        printf(" Invalid GetPosition Length %u  %d\n", size, int(strlen(sc + 4)));
-        delete[] sc;
+    if (sc == nullptr) {
         return false;
-    } else {
-        printL("Good Position");
     }
-    char* scNum = sc + 4;
+
+    // Advance 4 bytes for size, 32 for hmac
+    char* scNum = sc + RECV_OFFSET;
+    int i;
     for (i = 0; i < strlen(scNum); i++) {
         if (scNum[i] == '\n') break;
     }
@@ -340,8 +337,10 @@ bool FlightController::GetHeading(float& fHeading)
 {
     if (pInstance == nullptr) return false;
     char* sc = pInstance->SendRecXML("<heading_retrieve />");
-    if (sc == nullptr) return false;
-    fHeading = atof(sc);
+    if (sc == nullptr) {
+        return false;
+    }
+    fHeading = atof(sc + RECV_OFFSET);
     delete[] sc;
     return true;
 }
@@ -349,8 +348,10 @@ bool FlightController::GetHeading(float& fHeading)
 bool FlightController::GetSpeed(float& fSpeedMS)
 {
     char* sc = SendRecXML("<speed_retrieve />");
-    if (sc == nullptr) return false;
-    fSpeedMS = atof(sc);
+    if (sc == nullptr) {
+        return false;
+    }
+    fSpeedMS = atof(sc + RECV_OFFSET);
     delete[] sc;
     return true;
 }
@@ -359,8 +360,10 @@ bool FlightController::GetAltitude(float& fAltitude)
 {
     if (pInstance == nullptr) return false;
     char* sc = pInstance->SendRecXML("<altitude_retrieve />");
-    if (sc == nullptr) return false;
-    fAltitude = atof(sc);
+    if (sc == nullptr) {
+        return false;
+    }
+    fAltitude = atof(sc + RECV_OFFSET);
     delete[] sc;
     return true;
 }
@@ -368,8 +371,10 @@ bool FlightController::GetAltitude(float& fAltitude)
 bool FlightController::GetMode(char* scMode, int iStrLen)
 {
     char* sc = SendRecXML("<mode_retrieve />");
-    if (sc == nullptr) return false;
-    strncpy(scMode, sc, iStrLen);
+    if (sc == nullptr) {
+        return false;
+    }
+    strncpy(scMode, sc + RECV_OFFSET, iStrLen);
     delete sc;
     return true;
 }
@@ -377,8 +382,10 @@ bool FlightController::GetMode(char* scMode, int iStrLen)
 int FlightController::GetBattery()
 {
     char* sc = SendRecXML("<battery_retrieve />");
-    if (sc == nullptr) return -1;
-    int iBattery = atoi(sc);
+    if (sc == nullptr) {
+        return -1;
+    }
+    int iBattery = atoi(sc + RECV_OFFSET);
     delete sc;
     return iBattery;
 }
@@ -688,6 +695,103 @@ void FlightController::SendXML(const char* _scMessage)
     #endif
 }
 
+bool FlightController::VerifyMessage(const char* _scMessage, uint32_t uExpectedSalt)
+{
+    const char* scHmacOrig = _scMessage;
+    const char* scMessage = _scMessage + 32 + 4;
+    size_t uMessageLength = strlen(scMessage);
+    uint32_t* uSalt = (uint32_t*)(_scMessage + 32);
+    const char* scMessageAndSalt = _scMessage + 32;
+    bool bReturn = true;
+
+    // Verify salt is correct (this is already done at the moment...but since this is a verify function...)
+    if (*uSalt != uExpectedSalt) {
+        printf(" Wrong Salt:%d  Expected:%d\n", int(*uSalt), int(uExpectedSalt));
+        return false;
+    }
+
+    // Create the message digest context
+    EVP_MD_CTX* pSslCtx = nullptr;
+    pSslCtx = EVP_MD_CTX_create();
+    if (pSslCtx == nullptr) {
+        printf("EVP_MD_CTX_create failed, error 0x%lx\n", ERR_get_error());
+        return false;
+    }
+    // Get the message digest for sha256
+    const EVP_MD* pMd = EVP_get_digestbyname("SHA256");
+    if(pMd == nullptr) {
+        printf("EVP_get_digestbyname failed, error 0x%lx\n", ERR_get_error());
+        bReturn = false;
+    }
+    // Create the hmac/sha256 digest
+    if (bReturn && (EVP_DigestInit_ex(pSslCtx, pMd, NULL) != 1)) {
+        printf("EVP_DigestInit_ex failed, error 0x%lx\n", ERR_get_error());
+        bReturn = false;
+    }
+
+    // Get the key for the hmac
+    EVP_PKEY* pKey = nullptr;
+    if (bReturn) {
+        pKey = hmacCreateKey(scKey);
+        if (pKey == nullptr) bReturn = false;
+    }
+    
+    // Attach the key to the digest
+    if (bReturn && (EVP_DigestSignInit(pSslCtx, NULL, pMd, NULL, pKey) != 1)) {
+        printf("EVP_DigestSignInit failed, error 0x%lx\n", ERR_get_error());
+        bReturn = false;
+    }
+    
+    // Add the message to the digest
+    if (bReturn && (EVP_DigestSignUpdate(pSslCtx, scMessageAndSalt, uMessageLength + 4) != 1) ) {
+        printf("EVP_DigestSignUpdate failed, error 0x%lx\n", ERR_get_error());
+        bReturn = false;
+    }
+
+    // Get the size of the digest, allocate enough room for the output
+    size_t req = 0;
+    if (bReturn && (EVP_DigestSignFinal(pSslCtx, NULL, &req) != 1)) {
+        printf("EVP_DigestSignFinal failed (1), error 0x%lx\n", ERR_get_error());
+        bReturn = false;
+    }
+    char* scHmac = nullptr;
+    if (bReturn && (req == 0)) {
+        printf("EVP_DigestSignFinal failed (2), error 0x%lx\n", ERR_get_error());
+        bReturn = false;
+    } else {
+        scHmac = (char*)OPENSSL_malloc(req);
+    }
+    if (!scHmac) {
+        printf("OPENSSL_malloc(%d) failed, error 0x%lx\n", int(req), ERR_get_error());
+        bReturn = false;
+    }
+
+    // Get the digest and verify size is correct
+    size_t slen = 0;
+    if (bReturn && (EVP_DigestSignFinal(pSslCtx, (unsigned char*)(scHmac), &slen) != 1)) {
+        printf("EVP_DigestSignFinal failed (3), error 0x%lx\n", ERR_get_error());
+        bReturn = false;
+    }
+    if (bReturn && (req != slen)) {
+        printf("EVP_DigestSignFinal failed, mismatched signature sizes %ld, %ld", req, slen);
+        bReturn = false;
+    }
+
+    if (pSslCtx) EVP_MD_CTX_destroy(pSslCtx); // Renamed EVP_MD_CTX_free in openssl 1.1.0
+    EVP_PKEY_free(pKey);
+    // Now do a quick check to make sure the digest matches (can make this faster by comparing bigger things)
+    if (bReturn) {
+        for (int i = 0; i < slen; i++) {
+            if (scHmac[i] != scHmacOrig[i]) {
+                bReturn = false;
+            }
+        }
+    }
+
+    if (scHmac != nullptr) OPENSSL_free(scHmac);
+    return bReturn;
+}
+
 char* FlightController::SendRecXML(const char* _scMessage)
 {
     #ifdef FLIGHT_CONTROLLER_TCP
@@ -713,8 +817,14 @@ char* FlightController::SendRecXML(const char* _scMessage)
     char* scHmacMessage = nullptr;
     const char* scMessage = _scMessage;
     int iStrLen = strlen(scMessage);
+    // Grab the salt and save it (threads, we'll be using it to verify too)
+    mtXML.lock();
+    int iUsedSalt = iSalt++;
+    mtXML.unlock();
+
+    // Create the message to send
     if (scKey[0] != 0) {
-        if (!hmacMessage(scMessage, scKey, iSalt++, &scHmac, &scSaltedMessage)) {
+        if (!hmacMessage(scMessage, scKey, iUsedSalt, &scHmac, &scSaltedMessage)) {
             printL("Failed to HMAC message");
             return nullptr;
         }
@@ -725,33 +835,83 @@ char* FlightController::SendRecXML(const char* _scMessage)
         iStrLen += 32 + 4;
     }
 
+    // In a big lock, send then recv
     mtXML.lock();
     if (socketDesc < 0) ConnectMavLink();
     sendto(socketDesc, scMessage, iStrLen, MSG_CONFIRM, (const struct sockaddr*)&addressMavLink, sizeof(addressMavLink));
-    char* scResponse = new char[512];
-    int iLength = recv(socketDesc, scResponse, 511, 0);
-    if (iLength < 0) {
-        // It failed, give it __msec then try one more time
-        std::this_thread::sleep_for(std::chrono::milliseconds(iUdpTimeoutUs / 1000));
-        iLength = recv(socketDesc, scResponse, 511, 0);
-        if (iLength < 0) {
-            // Still failed...give up
-            delete[] scResponse;
-            mtXML.unlock();
-            if (scKey[0] != 0) {
-                OPENSSL_free(scHmac);
-                delete[] scSaltedMessage;
-                delete[] scHmacMessage;
+    char* scResponse = new char[1024];
+    char* scBufferStart = scResponse;
+    uint32_t* size = (uint32_t*)scResponse; // Mesage length is beginning of message
+    int iLength = 0;
+    int iCount = 0;
+    bool bSuccess = true;
+    bool bWrongSalt = false;
+    do {
+        do {
+            iLength = recv(socketDesc, scBufferStart, 1023, 0);
+            if (iLength < 0) {
+                // It failed, give it __msec then try one more time
+                std::this_thread::sleep_for(std::chrono::milliseconds(iUdpTimeoutUs / 1000));
+                iLength = recv(socketDesc, scBufferStart, 1023, 0);
+                if (iLength < 0) {
+                    // Still failed...give up
+                    bSuccess = false;
+                    break;
+                }
             }
-            return nullptr;
+            // If we didn't get 4 byte, we don't have a valid message length, so fail
+            if (iLength < 4) {
+                bSuccess = false;
+                break;
+            }
+            // Don't cause problems with a too big "size" for the buffer need to hash or parity or crc message
+            if (*size > 1023) {
+                bSuccess = false;
+                break;
+            }
+            scBufferStart += iLength;
+        } while (iLength < *size && iCount++ < 1); // end of the loop that's trying to get "an entire message"
+
+        if (!bSuccess) break;
+        // Now check that the message that was received is the right one (same salt that we sent was used)
+        if (*((uint32_t*)(scResponse + 4 + 32)) < iUsedSalt) {
+            // If it is wrong, wait another timeout amount before looping
+            bWrongSalt = true;
+            std::this_thread::sleep_for(std::chrono::milliseconds(iUdpTimeoutUs / 1000));
+        } else {
+            bWrongSalt = false;
         }
+    } while (bWrongSalt);
+
+    if (!bSuccess) {
+        delete[] scResponse;
+        mtXML.unlock();
+        if (scKey[0] != 0) {
+            OPENSSL_free(scHmac);
+            delete[] scSaltedMessage;
+            delete[] scHmacMessage;
+        }
+        return nullptr;
     }
-    scResponse[iLength] = 0;
+    // Haven't been seeing this yet, so leaving it in here
+    if (iLength != *size) {
+        printf("Size mismatch: %d  %d\n", iLength, int(*size));
+    }
+    
+    // Set null character at end of the string
+    scResponse[*size] = 0;
     mtXML.unlock();
+    // Unlock and cleanup
     if (scKey[0] != 0) {
         OPENSSL_free(scHmac);
         delete[] scSaltedMessage;
         delete[] scHmacMessage;
+    }
+    // Verify that the message is valid
+    if (!VerifyMessage(scResponse + 4, uint32_t(iUsedSalt))) {
+        printL("Verify Fail");
+        delete[] scResponse;
+        return nullptr;
     }
     return scResponse;
     #endif

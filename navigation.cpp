@@ -459,6 +459,7 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
 
     while (!ss.shouldStop()) {
         sigRGB.wait(1000);
+        // Get new image and process it
         CameraFrame frameNew;
         if (!camera.GetFrameRGB(frameNew)) {
             printL("runNavigator frame was not valid");
