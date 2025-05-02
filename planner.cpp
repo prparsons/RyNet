@@ -315,7 +315,8 @@ FlightController::~FlightController()
 bool FlightController::GetPosition(float& fLat, float& fLon)
 {
     if (pInstance == nullptr) return false;
-    char* sc = pInstance->SendRecXML("<pos_retrieve />");
+    uint32_t uSalt = pInstance->SendRecXML("<pos_retrieve />");
+    char* sc = pInstance->GetUdp(uSalt, 100);
     if (sc == nullptr) {
         return false;
     }
@@ -336,7 +337,8 @@ bool FlightController::GetPosition(float& fLat, float& fLon)
 bool FlightController::GetHeading(float& fHeading)
 {
     if (pInstance == nullptr) return false;
-    char* sc = pInstance->SendRecXML("<heading_retrieve />");
+    uint32_t uSalt = pInstance->SendRecXML("<heading_retrieve />");
+    char* sc = pInstance->GetUdp(uSalt, 100);
     if (sc == nullptr) {
         return false;
     }
@@ -347,7 +349,9 @@ bool FlightController::GetHeading(float& fHeading)
 
 bool FlightController::GetSpeed(float& fSpeedMS)
 {
-    char* sc = SendRecXML("<speed_retrieve />");
+    if (pInstance == nullptr) return false;
+    uint32_t uSalt = pInstance->SendRecXML("<speed_retrieve />");
+    char* sc = pInstance->GetUdp(uSalt, 100);
     if (sc == nullptr) {
         return false;
     }
@@ -359,7 +363,8 @@ bool FlightController::GetSpeed(float& fSpeedMS)
 bool FlightController::GetAltitude(float& fAltitude)
 {
     if (pInstance == nullptr) return false;
-    char* sc = pInstance->SendRecXML("<altitude_retrieve />");
+    uint32_t uSalt = pInstance->SendRecXML("<altitude_retrieve />");
+    char* sc = pInstance->GetUdp(uSalt, 100);
     if (sc == nullptr) {
         return false;
     }
@@ -370,7 +375,9 @@ bool FlightController::GetAltitude(float& fAltitude)
 
 bool FlightController::GetMode(char* scMode, int iStrLen)
 {
-    char* sc = SendRecXML("<mode_retrieve />");
+    if (pInstance == nullptr) return false;
+    uint32_t uSalt = pInstance->SendRecXML("<mode_retrieve />");
+    char* sc = pInstance->GetUdp(uSalt, 100);
     if (sc == nullptr) {
         return false;
     }
@@ -381,9 +388,11 @@ bool FlightController::GetMode(char* scMode, int iStrLen)
 
 int FlightController::GetBattery()
 {
-    char* sc = SendRecXML("<battery_retrieve />");
+    if (pInstance == nullptr) return false;
+    uint32_t uSalt = pInstance->SendRecXML("<battery_retrieve />");
+    char* sc = pInstance->GetUdp(uSalt, 100);
     if (sc == nullptr) {
-        return -1;
+        return false;
     }
     int iBattery = atoi(sc + RECV_OFFSET);
     delete sc;
@@ -672,6 +681,7 @@ void FlightController::runRecv(StopSignal ss)
                 delete[] buffer;
                 continue;
             }
+            pSalt = (uint32_t*)(buffer + 4 + 32);
 
             mtRecv.lock();
             mapRecv[*pSalt] = buffer;
@@ -855,7 +865,7 @@ bool FlightController::VerifyMessage(const char* _scMessage)
     return bReturn;
 }
 
-char* FlightController::SendRecXML(const char* _scMessage)
+uint32_t FlightController::SendRecXML(const char* _scMessage)
 {
     #ifdef FLIGHT_CONTROLLER_TCP
     //Send some data
@@ -882,14 +892,14 @@ char* FlightController::SendRecXML(const char* _scMessage)
     int iStrLen = strlen(scMessage);
     // Grab the salt and save it (threads, we'll be using it to verify too)
     mtXML.lock();
-    int iUsedSalt = iSalt++;
+    int iUsedSalt = ++iSalt;
     mtXML.unlock();
 
     // Create the message to send
     if (scKey[0] != 0) {
         if (!hmacMessage(scMessage, scKey, iUsedSalt, &scHmac, &scSaltedMessage)) {
             printL("Failed to HMAC message");
-            return nullptr;
+            return 0;
         }
         scHmacMessage = new char[32 + 4 + iStrLen];
         memcpy(scHmacMessage, scHmac, 32);
@@ -904,7 +914,7 @@ char* FlightController::SendRecXML(const char* _scMessage)
     sendto(socketDesc, scMessage, iStrLen, MSG_CONFIRM, (const struct sockaddr*)&addressMavLink, sizeof(addressMavLink));
     mtXML.unlock();
     #endif
-    return nullptr;
+    return uint32_t(iUsedSalt);
 }
 
 char* FlightController::GetUdp(uint32_t uSalt, size_t uTimeoutMs)
