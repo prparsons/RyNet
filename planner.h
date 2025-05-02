@@ -90,8 +90,8 @@ private:
 
     void SaveRoute();
     void SendXML(const char* sc);
-    uint32_t SendRecXML(const char* sc);
-    char* GetUdp(uint32_t uSalt, int iTimeoutMs);
+    uint32_t SendRecXML(const char* sc); // Used to send message if you want to be able to get a response
+    char* GetUdp(uint32_t uSalt, int iTimeoutMs); // Used to get any response
     bool VerifyMessage(const char* _scMessage);
     void ConnectMavLink();
 
