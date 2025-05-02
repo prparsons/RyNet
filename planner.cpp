@@ -323,6 +323,7 @@ bool FlightController::GetPosition(float& fLat, float& fLon)
     uint32_t uSalt = pInstance->SendRecXML("<pos_retrieve />");
     char* sc = pInstance->GetUdp(uSalt, 100);
     if (sc == nullptr) {
+        printL(" GetPosition fail");
         return false;
     }
 
@@ -345,6 +346,7 @@ bool FlightController::GetHeading(float& fHeading)
     uint32_t uSalt = pInstance->SendRecXML("<heading_retrieve />");
     char* sc = pInstance->GetUdp(uSalt, 100);
     if (sc == nullptr) {
+        printL(" GetHeading fail");
         return false;
     }
     fHeading = atof(sc + RECV_OFFSET);
@@ -358,6 +360,7 @@ bool FlightController::GetSpeed(float& fSpeedMS)
     uint32_t uSalt = pInstance->SendRecXML("<speed_retrieve />");
     char* sc = pInstance->GetUdp(uSalt, 100);
     if (sc == nullptr) {
+        printL(" GetSpeed fail");
         return false;
     }
     fSpeedMS = atof(sc + RECV_OFFSET);
@@ -371,6 +374,7 @@ bool FlightController::GetAltitude(float& fAltitude)
     uint32_t uSalt = pInstance->SendRecXML("<altitude_retrieve />");
     char* sc = pInstance->GetUdp(uSalt, 100);
     if (sc == nullptr) {
+        printL(" GetAltitude fail");
         return false;
     }
     fAltitude = atof(sc + RECV_OFFSET);
@@ -384,6 +388,7 @@ bool FlightController::GetMode(char* scMode, int iStrLen)
     uint32_t uSalt = pInstance->SendRecXML("<mode_retrieve />");
     char* sc = pInstance->GetUdp(uSalt, 100);
     if (sc == nullptr) {
+        printL(" GetMode fail");
         return false;
     }
     strncpy(scMode, sc + RECV_OFFSET, iStrLen);
@@ -397,6 +402,7 @@ int FlightController::GetBattery()
     uint32_t uSalt = pInstance->SendRecXML("<battery_retrieve />");
     char* sc = pInstance->GetUdp(uSalt, 100);
     if (sc == nullptr) {
+        printL(" GetBattery fail");
         return false;
     }
     int iBattery = atoi(sc + RECV_OFFSET);
