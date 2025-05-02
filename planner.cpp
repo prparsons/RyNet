@@ -656,18 +656,82 @@ void FlightController::runIr(Signal sig, StopSignal ss)
 void FlightController::runRecv(StopSignal ss)
 {
     printL("FlightController::runRecv");
+
+    char* buffer = nullptr;
+    uint32_t* pSalt = nullptr;
+
     while (!ss.shouldStop()) {
-        //wait
-        char* buffer = nullptr;
-        uint32_t* pSalt = nullptr;
-        // recv()
+        //wait std::this_thread::sleep_for(std::chrono::milliseconds(iUdpTimeoutUs / 1000));
+
+        buffer = recvUdp();
+
         if (buffer) {
+            pSalt = (uint32_t*)(buffer + 4 + 32);
+
+            // // Verify that the message is valid
+            // if (!VerifyMessage(scResponse + 4, uint32_t(iUsedSalt))) {
+            //     printL("Verify Fail");
+            //     delete[] scResponse;
+            //     return nullptr;
+            // }
+
             mtRecv.lock();
             mapRecv[*pSalt] = buffer;
-            buffer = nullptr;
             mtRecv.unlock();
+            buffer = nullptr;
         }
     }
+}
+
+char* FlightController::recvUdp()
+{
+    mtXML.lock();
+    char* scResponse = new char[1024];
+    char* scBufferStart = scResponse;
+    uint32_t* size = (uint32_t*)scResponse; // Mesage length is beginning of message
+    int iLength = 0;
+    int iCount = 0;
+    bool bSuccess = true;
+    do {
+        iLength = recv(socketDesc, scBufferStart, 1023, 0);
+        if (iLength < 0) {
+            // It failed, give it __msec then try one more time
+            std::this_thread::sleep_for(std::chrono::milliseconds(iUdpTimeoutUs / 1000));
+            iLength = recv(socketDesc, scBufferStart, 1023, 0);
+            if (iLength < 0) {
+                // Still failed...give up
+                bSuccess = false;
+                break;
+            }
+        }
+        // If we didn't get 4 byte, we don't have a valid message length, so fail
+        if (iLength < 4) {
+            bSuccess = false;
+            break;
+        }
+        // Don't cause problems with a too big "size" for the buffer need to hash or parity or crc message
+        if (*size > 1023) {
+            bSuccess = false;
+            break;
+        }
+        scBufferStart += iLength;
+    } while (iLength < *size && iCount++ < 1); // end of the loop that's trying to get "an entire message"
+
+    if (!bSuccess) {
+        delete[] scResponse;
+        mtXML.unlock();
+        return nullptr;
+    }
+    // Haven't been seeing this yet, so leaving it in here
+    if (iLength != *size) {
+        printf("Size mismatch: %d  %d\n", iLength, int(*size));
+    }
+    
+    // Set null character at end of the string
+    scResponse[*size] = 0;
+    mtXML.unlock();
+
+    return scResponse;
 }
 
 void FlightController::SendXML(const char* _scMessage)

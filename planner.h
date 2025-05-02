@@ -99,6 +99,7 @@ private:
     void runPointLogger(StopSignal ss); // Thread function to continuously retrieve and store visited points when in guided mode
     void runIr(Signal sig, StopSignal ss);
     void runRecv(StopSignal ss); // Thread that recv's UDP packet and stores them in a map according to salt
+    char* recvUdp();
 
     DataLogger& logger;
     CameraController& camera;
