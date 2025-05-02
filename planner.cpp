@@ -653,6 +653,23 @@ void FlightController::runIr(Signal sig, StopSignal ss)
     }
 }
 
+void FlightController::runRecv(StopSignal ss)
+{
+    printL("FlightController::runRecv");
+    while (!ss.shouldStop()) {
+        //wait
+        char* buffer = nullptr;
+        uint32_t* pSalt = nullptr;
+        // recv()
+        if (buffer) {
+            mtRecv.lock();
+            mapRecv[*pSalt] = buffer;
+            buffer = nullptr;
+            mtRecv.unlock();
+        }
+    }
+}
+
 void FlightController::SendXML(const char* _scMessage)
 {
     #ifdef FLIGHT_CONTROLLER_TCP
@@ -915,6 +932,32 @@ char* FlightController::SendRecXML(const char* _scMessage)
     }
     return scResponse;
     #endif
+}
+
+char* FlightController::RecvUdp(uint32_t uSalt, size_t uTimeoutMs)
+{
+    /*std::map<uint32_t, char*> mapRecv;ThreadMutex mtXML; */
+    bool bFound = false;    
+    char* buffer = nullptr;
+    do {
+        //recv stuff
+        mtRecv.lock();
+        try{
+            buffer = mapRecv.at(uSalt);
+        } catch (std::out_of_range e)
+        {
+            buffer = nullptr;
+        }
+        mtRecv.unlock();
+        if (buffer != nullptr) {
+            // delete from map
+            bFound = true;
+        } else {
+            //wait
+        }
+    } while (!bFound);
+
+    return buffer;
 }
 
 void FlightController::ConnectMavLink()

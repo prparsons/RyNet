@@ -91,25 +91,30 @@ private:
     void SaveRoute();
     void SendXML(const char* sc);
     char* SendRecXML(const char* sc);
+    char* RecvUdp(uint32_t uSalt, size_t uTimeoutMs);
     bool VerifyMessage(const char* _scMessage, uint32_t uExpectedSalt);
     void ConnectMavLink();
 
     void runDepth(Signal sig, StopSignal ss); // Thread function to continuously send depth info for obstacle avoidance
     void runPointLogger(StopSignal ss); // Thread function to continuously retrieve and store visited points when in guided mode
     void runIr(Signal sig, StopSignal ss);
+    void runRecv(StopSignal ss); // Thread that recv's UDP packet and stores them in a map according to salt
 
     DataLogger& logger;
     CameraController& camera;
     std::thread* pThreadDepth;
     std::thread* pThreadPoint;
     std::thread* pThreadIr;
+    std::thread* pThreadRecv;
     
     Signal sigCameraDepth;
     Signal sigIr;
     StopSignal ssDepth;
     StopSignal ssPtLog;
     StopSignal ssIr;
+    StopSignal ssRecv;
     ThreadMutex mtXML;
+    ThreadMutex mtRecv;
 
     struct sockaddr_in addressMavLink;
     int socketDesc;
@@ -124,5 +129,6 @@ private:
     int iMissionSpeedMS;
     int iExtraGuidedDistance;
     int iRouteCleanType;
+    std::map<uint32_t, char*> mapRecv;
 };
 
