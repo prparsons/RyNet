@@ -91,7 +91,7 @@ private:
     void SaveRoute();
     void SendXML(const char* sc);
     char* SendRecXML(const char* sc);
-    bool VerifyMessage(const char* _scMessage);
+    bool VerifyMessage(const char* _scMessage, uint32_t uExpectedSalt);
     void ConnectMavLink();
 
     void runDepth(Signal sig, StopSignal ss); // Thread function to continuously send depth info for obstacle avoidance

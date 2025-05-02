@@ -311,15 +311,15 @@ FlightController::~FlightController()
 
 bool FlightController::GetPosition(float& fLat, float& fLon)
 {
+    printf("GetPosition\n");
     if (pInstance == nullptr) return false;
     char* sc = pInstance->SendRecXML("<pos_retrieve />");
-    if (sc == nullptr) return false;
-    if (!pInstance->VerifyMessage(sc + 4)) {
-        printL("GetPosition verify fail");
-        delete[] sc;
+    if (sc == nullptr) {
         return false;
     }
-    char* scNum = sc + 4 + 32;
+
+    // Advance 4 bytes for size, 32 for hmac
+    char* scNum = sc + 4 + 32 + 4;
     printf("%s\n", scNum);
     int i;
     for (i = 0; i < strlen(scNum); i++) {
@@ -336,8 +336,10 @@ bool FlightController::GetHeading(float& fHeading)
 {
     if (pInstance == nullptr) return false;
     char* sc = pInstance->SendRecXML("<heading_retrieve />");
-    if (sc == nullptr) return false;
-    fHeading = atof(sc + 4);
+    if (sc == nullptr) {
+        return false;
+    }
+    fHeading = atof(sc + 4 + 32 + 4);
     delete[] sc;
     return true;
 }
@@ -345,8 +347,10 @@ bool FlightController::GetHeading(float& fHeading)
 bool FlightController::GetSpeed(float& fSpeedMS)
 {
     char* sc = SendRecXML("<speed_retrieve />");
-    if (sc == nullptr) return false;
-    fSpeedMS = atof(sc + 4);
+    if (sc == nullptr) {
+        return false;
+    }
+    fSpeedMS = atof(sc + 4 + 32 + 4);
     delete[] sc;
     return true;
 }
@@ -355,8 +359,10 @@ bool FlightController::GetAltitude(float& fAltitude)
 {
     if (pInstance == nullptr) return false;
     char* sc = pInstance->SendRecXML("<altitude_retrieve />");
-    if (sc == nullptr) return false;
-    fAltitude = atof(sc + 4);
+    if (sc == nullptr) {
+        return false;
+    }
+    fAltitude = atof(sc + 4 + 32 + 4);
     delete[] sc;
     return true;
 }
@@ -364,8 +370,10 @@ bool FlightController::GetAltitude(float& fAltitude)
 bool FlightController::GetMode(char* scMode, int iStrLen)
 {
     char* sc = SendRecXML("<mode_retrieve />");
-    if (sc == nullptr) return false;
-    strncpy(scMode, sc + 4, iStrLen);
+    if (sc == nullptr) {
+        return false;
+    }
+    strncpy(scMode, sc + 4 + 32 + 4, iStrLen);
     delete sc;
     return true;
 }
@@ -373,8 +381,10 @@ bool FlightController::GetMode(char* scMode, int iStrLen)
 int FlightController::GetBattery()
 {
     char* sc = SendRecXML("<battery_retrieve />");
-    if (sc == nullptr) return -1;
-    int iBattery = atoi(sc + 4);
+    if (sc == nullptr) {
+        return -1;
+    }
+    int iBattery = atoi(sc + 4 + 32 + 4);
     delete sc;
     return iBattery;
 }
@@ -684,12 +694,20 @@ void FlightController::SendXML(const char* _scMessage)
     #endif
 }
 
-bool FlightController::VerifyMessage(const char* _scMessage)
+bool FlightController::VerifyMessage(const char* _scMessage, uint32_t uExpectedSalt)
 {
+    //@todo need to update this to re-use the sending salt
     const char* scHmacOrig = _scMessage;
-    const char* scMessage = _scMessage + 32;
+    const char* scMessage = _scMessage + 32 + 4;
     size_t uMessageLength = strlen(scMessage);
+    uint32_t* uSalt = (uint32_t*)(_scMessage + 32);
+    const char* scMessageAndSalt = _scMessage + 32;
     bool bReturn = true;
+
+    if (*uSalt != uExpectedSalt) {
+        printf(" Wrong Salt:%d  Expected:%d\n", int(*uSalt), int(uExpectedSalt));
+        return false;
+    }
 
     // Create the message digest context
     EVP_MD_CTX* pSslCtx = nullptr;
@@ -724,7 +742,7 @@ bool FlightController::VerifyMessage(const char* _scMessage)
     }
     
     // Add the message to the digest
-    if (bReturn && (EVP_DigestSignUpdate(pSslCtx, scMessage, uMessageLength) != 1) ) {
+    if (bReturn && (EVP_DigestSignUpdate(pSslCtx, scMessageAndSalt, uMessageLength + 4) != 1) ) {
         printf("EVP_DigestSignUpdate failed, error 0x%lx\n", ERR_get_error());
         bReturn = false;
     }
@@ -801,8 +819,11 @@ char* FlightController::SendRecXML(const char* _scMessage)
     char* scHmacMessage = nullptr;
     const char* scMessage = _scMessage;
     int iStrLen = strlen(scMessage);
+    mtXML.lock();
+    int iUsedSalt = iSalt++;
+    mtXML.unlock();
     if (scKey[0] != 0) {
-        if (!hmacMessage(scMessage, scKey, iSalt++, &scHmac, &scSaltedMessage)) {
+        if (!hmacMessage(scMessage, scKey, iUsedSalt, &scHmac, &scSaltedMessage)) {
             printL("Failed to HMAC message");
             return nullptr;
         }
@@ -816,36 +837,47 @@ char* FlightController::SendRecXML(const char* _scMessage)
     mtXML.lock();
     if (socketDesc < 0) ConnectMavLink();
     sendto(socketDesc, scMessage, iStrLen, MSG_CONFIRM, (const struct sockaddr*)&addressMavLink, sizeof(addressMavLink));
-    char* scResponse = new char[512];
+    char* scResponse = new char[1024];
     char* scBufferStart = scResponse;
     uint32_t* size = (uint32_t*)scResponse; // Mesage length is beginning of message
     int iLength = 0;
     int iCount = 0;
     bool bSuccess = true;
+    bool bWrongSalt = false;
     do {
-        iLength = recv(socketDesc, scBufferStart, 511, 0);
-        if (iLength < 0) {
-            // It failed, give it __msec then try one more time
-            std::this_thread::sleep_for(std::chrono::milliseconds(iUdpTimeoutUs / 1000));
-            iLength = recv(socketDesc, scBufferStart, 511, 0);
+        do {
+            iLength = recv(socketDesc, scBufferStart, 1023, 0);
             if (iLength < 0) {
-                // Still failed...give up
+                // It failed, give it __msec then try one more time
+                std::this_thread::sleep_for(std::chrono::milliseconds(iUdpTimeoutUs / 1000));
+                iLength = recv(socketDesc, scBufferStart, 1023, 0);
+                if (iLength < 0) {
+                    // Still failed...give up
+                    bSuccess = false;
+                    break;
+                }
+            }
+            // If we didn't get 4 byte, we don't have a valid message length, so fail
+            if (iLength < 4) {
                 bSuccess = false;
                 break;
             }
+            // Don't cause problems with a too big "size" for the buffer need to hash or parity or crc message
+            if (*size > 1023) {
+                bSuccess = false;
+                break;
+            }
+            scBufferStart += iLength;
+        } while (iLength < *size && iCount++ < 1);
+        if (*((uint32_t*)(scResponse + 4 + 32)) < iUsedSalt) {
+            bWrongSalt = true;
+            //printL("Looping for wrong salt");
+            std::this_thread::sleep_for(std::chrono::milliseconds(iUdpTimeoutUs / 1000));
+        } else {
+            //printf("  Used:%d  Got:%d\n", iUsedSalt, int(*((uint32_t*)(scResponse + 4 + 32))));
+            bWrongSalt = false;
         }
-        // If we didn't get 4 byte, we don't have a valid message length, so fail
-        if (iLength < 4) {
-            bSuccess = false;
-            break;
-        }
-        // Don't cause problems with a too big "size" for the buffer need to hash or parity or crc message
-        if (*size > 511) {
-            bSuccess = false;
-            break;
-        }
-        scBufferStart += iLength;
-    } while (iLength < *size && iCount++ < 1);
+    } while (bWrongSalt);
     if (!bSuccess) {
         delete[] scResponse;
         mtXML.unlock();
@@ -856,6 +888,9 @@ char* FlightController::SendRecXML(const char* _scMessage)
         }
         return nullptr;
     }
+    if (iLength != *size) {
+        printf("Size mismatch: %d  %d\n", iLength, int(*size));
+    }
     
     scResponse[*size] = 0;
     mtXML.unlock();
@@ -863,6 +898,11 @@ char* FlightController::SendRecXML(const char* _scMessage)
         OPENSSL_free(scHmac);
         delete[] scSaltedMessage;
         delete[] scHmacMessage;
+    }
+    if (!VerifyMessage(scResponse + 4, uint32_t(iUsedSalt))) {
+        printL("Verify Fail");
+        delete[] scResponse;
+        return nullptr;
     }
     return scResponse;
     #endif
