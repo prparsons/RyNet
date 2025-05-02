@@ -375,7 +375,7 @@ bool FlightController::GetMode(char* scMode, int iStrLen)
         return false;
     }
     strncpy(scMode, sc + RECV_OFFSET, iStrLen);
-    delete sc;
+    delete[] sc;
     return true;
 }
 
@@ -386,12 +386,21 @@ int FlightController::GetBattery()
         return -1;
     }
     int iBattery = atoi(sc + RECV_OFFSET);
-    delete sc;
+    delete[] sc;
     return iBattery;
 }
 
 Route* FlightController::GetRoute()
 {
+    char* sc = SendRecXML("<route_retrieve />");
+    if (sc == nullptr) {
+        printL("GetRoute failed");
+        return nullptr;
+    }
+    char* scRoute = sc + RECV_OFFSET;
+    delete[] sc;
+    
+    printf(" Route:\n%s\n", scRoute);
     return nullptr;
 }
 

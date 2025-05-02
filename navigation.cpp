@@ -457,6 +457,8 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
     detector.Start();
     segmenter.Start();
 
+    control.GetRoute();
+
     while (!ss.shouldStop()) {
         sigRGB.wait(1000);
         // Get new image and process it

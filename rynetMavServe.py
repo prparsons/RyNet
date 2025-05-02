@@ -604,6 +604,7 @@ def cmdRouteRestore(vehicle, element):
 def cmdRoutRetrieve(vehicle, UDPServerSocket, address, saltBytes):
     missionList = download_mission(vehicle)
     missionStr = mission_to_str(missionList)
+    print(missionStr)
     sendReply(UDPServerSocket, address, missionStr, saltBytes)
 
 def cmdPosRetrieve(vehicle, UDPServerSocket, address, saltBytes):

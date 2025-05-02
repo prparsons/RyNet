@@ -40,9 +40,24 @@ private:
 };
 
 class Route
-{
-    float fLat;
-    float fLon;
+{//20      0       10      16      0.0     0.0     0.0     0.0     39.45755386352539       -105.05416870117188     100.0   1
+
+    struct command {
+        int i;
+        int j;
+        int k;
+        int l;
+        float a;
+        float b;
+        float c;
+        float d;
+        float lat;
+        float lon
+        float e;
+        int x;
+    };
+
+    command cmd;
     Route* pNext;
 };
 
