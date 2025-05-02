@@ -661,19 +661,17 @@ void FlightController::runRecv(StopSignal ss)
     uint32_t* pSalt = nullptr;
 
     while (!ss.shouldStop()) {
-        //wait std::this_thread::sleep_for(std::chrono::milliseconds(iUdpTimeoutUs / 1000));
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
         buffer = recvUdp();
 
         if (buffer) {
-            pSalt = (uint32_t*)(buffer + 4 + 32);
-
-            // // Verify that the message is valid
-            // if (!VerifyMessage(scResponse + 4, uint32_t(iUsedSalt))) {
-            //     printL("Verify Fail");
-            //     delete[] scResponse;
-            //     return nullptr;
-            // }
+            // Verify that the message is valid
+            if (!VerifyMessage(buffer + 4)) {
+                printL("Verify Fail");
+                delete[] buffer;
+                continue;
+            }
 
             mtRecv.lock();
             mapRecv[*pSalt] = buffer;
@@ -694,18 +692,9 @@ char* FlightController::recvUdp()
     bool bSuccess = true;
     do {
         iLength = recv(socketDesc, scBufferStart, 1023, 0);
-        if (iLength < 0) {
-            // It failed, give it __msec then try one more time
-            std::this_thread::sleep_for(std::chrono::milliseconds(iUdpTimeoutUs / 1000));
-            iLength = recv(socketDesc, scBufferStart, 1023, 0);
-            if (iLength < 0) {
-                // Still failed...give up
-                bSuccess = false;
-                break;
-            }
-        }
+
         // If we didn't get 4 byte, we don't have a valid message length, so fail
-        if (iLength < 4) {
+        if (iLength < 4 + 32 + 4) {
             bSuccess = false;
             break;
         }
@@ -776,20 +765,13 @@ void FlightController::SendXML(const char* _scMessage)
     #endif
 }
 
-bool FlightController::VerifyMessage(const char* _scMessage, uint32_t uExpectedSalt)
+bool FlightController::VerifyMessage(const char* _scMessage)
 {
     const char* scHmacOrig = _scMessage;
     const char* scMessage = _scMessage + 32 + 4;
     size_t uMessageLength = strlen(scMessage);
-    uint32_t* uSalt = (uint32_t*)(_scMessage + 32);
     const char* scMessageAndSalt = _scMessage + 32;
     bool bReturn = true;
-
-    // Verify salt is correct (this is already done at the moment...but since this is a verify function...)
-    if (*uSalt != uExpectedSalt) {
-        printf(" Wrong Salt:%d  Expected:%d\n", int(*uSalt), int(uExpectedSalt));
-        return false;
-    }
 
     // Create the message digest context
     EVP_MD_CTX* pSslCtx = nullptr;
@@ -920,91 +902,16 @@ char* FlightController::SendRecXML(const char* _scMessage)
     mtXML.lock();
     if (socketDesc < 0) ConnectMavLink();
     sendto(socketDesc, scMessage, iStrLen, MSG_CONFIRM, (const struct sockaddr*)&addressMavLink, sizeof(addressMavLink));
-    char* scResponse = new char[1024];
-    char* scBufferStart = scResponse;
-    uint32_t* size = (uint32_t*)scResponse; // Mesage length is beginning of message
-    int iLength = 0;
-    int iCount = 0;
-    bool bSuccess = true;
-    bool bWrongSalt = false;
-    do {
-        do {
-            iLength = recv(socketDesc, scBufferStart, 1023, 0);
-            if (iLength < 0) {
-                // It failed, give it __msec then try one more time
-                std::this_thread::sleep_for(std::chrono::milliseconds(iUdpTimeoutUs / 1000));
-                iLength = recv(socketDesc, scBufferStart, 1023, 0);
-                if (iLength < 0) {
-                    // Still failed...give up
-                    bSuccess = false;
-                    break;
-                }
-            }
-            // If we didn't get 4 byte, we don't have a valid message length, so fail
-            if (iLength < 4) {
-                bSuccess = false;
-                break;
-            }
-            // Don't cause problems with a too big "size" for the buffer need to hash or parity or crc message
-            if (*size > 1023) {
-                bSuccess = false;
-                break;
-            }
-            scBufferStart += iLength;
-        } while (iLength < *size && iCount++ < 1); // end of the loop that's trying to get "an entire message"
-
-        if (!bSuccess) break;
-        // Now check that the message that was received is the right one (same salt that we sent was used)
-        if (*((uint32_t*)(scResponse + 4 + 32)) < iUsedSalt) {
-            // If it is wrong, wait another timeout amount before looping
-            bWrongSalt = true;
-            std::this_thread::sleep_for(std::chrono::milliseconds(iUdpTimeoutUs / 1000));
-        } else {
-            bWrongSalt = false;
-        }
-    } while (bWrongSalt);
-
-    if (!bSuccess) {
-        delete[] scResponse;
-        mtXML.unlock();
-        if (scKey[0] != 0) {
-            OPENSSL_free(scHmac);
-            delete[] scSaltedMessage;
-            delete[] scHmacMessage;
-        }
-        return nullptr;
-    }
-    // Haven't been seeing this yet, so leaving it in here
-    if (iLength != *size) {
-        printf("Size mismatch: %d  %d\n", iLength, int(*size));
-    }
-    
-    // Set null character at end of the string
-    scResponse[*size] = 0;
     mtXML.unlock();
-    // Unlock and cleanup
-    if (scKey[0] != 0) {
-        OPENSSL_free(scHmac);
-        delete[] scSaltedMessage;
-        delete[] scHmacMessage;
-    }
-    // Verify that the message is valid
-    if (!VerifyMessage(scResponse + 4, uint32_t(iUsedSalt))) {
-        printL("Verify Fail");
-        delete[] scResponse;
-        return nullptr;
-    }
-    return scResponse;
     #endif
+    return nullptr;
 }
 
-char* FlightController::RecvUdp(uint32_t uSalt, size_t uTimeoutMs)
+char* FlightController::GetUdp(uint32_t uSalt, size_t uTimeoutMs)
 {
-    /*std::map<uint32_t, char*> mapRecv;ThreadMutex mtXML; */
     bool bFound = false;    
     char* buffer = nullptr;
     do {
-        //recv stuff
         mtRecv.lock();
         try{
             buffer = mapRecv.at(uSalt);
@@ -1012,12 +919,13 @@ char* FlightController::RecvUdp(uint32_t uSalt, size_t uTimeoutMs)
         {
             buffer = nullptr;
         }
-        mtRecv.unlock();
         if (buffer != nullptr) {
-            // delete from map
+            mapRecv.erase(uSalt);
+            mtRecv.unlock();
             bFound = true;
         } else {
-            //wait
+            mtRecv.unlock();
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     } while (!bFound);
 
