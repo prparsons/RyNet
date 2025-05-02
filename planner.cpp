@@ -166,7 +166,7 @@ FlightController::FlightController(DataLogger& _logger, CameraController& _camer
 , pThreadIr(nullptr)
 , sigCameraDepth(_camera.GetSignalDepth())
 , socketDesc(-1)
-, iSalt(0)
+, iSalt(1)
 , iUdpTimeoutUs(100000)
 , iMaxDist(-1)
 , fHomeLat(0)
@@ -219,6 +219,7 @@ void FlightController::Start(bool bStartDepth, bool bStartPointLogger, bool bSta
 void FlightController::Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr)
 {
     printL("FlightController::Start");
+    pThreadRecv = new std::thread(&FlightController::runRecv, this, ssRecv);
     if (bStartDepth) {
         pThreadDepth = new std::thread(&FlightController::runDepth, this, sigCameraDepth, ssDepth);
     }
@@ -293,6 +294,10 @@ void FlightController::SetRouteClean(int iClean)
 FlightController::~FlightController()
 {
     printL("FlightController::~FlightController");
+    ssRecv.stop();
+    if (pThreadRecv->joinable()) pThreadRecv->join();
+    delete pThreadRecv;
+
     if (pThreadDepth != nullptr) {
         ssDepth.stop();
         if (pThreadDepth->joinable()) pThreadDepth->join();
@@ -892,8 +897,7 @@ uint32_t FlightController::SendRecXML(const char* _scMessage)
     int iStrLen = strlen(scMessage);
     // Grab the salt and save it (threads, we'll be using it to verify too)
     mtXML.lock();
-    int iUsedSalt = ++iSalt;
-    mtXML.unlock();
+    int iUsedSalt = iSalt++;
 
     // Create the message to send
     if (scKey[0] != 0) {
@@ -908,8 +912,6 @@ uint32_t FlightController::SendRecXML(const char* _scMessage)
         iStrLen += 32 + 4;
     }
 
-    // In a big lock, send then recv
-    mtXML.lock();
     if (socketDesc < 0) ConnectMavLink();
     sendto(socketDesc, scMessage, iStrLen, MSG_CONFIRM, (const struct sockaddr*)&addressMavLink, sizeof(addressMavLink));
     mtXML.unlock();
@@ -917,7 +919,7 @@ uint32_t FlightController::SendRecXML(const char* _scMessage)
     return uint32_t(iUsedSalt);
 }
 
-char* FlightController::GetUdp(uint32_t uSalt, size_t uTimeoutMs)
+char* FlightController::GetUdp(uint32_t uSalt, int iTimeoutMs)
 {
     bool bFound = false;    
     char* buffer = nullptr;
@@ -935,7 +937,9 @@ char* FlightController::GetUdp(uint32_t uSalt, size_t uTimeoutMs)
             bFound = true;
         } else {
             mtRecv.unlock();
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            if (iTimeoutMs <= 0) return nullptr;
+            std::this_thread::sleep_for(std::chrono::milliseconds(iTimeoutMs));
+            iTimeoutMs -= 10;
         }
     } while (!bFound);
 

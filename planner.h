@@ -91,7 +91,7 @@ private:
     void SaveRoute();
     void SendXML(const char* sc);
     uint32_t SendRecXML(const char* sc);
-    char* GetUdp(uint32_t uSalt, size_t uTimeoutMs);
+    char* GetUdp(uint32_t uSalt, int iTimeoutMs);
     bool VerifyMessage(const char* _scMessage);
     void ConnectMavLink();
 
