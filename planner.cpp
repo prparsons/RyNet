@@ -166,7 +166,7 @@ FlightController::FlightController(DataLogger& _logger, CameraController& _camer
 , pThreadIr(nullptr)
 , sigCameraDepth(_camera.GetSignalDepth())
 , socketDesc(-1)
-, iSalt(1)
+, uSalt(1)
 , iUdpTimeoutUs(100000)
 , iMaxDist(-1)
 , fHomeLat(0)
@@ -711,6 +711,11 @@ char* FlightController::recvUdp()
     int iLength = 0;
     int iCount = 0;
     bool bSuccess = true;
+
+    if (socketDesc < 0) { // Not initialized yet, let send do it
+        mtXML.unlock();
+        return nullptr;
+    }
     do {
         iLength = recv(socketDesc, scBufferStart, 1023, 0);
 
@@ -761,8 +766,12 @@ void FlightController::SendXML(const char* _scMessage)
     char* scHmacMessage = nullptr;
     const char* scMessage = _scMessage;
     int iStrLen = strlen(scMessage);
+    mtXML.lock();
+    uint32_t usedSalt = uSalt++;
+    mtXML.unlock();
+
     if (scKey[0] != 0) {
-        if (!hmacMessage(scMessage, scKey, iSalt++, &scHmac, &scSaltedMessage)) {
+        if (!hmacMessage(scMessage, scKey, usedSalt, &scHmac, &scSaltedMessage)) {
             printL("Failed to HMAC message");
             return;
         }
@@ -903,11 +912,12 @@ uint32_t FlightController::SendRecXML(const char* _scMessage)
     int iStrLen = strlen(scMessage);
     // Grab the salt and save it (threads, we'll be using it to verify too)
     mtXML.lock();
-    int iUsedSalt = iSalt++;
+    uint32_t usedSalt = uSalt++;
+    mtXML.unlock();
 
     // Create the message to send
     if (scKey[0] != 0) {
-        if (!hmacMessage(scMessage, scKey, iUsedSalt, &scHmac, &scSaltedMessage)) {
+        if (!hmacMessage(scMessage, scKey, usedSalt, &scHmac, &scSaltedMessage)) {
             printL("Failed to HMAC message");
             return 0;
         }
@@ -918,11 +928,12 @@ uint32_t FlightController::SendRecXML(const char* _scMessage)
         iStrLen += 32 + 4;
     }
 
+    mtXML.lock();
     if (socketDesc < 0) ConnectMavLink();
     sendto(socketDesc, scMessage, iStrLen, MSG_CONFIRM, (const struct sockaddr*)&addressMavLink, sizeof(addressMavLink));
     mtXML.unlock();
     #endif
-    return uint32_t(iUsedSalt);
+    return usedSalt;
 }
 
 char* FlightController::GetUdp(uint32_t uSalt, int iTimeoutMs)

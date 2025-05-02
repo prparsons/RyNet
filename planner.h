@@ -124,7 +124,7 @@ private:
     char scMavLinkAddress[32];
     const int iMavlinkPort = 3636;
     char scKey[33];
-    int iSalt;
+    uint32_t uSalt;
     float fHomeLat;
     float fHomeLon;
     int iMissionSpeedMS;
