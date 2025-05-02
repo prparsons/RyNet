@@ -314,15 +314,20 @@ bool FlightController::GetPosition(float& fLat, float& fLon)
     if (pInstance == nullptr) return false;
     char* sc = pInstance->SendRecXML("<pos_retrieve />");
     if (sc == nullptr) return false;
-    int i;
-    char* scPos = sc + 4;
-    // string is in format "LAT\nLON"
-    for (i = 0; i < strlen(scPos); i++) {
-        if (scPos[i] == '\n') break;
+    if (!pInstance->VerifyMessage(sc + 4)) {
+        printL("GetPosition verify fail");
+        delete[] sc;
+        return false;
     }
-    scPos[i] = 0;
-    fLat = float(atof(scPos));
-    fLon = float(atof(scPos + i + 1));
+    char* scNum = sc + 4 + 32;
+    printf("%s\n", scNum);
+    int i;
+    for (i = 0; i < strlen(scNum); i++) {
+        if (scNum[i] == '\n') break;
+    }
+    scNum[i] = 0;
+    fLat = float(atof(scNum));
+    fLon = float(atof(scNum + i + 1));
     delete[] sc;
     return true;
 }
@@ -679,6 +684,98 @@ void FlightController::SendXML(const char* _scMessage)
     #endif
 }
 
+bool FlightController::VerifyMessage(const char* _scMessage)
+{
+    const char* scHmacOrig = _scMessage;
+    const char* scMessage = _scMessage + 32;
+    size_t uMessageLength = strlen(scMessage);
+    bool bReturn = true;
+
+    // Create the message digest context
+    EVP_MD_CTX* pSslCtx = nullptr;
+    pSslCtx = EVP_MD_CTX_create();
+    if (pSslCtx == nullptr) {
+        printf("EVP_MD_CTX_create failed, error 0x%lx\n", ERR_get_error());
+        return false;
+    }
+    // Get the message digest for sha256
+    const EVP_MD* pMd = EVP_get_digestbyname("SHA256");
+    if(pMd == nullptr) {
+        printf("EVP_get_digestbyname failed, error 0x%lx\n", ERR_get_error());
+        bReturn = false;
+    }
+    // Create the hmac/sha256 digest
+    if (bReturn && (EVP_DigestInit_ex(pSslCtx, pMd, NULL) != 1)) {
+        printf("EVP_DigestInit_ex failed, error 0x%lx\n", ERR_get_error());
+        bReturn = false;
+    }
+
+    // Get the key for the hmac
+    EVP_PKEY* pKey = nullptr;
+    if (bReturn) {
+        pKey = hmacCreateKey(scKey);
+        if (pKey == nullptr) bReturn = false;
+    }
+    
+    // Attach the key to the digest
+    if (bReturn && (EVP_DigestSignInit(pSslCtx, NULL, pMd, NULL, pKey) != 1)) {
+        printf("EVP_DigestSignInit failed, error 0x%lx\n", ERR_get_error());
+        bReturn = false;
+    }
+    
+    // Add the message to the digest
+    if (bReturn && (EVP_DigestSignUpdate(pSslCtx, scMessage, uMessageLength) != 1) ) {
+        printf("EVP_DigestSignUpdate failed, error 0x%lx\n", ERR_get_error());
+        bReturn = false;
+    }
+
+    // Get the size of the digest, allocate enough room for the output
+    size_t req = 0;
+    if (bReturn && (EVP_DigestSignFinal(pSslCtx, NULL, &req) != 1)) {
+        printf("EVP_DigestSignFinal failed (1), error 0x%lx\n", ERR_get_error());
+        bReturn = false;
+    }
+    char* scHmac = nullptr;
+    if (bReturn && (req == 0)) {
+        printf("EVP_DigestSignFinal failed (2), error 0x%lx\n", ERR_get_error());
+        bReturn = false;
+    } else {
+        scHmac = (char*)OPENSSL_malloc(req);
+    }
+    if (!scHmac) {
+        printf("OPENSSL_malloc(%d) failed, error 0x%lx\n", int(req), ERR_get_error());
+        bReturn = false;
+    }
+
+    // Get the digest and verify size is correct
+    size_t slen = 0;
+    if (bReturn && (EVP_DigestSignFinal(pSslCtx, (unsigned char*)(scHmac), &slen) != 1)) {
+        printf("EVP_DigestSignFinal failed (3), error 0x%lx\n", ERR_get_error());
+        bReturn = false;
+    }
+    if (bReturn && (req != slen)) {
+        printf("EVP_DigestSignFinal failed, mismatched signature sizes %ld, %ld", req, slen);
+        bReturn = false;
+    }
+
+    if (pSslCtx) EVP_MD_CTX_destroy(pSslCtx); // Renamed EVP_MD_CTX_free in openssl 1.1.0
+    EVP_PKEY_free(pKey);
+    if (slen != 32) {
+        printf("You're a dummy: %d", int(slen));
+        bReturn = false;
+    }
+    if (bReturn) {
+        for (int i = 0; i < slen; i++) {
+            if (scHmac[i] != scHmacOrig[i]) {
+                bReturn = false;
+            }
+        }
+    }
+
+    if (scHmac != nullptr) OPENSSL_free(scHmac);
+    return bReturn;
+}
+
 char* FlightController::SendRecXML(const char* _scMessage)
 {
     #ifdef FLIGHT_CONTROLLER_TCP
@@ -742,6 +839,11 @@ char* FlightController::SendRecXML(const char* _scMessage)
             bSuccess = false;
             break;
         }
+        // Don't cause problems with a too big "size" for the buffer need to hash or parity or crc message
+        if (*size > 511) {
+            bSuccess = false;
+            break;
+        }
         scBufferStart += iLength;
     } while (iLength < *size && iCount++ < 1);
     if (!bSuccess) {
@@ -755,7 +857,7 @@ char* FlightController::SendRecXML(const char* _scMessage)
         return nullptr;
     }
     
-    scResponse[iLength] = 0;
+    scResponse[*size] = 0;
     mtXML.unlock();
     if (scKey[0] != 0) {
         OPENSSL_free(scHmac);

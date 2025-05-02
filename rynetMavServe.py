@@ -154,6 +154,11 @@ def hmacCreateMessage(stringMessage, key):
     print("Creation Digest: " + h.hexdigest())
     return h.digest() + hmacCreateMessage.salt.to_bytes(4, 'big') + str.encode(stringMessage)
 
+def hmacCreateResponse(stringMessage, key):
+    h = hmac.new(key.encode(), stringMessage.encode(), hashlib.sha256)
+    print("Creation Digest: " + h.hexdigest())
+    return h.digest() + str.encode(stringMessage)
+
 #Testing/verification code below
 #message = '<pos_retrieve />'
 #key = 'Secret Key'
@@ -631,8 +636,10 @@ def cmdRoutRetrieve(vehicle, UDPServerSocket, address):
 
 def cmdPosRetrieve(vehicle, UDPServerSocket, address):
     strReply = "%f\n%f\n" % (vehicle.location.global_frame.lat, vehicle.location.global_frame.lon)
-    strlen = len(strReply) + 4
-    UDPServerSocket.sendto(strlen.to_bytes(4, 'little') + str.encode(strReply), address)
+    print(strReply)
+    strReplyBytes = hmacCreateResponse(strReply, args.udp_hmac)
+    strlen = len(strReplyBytes) + 4
+    UDPServerSocket.sendto(strlen.to_bytes(4, 'little') + strReplyBytes, address)
 
 def cmdBatteryRetrieve(vehicle, UDPServerSocket, address):
     strReply = "%d\n" % (vehicle.battery.level)
