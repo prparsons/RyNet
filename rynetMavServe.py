@@ -184,7 +184,7 @@ def hmacCreateResponse(stringMessage, key, saltBytes):
 #     UDPClientSocket.sendto(bytesToSend, serverAddressPort)
     
 def sendReply(UDPServerSocket, address, strReply, saltBytes):
-    print(" Using Salt:%d\nReply:%s\n" % (int.from_bytes(saltBytes, 'little'), strReply))
+    # print(" Using Salt:%d\nReply:%s\n" % (int.from_bytes(saltBytes, 'little'), strReply))
     strReplyBytes = hmacCreateResponse(strReply, args.udp_hmac, saltBytes)
     strlen = len(strReplyBytes) + 4
     UDPServerSocket.sendto(strlen.to_bytes(4, 'little') + strReplyBytes, address)
