@@ -449,13 +449,6 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
     bool bGridSearching = true;
     float fMargin = 5;
     float fCurrentDirection = 0;
-    float fLat = 0;
-    float fLon = 0;
-    uint32_t counter = 0;
-
-    //@todo removeme
-    control.GetPosition(fLat, fLon);
-    CoordNode locationTree(fLat, fLon);
 
     StopSignal ssBattery;
     std::thread* pThrBattery = nullptr;
@@ -466,15 +459,6 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
 
     while (!ss.shouldStop()) {
         sigRGB.wait(1000);
-        counter++;
-
-        //@todo removme
-        // Record location if _____mode...guided?
-        if (counter % 10 == 0) {
-            control.GetPosition(fLat, fLon);
-            locationTree.InsertPoint(fLat, fLon);
-        }
-
         // Get new image and process it
         CameraFrame frameNew;
         if (!camera.GetFrameRGB(frameNew)) {
@@ -544,8 +528,6 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
             }
         }
     }
-    //@todo removeme
-    locationTree.Print();
 
     printL("Navigator::runNavigator loop done, stopping segmenter and detector");
     // Handle all the cleanup

@@ -144,44 +144,11 @@ def hmacVerifyMessage(signature, bytesSalt, bytesMessage, key):
         hmacVerifyMessage.salt = intSalt
     return retValue
 
-# def hmacCreateMessage(stringMessage, key):
-#     try: hmacCreateMessage.salt
-#     except AttributeError: hmacCreateMessage.salt = -1
-        
-#     hmacCreateMessage.salt += 1
-#     print("Creation Salt: %d" % hmacCreateMessage.salt)
-#     h = hmac.new(key.encode(), hmacCreateMessage.salt.to_bytes(4, 'big') + stringMessage.encode(), hashlib.sha256)
-#     print("Creation Digest: " + h.hexdigest())
-#     return h.digest() + hmacCreateMessage.salt.to_bytes(4, 'big') + str.encode(stringMessage)
-
 def hmacCreateResponse(stringMessage, key, saltBytes):
     #this needs to grab the salt from hmacVerifyMessage
     h = hmac.new(key.encode(), saltBytes + stringMessage.encode(), hashlib.sha256)
     # print("Creation Digest: " + h.hexdigest())
     return h.digest() + saltBytes + str.encode(stringMessage)
-
-#Testing/verification code below
-#message = '<pos_retrieve />'
-#key = 'Secret Key'
-#bytesSig = hmacCreateMessage(message, key)
-#print(hmacVerifyMessage(bytesSig[:32], bytesSig[32:36], bytesSig[36:], key))
-#Should get the following output:
-#Creation Salt: 0
-#Creation Digest: b227c99f8f6255dc93596b8fecc1274708e31ce84b72a11c64e413b39539ecd3
-#Verification Salt 0
-#Verification Digest: b227c99f8f6255dc93596b8fecc1274708e31ce84b72a11c64e413b39539ecd3
-#True
-
-# def sendMessage(msgFromClient):
-#     global salt
-#     h = hmac.new(key.encode(), salt.to_bytes(4, 'big') + msgFromClient.encode(), hashlib.sha256)
-#     bytesToSend         = h.digest() + salt.to_bytes(4, 'big') + str.encode(msgFromClient)
-#     serverAddressPort   = ("127.0.0.1", 3636)
-#     bufferSize          = 1024
-#     # Create a UDP socket at client side
-#     UDPClientSocket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
-#     # Send to server using created UDP socket
-#     UDPClientSocket.sendto(bytesToSend, serverAddressPort)
     
 def sendReply(UDPServerSocket, address, strReply, saltBytes):
     # print(" Using Salt:%d\nReply:%s\n" % (int.from_bytes(saltBytes, 'little'), strReply))

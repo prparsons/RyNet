@@ -5,6 +5,9 @@
 #include <openssl/evp.h>
 #include <openssl/err.h>
 
+// Messages: uint32_t(size of mesage)32_bytes(hmac digest)uint32_t(salt)
+#define RECV_OFFSET (4 + 32 + 4)
+
 
 EVP_PKEY* hmacCreateKey(const char* _scKey);
 bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** scHmac, char** scSaltAndMessageOut);
@@ -311,7 +314,6 @@ FlightController::~FlightController()
 
 bool FlightController::GetPosition(float& fLat, float& fLon)
 {
-    printf("GetPosition\n");
     if (pInstance == nullptr) return false;
     char* sc = pInstance->SendRecXML("<pos_retrieve />");
     if (sc == nullptr) {
@@ -319,8 +321,7 @@ bool FlightController::GetPosition(float& fLat, float& fLon)
     }
 
     // Advance 4 bytes for size, 32 for hmac
-    char* scNum = sc + 4 + 32 + 4;
-    printf("%s\n", scNum);
+    char* scNum = sc + RECV_OFFSET;
     int i;
     for (i = 0; i < strlen(scNum); i++) {
         if (scNum[i] == '\n') break;
@@ -339,7 +340,7 @@ bool FlightController::GetHeading(float& fHeading)
     if (sc == nullptr) {
         return false;
     }
-    fHeading = atof(sc + 4 + 32 + 4);
+    fHeading = atof(sc + RECV_OFFSET);
     delete[] sc;
     return true;
 }
@@ -350,7 +351,7 @@ bool FlightController::GetSpeed(float& fSpeedMS)
     if (sc == nullptr) {
         return false;
     }
-    fSpeedMS = atof(sc + 4 + 32 + 4);
+    fSpeedMS = atof(sc + RECV_OFFSET);
     delete[] sc;
     return true;
 }
@@ -362,7 +363,7 @@ bool FlightController::GetAltitude(float& fAltitude)
     if (sc == nullptr) {
         return false;
     }
-    fAltitude = atof(sc + 4 + 32 + 4);
+    fAltitude = atof(sc + RECV_OFFSET);
     delete[] sc;
     return true;
 }
@@ -373,7 +374,7 @@ bool FlightController::GetMode(char* scMode, int iStrLen)
     if (sc == nullptr) {
         return false;
     }
-    strncpy(scMode, sc + 4 + 32 + 4, iStrLen);
+    strncpy(scMode, sc + RECV_OFFSET, iStrLen);
     delete sc;
     return true;
 }
@@ -384,7 +385,7 @@ int FlightController::GetBattery()
     if (sc == nullptr) {
         return -1;
     }
-    int iBattery = atoi(sc + 4 + 32 + 4);
+    int iBattery = atoi(sc + RECV_OFFSET);
     delete sc;
     return iBattery;
 }
@@ -696,7 +697,6 @@ void FlightController::SendXML(const char* _scMessage)
 
 bool FlightController::VerifyMessage(const char* _scMessage, uint32_t uExpectedSalt)
 {
-    //@todo need to update this to re-use the sending salt
     const char* scHmacOrig = _scMessage;
     const char* scMessage = _scMessage + 32 + 4;
     size_t uMessageLength = strlen(scMessage);
@@ -704,6 +704,7 @@ bool FlightController::VerifyMessage(const char* _scMessage, uint32_t uExpectedS
     const char* scMessageAndSalt = _scMessage + 32;
     bool bReturn = true;
 
+    // Verify salt is correct (this is already done at the moment...but since this is a verify function...)
     if (*uSalt != uExpectedSalt) {
         printf(" Wrong Salt:%d  Expected:%d\n", int(*uSalt), int(uExpectedSalt));
         return false;
@@ -778,10 +779,7 @@ bool FlightController::VerifyMessage(const char* _scMessage, uint32_t uExpectedS
 
     if (pSslCtx) EVP_MD_CTX_destroy(pSslCtx); // Renamed EVP_MD_CTX_free in openssl 1.1.0
     EVP_PKEY_free(pKey);
-    if (slen != 32) {
-        printf("You're a dummy: %d", int(slen));
-        bReturn = false;
-    }
+    // Now do a quick check to make sure the digest matches (can make this faster by comparing bigger things)
     if (bReturn) {
         for (int i = 0; i < slen; i++) {
             if (scHmac[i] != scHmacOrig[i]) {
@@ -819,9 +817,12 @@ char* FlightController::SendRecXML(const char* _scMessage)
     char* scHmacMessage = nullptr;
     const char* scMessage = _scMessage;
     int iStrLen = strlen(scMessage);
+    // Grab the salt and save it (threads, we'll be using it to verify too)
     mtXML.lock();
     int iUsedSalt = iSalt++;
     mtXML.unlock();
+
+    // Create the message to send
     if (scKey[0] != 0) {
         if (!hmacMessage(scMessage, scKey, iUsedSalt, &scHmac, &scSaltedMessage)) {
             printL("Failed to HMAC message");
@@ -834,6 +835,7 @@ char* FlightController::SendRecXML(const char* _scMessage)
         iStrLen += 32 + 4;
     }
 
+    // In a big lock, send then recv
     mtXML.lock();
     if (socketDesc < 0) ConnectMavLink();
     sendto(socketDesc, scMessage, iStrLen, MSG_CONFIRM, (const struct sockaddr*)&addressMavLink, sizeof(addressMavLink));
@@ -868,16 +870,19 @@ char* FlightController::SendRecXML(const char* _scMessage)
                 break;
             }
             scBufferStart += iLength;
-        } while (iLength < *size && iCount++ < 1);
+        } while (iLength < *size && iCount++ < 1); // end of the loop that's trying to get "an entire message"
+
+        if (!bSuccess) break;
+        // Now check that the message that was received is the right one (same salt that we sent was used)
         if (*((uint32_t*)(scResponse + 4 + 32)) < iUsedSalt) {
+            // If it is wrong, wait another timeout amount before looping
             bWrongSalt = true;
-            //printL("Looping for wrong salt");
             std::this_thread::sleep_for(std::chrono::milliseconds(iUdpTimeoutUs / 1000));
         } else {
-            //printf("  Used:%d  Got:%d\n", iUsedSalt, int(*((uint32_t*)(scResponse + 4 + 32))));
             bWrongSalt = false;
         }
     } while (bWrongSalt);
+
     if (!bSuccess) {
         delete[] scResponse;
         mtXML.unlock();
@@ -888,17 +893,21 @@ char* FlightController::SendRecXML(const char* _scMessage)
         }
         return nullptr;
     }
+    // Haven't been seeing this yet, so leaving it in here
     if (iLength != *size) {
         printf("Size mismatch: %d  %d\n", iLength, int(*size));
     }
     
+    // Set null character at end of the string
     scResponse[*size] = 0;
     mtXML.unlock();
+    // Unlock and cleanup
     if (scKey[0] != 0) {
         OPENSSL_free(scHmac);
         delete[] scSaltedMessage;
         delete[] scHmacMessage;
     }
+    // Verify that the message is valid
     if (!VerifyMessage(scResponse + 4, uint32_t(iUsedSalt))) {
         printL("Verify Fail");
         delete[] scResponse;
