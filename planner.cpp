@@ -418,7 +418,9 @@ int FlightController::GetBattery()
 
 Route* FlightController::GetRoute()
 {
-    char* sc = SendRecXML("<route_retrieve />");
+    if (pInstance == nullptr) return nullptr;
+    uint32_t uSalt = pInstance->SendRecXML("<route_retrieve />");
+    char* sc = pInstance->GetUdp(uSalt, 2000);
     if (sc == nullptr) {
         printL("GetRoute failed");
         return nullptr;
@@ -723,27 +725,30 @@ void FlightController::runRecv(StopSignal ss)
 char* FlightController::recvUdp()
 {
     mtXML.lock();
-    char* scResponse = new char[1024];
+    char* scResponse = new char[16384];
     char* scBufferStart = scResponse;
     uint32_t* size = (uint32_t*)scResponse; // Mesage length is beginning of message
+    *size = 0;
     int iLength = 0;
     int iCount = 0;
     bool bSuccess = true;
+    size_t recvSize = 16383;
 
     if (socketDesc < 0) { // Not initialized yet, let send do it
         mtXML.unlock();
         return nullptr;
     }
     do {
-        iLength = recv(socketDesc, scBufferStart, 1023, 0);
+        iLength = recv(socketDesc, scBufferStart, recvSize, 0);
 
         // If we didn't get 4 byte, we don't have a valid message length, so fail
         if (iLength < 4 + 32 + 4) {
             bSuccess = false;
-            break;
+        } else {
+            bSuccess = true;
         }
         // Don't cause problems with a too big "size" for the buffer need to hash or parity or crc message
-        if (*size > 1023) {
+        if (*size > recvSize) {
             bSuccess = false;
             break;
         }
@@ -977,7 +982,7 @@ char* FlightController::GetUdp(uint32_t uSalt, int iTimeoutMs)
             // Didn't find anything, so unlock mutex and check timeout. If time left, then wait.
             mtRecv.unlock();
             if (iTimeoutMs <= 0) return nullptr;
-            std::this_thread::sleep_for(std::chrono::milliseconds(iTimeoutMs));
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
             iTimeoutMs -= 10;
         }
     } while (!bFound);

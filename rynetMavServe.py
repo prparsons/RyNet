@@ -277,6 +277,16 @@ def mission_to_str(missionList):
         output+=commandline
     return output
 
+def mission_to_hex(missionList):
+    home = vehicle.home_location
+    homeList = [0,1,0,16,0,0,0,0,home.lat,home.lon,home.alt,1]
+    for item in homeList:
+        outputBytes = item.to_bytes('little', 4)
+    for cmd in missionList:
+        for item in cmd:
+            outputBytes = item.to_bytes('little', 4)
+    return [1,2]
+
 def mission_cleanSimple(missionList, nextWaypoint, fLat, fLon):
     missionListClean = []
     fDistClosest = 9999999999.0
@@ -604,7 +614,8 @@ def cmdRouteRestore(vehicle, element):
 def cmdRoutRetrieve(vehicle, UDPServerSocket, address, saltBytes):
     missionList = download_mission(vehicle)
     missionStr = mission_to_str(missionList)
-    print(missionStr)
+    print(" Mission string length %d" % len(missionStr))
+    #print("Mission hex length %d" % len(mission_to_hex(missionList)))
     sendReply(UDPServerSocket, address, missionStr, saltBytes)
 
 def cmdPosRetrieve(vehicle, UDPServerSocket, address, saltBytes):

@@ -45,15 +45,15 @@ class Route
     struct command {
         int i;
         int j;
-        int k;
+        int k; // speed is/was 10 I think, but should be a float?
         int l;
         float a;
         float b;
         float c;
         float d;
         float lat;
-        float lon
-        float e;
+        float lon;
+        float alt;
         int x;
     };
 
