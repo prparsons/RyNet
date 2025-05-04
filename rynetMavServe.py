@@ -156,8 +156,8 @@ def hmacCreateResponseBytes(bytesMessage, key, saltBytes):
     #this needs to grab the salt from hmacVerifyMessage
     outputBytes = saltBytes + bytesMessage
     h = hmac.new(key.encode(), outputBytes, hashlib.sha256)
-    print("Creation Digest: " + h.hexdigest())
-    print("Size bytes: ", len(outputBytes))
+    # print("Creation Digest: " + h.hexdigest())
+    # print("Size bytes: ", len(outputBytes))
     return h.digest() + outputBytes
     
 def sendReply(UDPServerSocket, address, strReply, saltBytes):

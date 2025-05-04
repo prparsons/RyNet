@@ -476,15 +476,15 @@ Route* FlightController::GetRoute()
         return nullptr;
     }
     char* scRoute = sc + RECV_OFFSET;
-    //printf(" Route:\n%s\n", scRoute);
+    
     uint32_t& uLen = *((uint32_t*)sc);
-    Route bob(scRoute, uLen - RECV_OFFSET);
-    //Route bill(scRoute, sizeof(Route::command));
-    printf("Total length %d\n", int(uLen));
-    printL(bob.toString().c_str());
+    //@todo
+    // Since it's done in the constructor...either throw exception or have a not constructor static
+    // method that returns the pointer.
+    Route* pRoute = new Route(scRoute, uLen - RECV_OFFSET);
 
     delete[] sc;
-    return nullptr;
+    return pRoute;
 }
 
 int FlightController::CheckDirectionValid(float fDirection, time_t travelTime)

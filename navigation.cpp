@@ -457,7 +457,11 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
     detector.Start();
     segmenter.Start();
 
-    control.GetRoute();
+    Route* pRoute = control.GetRoute();
+    if (pRoute) {
+        //printL(pRoute->toString().c_str());
+        delete pRoute;
+    }
 
     while (!ss.shouldStop()) {
         sigRGB.wait(1000);
