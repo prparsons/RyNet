@@ -157,6 +157,56 @@ void CoordNode::Print() const
     printf("}\n");
 }
 
+Route::Route(char* buffer, Route& prev)
+{
+    memcpy(&cmd, buffer, sizeof(command));
+    prev.pNext = this;
+    this->pNext = nullptr;
+}
+Route::Route(char* buffer, size_t uBufferLen)
+{
+    pNext = nullptr;
+    const size_t sizeCmd = sizeof(command);
+    if (uBufferLen % sizeCmd != 0) {
+        printL(" Invalid buffer");
+        pNext = nullptr;
+        return;
+    }
+
+    Route* pPrev = this;
+    memcpy(&cmd, buffer, sizeof(command));
+    for (size_t indexBuffer = sizeCmd; indexBuffer < uBufferLen; indexBuffer += sizeCmd) {
+        pPrev = new Route(buffer + indexBuffer, *pPrev);
+    }
+}
+Route::~Route()
+{
+    if (pNext != nullptr) delete pNext;
+}
+
+std::string Route::toString() const
+{
+    char stringstreamSucks[256];
+
+    snprintf(stringstreamSucks, 256, "%d %d %d %d %.1f %.1f %.1f %.1f %.6f %.6f %.1f %d",
+        int(cmd.seq),
+        int(cmd.current),
+        int(cmd.frame),
+        int(cmd.command),
+        cmd.param1,
+        cmd.param2,
+        cmd.param3,
+        cmd.param4,
+        cmd.lat,
+        cmd.lon,
+        cmd.alt,
+        int(cmd.autocontinue));
+    std::string returnVal(stringstreamSucks);
+
+    if (pNext != nullptr) return returnVal + "\n" + pNext->toString();
+    return returnVal;
+}
+
 
 FlightController::FlightController(DataLogger& _logger, CameraController& _camera)
 : logger(_logger)
@@ -429,6 +479,9 @@ Route* FlightController::GetRoute()
     //printf(" Route:\n%s\n", scRoute);
     uint32_t& uLen = *((uint32_t*)sc);
     Route bob(scRoute, uLen - RECV_OFFSET);
+    //Route bill(scRoute, sizeof(Route::command));
+    printf("Total length %d\n", int(uLen));
+    printL(bob.toString().c_str());
 
     delete[] sc;
     return nullptr;
@@ -707,7 +760,7 @@ void FlightController::runRecv(StopSignal ss)
         buffer = recvUdp();
         if (buffer) {
             // Verify that the message is valid
-            if (!VerifyMessage(buffer + 4)) {
+            if (!VerifyMessage(buffer + 4, *((uint32_t*)buffer) - 4 - 32 - 4)) {
                 printL("Verify Fail");
                 delete[] buffer;
                 continue;
@@ -820,11 +873,12 @@ void FlightController::SendXML(const char* _scMessage)
     #endif
 }
 
-bool FlightController::VerifyMessage(const char* _scMessage)
+bool FlightController::VerifyMessage(const char* _scMessage, uint32_t uMessageLength)
 {
     const char* scHmacOrig = _scMessage;
     const char* scMessage = _scMessage + 32 + 4;
-    size_t uMessageLength = strlen(scMessage);
+    // size_t uMessageLength = strlen(scMessage);
+    // uint32_t uMessageLength = *((unit32_t*)_scMessage)
     const char* scMessageAndSalt = _scMessage + 32;
     bool bReturn = true;
 
@@ -902,6 +956,16 @@ bool FlightController::VerifyMessage(const char* _scMessage)
         for (int i = 0; i < slen; i++) {
             if (scHmac[i] != scHmacOrig[i]) {
                 bReturn = false;
+                printf(" Digest mismatch[Ours]: ");
+                for (int i = 0; i < slen; i++) {
+                    printf("%02x", scHmac[i]);
+                }
+                printf("\n Digest mismatch[Theirs]: ");
+                for (int i = 0; i < slen; i++) {
+                    printf("%02x", scHmacOrig[i]);
+                }
+                printf("\n");
+                break;
             }
         }
     }

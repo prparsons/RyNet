@@ -151,10 +151,24 @@ def hmacCreateResponse(stringMessage, key, saltBytes):
     h = hmac.new(key.encode(), saltBytes + stringMessage.encode(), hashlib.sha256)
     # print("Creation Digest: " + h.hexdigest())
     return h.digest() + saltBytes + str.encode(stringMessage)
+
+def hmacCreateResponseBytes(bytesMessage, key, saltBytes):
+    #this needs to grab the salt from hmacVerifyMessage
+    outputBytes = saltBytes + bytesMessage
+    h = hmac.new(key.encode(), outputBytes, hashlib.sha256)
+    print("Creation Digest: " + h.hexdigest())
+    print("Size bytes: ", len(outputBytes))
+    return h.digest() + outputBytes
     
 def sendReply(UDPServerSocket, address, strReply, saltBytes):
     # print(" Using Salt:%d\nReply:%s\n" % (int.from_bytes(saltBytes, 'little'), strReply))
     strReplyBytes = hmacCreateResponse(strReply, args.udp_hmac, saltBytes)
+    strlen = len(strReplyBytes) + 4
+    UDPServerSocket.sendto(strlen.to_bytes(4, 'little') + strReplyBytes, address)
+    
+def sendReplyBytes(UDPServerSocket, address, bytesReply, saltBytes):
+    # print(" Using Salt:%d\nReply:%s\n" % (int.from_bytes(saltBytes, 'little'), strReply))
+    strReplyBytes = hmacCreateResponseBytes(bytesReply, args.udp_hmac, saltBytes)
     strlen = len(strReplyBytes) + 4
     UDPServerSocket.sendto(strlen.to_bytes(4, 'little') + strReplyBytes, address)
 
@@ -631,9 +645,10 @@ def cmdRouteRestore(vehicle, element):
 
 def cmdRoutRetrieve(vehicle, UDPServerSocket, address, saltBytes):
     missionList = download_mission(vehicle)
-    missionStr = mission_to_str(missionList)
+    #missionStr = mission_to_str(missionList)
     #print("MissionHex: %d" % len(mission_to_hex(missionList)))
-    sendReply(UDPServerSocket, address, missionStr, saltBytes)
+    #sendReply(UDPServerSocket, address, missionStr, saltBytes)
+    sendReplyBytes(UDPServerSocket, address, mission_to_hex(missionList), saltBytes)
 
 def cmdPosRetrieve(vehicle, UDPServerSocket, address, saltBytes):
     strReply = "%f\n%f\n" % (vehicle.location.global_frame.lat, vehicle.location.global_frame.lon)

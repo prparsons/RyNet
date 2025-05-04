@@ -56,31 +56,10 @@ public:
         float alt;
         int16_t autocontinue;
     };
-    Route(char* buffer, Route& prev)
-    {
-        memcpy(&cmd, buffer, sizeof(command));
-        prev.pNext = this;
-        this->pNext = nullptr;
-    }
-    Route(char* buffer, size_t uBufferLen)
-    {
-        const size_t sizeCmd = sizeof(command);
-        if (uBufferLen % sizeCmd != 0) {
-            printL(" Invalid buffer");
-            pNext = nullptr;
-            return;
-        }
-
-        Route* pPrev = this;
-        memcpy(&cmd, buffer, sizeof(command));
-        for (size_t indexBuffer = sizeCmd; indexBuffer < uBufferLen; indexBuffer += sizeCmd) {
-            pPrev = new Route(buffer + indexBuffer, *pPrev);
-        }
-    }
-    ~Route()
-    {
-        if (pNext != nullptr) delete pNext;
-    }
+    Route(char* buffer, Route& prev);
+    Route(char* buffer, size_t uBufferLen);
+    ~Route();
+    std::string toString() const;
 
     command cmd;
     Route* pNext;
@@ -132,7 +111,7 @@ private:
     void SendXML(const char* sc);
     uint32_t SendRecXML(const char* sc); // Used to send message if you want to be able to get a response
     char* GetUdp(uint32_t uSalt, int iTimeoutMs); // Used to get any response
-    bool VerifyMessage(const char* _scMessage);
+    bool VerifyMessage(const char* _scMessage, uint32_t uMessageLength);
     void ConnectMavLink();
 
     void runDepth(Signal sig, StopSignal ss); // Thread function to continuously send depth info for obstacle avoidance
