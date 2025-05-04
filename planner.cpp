@@ -420,15 +420,17 @@ Route* FlightController::GetRoute()
 {
     if (pInstance == nullptr) return nullptr;
     uint32_t uSalt = pInstance->SendRecXML("<route_retrieve />");
-    char* sc = pInstance->GetUdp(uSalt, 2000);
+    char* sc = pInstance->GetUdp(uSalt, 5000);
     if (sc == nullptr) {
         printL("GetRoute failed");
         return nullptr;
     }
     char* scRoute = sc + RECV_OFFSET;
+    //printf(" Route:\n%s\n", scRoute);
+    uint32_t& uLen = *((uint32_t*)sc);
+    Route bob(scRoute, uLen - RECV_OFFSET);
+
     delete[] sc;
-    
-    printf(" Route:\n%s\n", scRoute);
     return nullptr;
 }
 

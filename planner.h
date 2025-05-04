@@ -40,22 +40,47 @@ private:
 };
 
 class Route
-{//20      0       10      16      0.0     0.0     0.0     0.0     39.45755386352539       -105.05416870117188     100.0   1
-
+{
+public:
     struct command {
-        int i;
-        int j;
-        int k; // speed is/was 10 I think, but should be a float?
-        int l;
-        float a;
-        float b;
-        float c;
-        float d;
+        int16_t seq;
+        int16_t current;
+        int16_t frame;
+        int16_t command;
+        float param1;
+        float param2;
+        float param3;
+        float param4;
         float lat;
         float lon;
         float alt;
-        int x;
+        int16_t autocontinue;
     };
+    Route(char* buffer, Route& prev)
+    {
+        memcpy(&cmd, buffer, sizeof(command));
+        prev.pNext = this;
+        this->pNext = nullptr;
+    }
+    Route(char* buffer, size_t uBufferLen)
+    {
+        const size_t sizeCmd = sizeof(command);
+        if (uBufferLen % sizeCmd != 0) {
+            printL(" Invalid buffer");
+            pNext = nullptr;
+            return;
+        }
+
+        Route* pPrev = this;
+        memcpy(&cmd, buffer, sizeof(command));
+        for (size_t indexBuffer = sizeCmd; indexBuffer < uBufferLen; indexBuffer += sizeCmd) {
+            pPrev = new Route(buffer + indexBuffer, *pPrev);
+        }
+    }
+    ~Route()
+    {
+        if (pNext != nullptr) delete pNext;
+    }
 
     command cmd;
     Route* pNext;

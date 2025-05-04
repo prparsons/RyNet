@@ -14,6 +14,8 @@ import hmac
 from tsp import *
 import numpy as np
 from pymavlink.dialects.v20 import ardupilotmega as mavlink2
+import datetime
+import struct
 
 """
 Command Documentation:
@@ -280,12 +282,28 @@ def mission_to_str(missionList):
 def mission_to_hex(missionList):
     home = vehicle.home_location
     homeList = [0,1,0,16,0,0,0,0,home.lat,home.lon,home.alt,1]
-    for item in homeList:
-        outputBytes = item.to_bytes('little', 4)
+    outputBytes = b''
+    
     for cmd in missionList:
-        for item in cmd:
-            outputBytes = item.to_bytes('little', 4)
-    return [1,2]
+        #outputBytes += int(cmd.target_system).to_bytes(4, 'little')
+        #outputBytes += int(cmd.target_component).to_bytes(4, 'little')
+        outputBytes += int(cmd.seq).to_bytes(2, 'little')
+        outputBytes += int(cmd.current).to_bytes(2, 'little')
+        outputBytes += int(cmd.frame).to_bytes(2, 'little')
+        outputBytes += int(cmd.command).to_bytes(2, 'little')
+        #outputBytes += int(cmd.current).to_bytes(4, 'little')
+        #outputBytes += int(cmd.autocontinue).to_bytes(4, 'little')
+        outputBytes += struct.pack("f", float(cmd.param1))
+        outputBytes += struct.pack("f", float(cmd.param2))
+        outputBytes += struct.pack("f", float(cmd.param3))
+        outputBytes += struct.pack("f", float(cmd.param4))
+        outputBytes += struct.pack("f", float(cmd.x))
+        outputBytes += struct.pack("f", float(cmd.y))
+        outputBytes += struct.pack("f", float(cmd.z))
+        outputBytes += int(cmd.autocontinue).to_bytes(4, 'little')
+        #outputBytes += int(cmd.target_system).to_bytes(4, 'little')
+
+    return outputBytes
 
 def mission_cleanSimple(missionList, nextWaypoint, fLat, fLon):
     missionListClean = []
@@ -481,13 +499,13 @@ def mission_cleanBetter(missionList, nextWaypoint, fLat, fLon):
 def parseXML(message, vehicle, UDPServerSocket, address):
     saltBytes = message[:4]
     message = message[4:]
-    try:
-        root = ET.fromstring(message)
-        print(root)
-        handleCommand(root, vehicle, UDPServerSocket, address, saltBytes)
-    except:
-        print("parseXML error")
-        return
+    # try:
+    root = ET.fromstring(message)
+    print(root)
+    handleCommand(root, vehicle, UDPServerSocket, address, saltBytes)
+    # except:
+    # print("parseXML error")
+    return
 
 def cmdTakeoff(vehicle, element):
     arm_and_takeoff(vehicle, float(element.text))
@@ -614,8 +632,7 @@ def cmdRouteRestore(vehicle, element):
 def cmdRoutRetrieve(vehicle, UDPServerSocket, address, saltBytes):
     missionList = download_mission(vehicle)
     missionStr = mission_to_str(missionList)
-    print(" Mission string length %d" % len(missionStr))
-    #print("Mission hex length %d" % len(mission_to_hex(missionList)))
+    #print("MissionHex: %d" % len(mission_to_hex(missionList)))
     sendReply(UDPServerSocket, address, missionStr, saltBytes)
 
 def cmdPosRetrieve(vehicle, UDPServerSocket, address, saltBytes):
@@ -757,21 +774,21 @@ def arm_and_takeoff(vehicle, aTargetAltitude):
         time.sleep(1)
 
 def recvUDP(sock, vehicle):
-    try:
-        message,address = sock.recvfrom(1024)
-        if args.udp_hmac != '':
-            if len(message) < 32:
-                print('message verification, too short failure')
-                print(message)
-                return
-            if hmacVerifyMessage(message[:32], message[32:36], message[36:], args.udp_hmac) == False:
-                print('message verification failure')
-                return
-            parseXML(message[32:], vehicle, sock, address)
-        else:
-            parseXML(message, vehicle, sock, address)
-    except:
-        print('recv failure')
+    # try:
+    message,address = sock.recvfrom(1024)
+    if args.udp_hmac != '':
+        if len(message) < 32:
+            print('message verification, too short failure')
+            print(message)
+            return
+        if hmacVerifyMessage(message[:32], message[32:36], message[36:], args.udp_hmac) == False:
+            print('message verification failure')
+            return
+        parseXML(message[32:], vehicle, sock, address)
+    else:
+        parseXML(message, vehicle, sock, address)
+    # except:
+        # print('recv failure')
 
 # Set up connection string to the drone
 connection_string = args.connect
