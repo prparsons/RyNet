@@ -47,6 +47,7 @@ public:
     Route(char* buffer, size_t uBufferLen);
     ~Route();
     std::string toString() const;
+    Route* twoOpt();
 
     command cmd;
     Route* pNext;
