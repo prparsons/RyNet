@@ -43,10 +43,12 @@ public:
         float alt;
         int16_t autocontinue;
     };
+
     Route(char* buffer, Route& prev);
     Route(char* buffer, size_t uBufferLen);
     Route(const Route& other);
     ~Route();
+
     std::string toString() const;
     float GetDistance() const;
     static Route* Tsp2Opt(Route* pStart, CoordNode* pVisitedPoints);
@@ -55,6 +57,7 @@ public:
 
 private:
     Route(const command& cmdCopy);
+    
     static Route* cleanRoute(Route* pStart, CoordNode* pVisitedPoints); // Takes over pStart, returns new start
     static Route* removeVisited(Route* pStart, int iCurrentWaypoint); // Takes over pStart, returns new start
     static Route* single2Opt(const Route& start); 
