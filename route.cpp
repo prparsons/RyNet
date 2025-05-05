@@ -23,6 +23,12 @@ float CoordNode::GetDistance(float fLatQuery, float fLonQuery) const
     return 1.0;
 }
 
+const CoordNode* CoordNode::GetClosest(float fLatQuery, float fLonQuery) const
+{
+    float f;
+    return GetClosest(fLatQuery, fLonQuery, f);
+}
+
 const CoordNode* CoordNode::GetClosest(float fLatQuery, float fLonQuery, float& fDistance) const
 {
     fDistance = GetDistance(fLatQuery, fLonQuery);
@@ -168,6 +174,29 @@ Route::Route(char* buffer, size_t uBufferLen)
         pPrev = new Route(buffer + indexBuffer, *pPrev);
     }
 }
+
+Route::Route(const Route& other)
+{
+    cmd = other.cmd;
+    pNext = nullptr;
+    if (!other.pNext) return;
+
+    const Route* pIndexOther = other.pNext;
+    Route* pIndexNew = this;
+    do {
+        pIndexNew->pNext = new Route(pIndexOther->cmd);
+        pIndexNew->pNext->pNext = nullptr;
+        pIndexNew = pIndexNew->pNext;
+        pIndexOther = pIndexOther->pNext;
+    } while(pIndexOther != nullptr);
+}
+
+Route::Route(const command& cmdCopy)
+{
+    cmd = cmdCopy;
+    pNext = nullptr;
+}
+
 Route::~Route()
 {
     if (pNext != nullptr) delete pNext;
@@ -196,8 +225,105 @@ std::string Route::toString() const
     return returnVal;
 }
 
-Route* Route::twoOpt()
+float Route::GetDistance() const
 {
+    if (pNext == nullptr) return 0;
+    float fDistance = PointDistanceM(cmd.lat, cmd.lon, pNext->cmd.lat, pNext->cmd.lon);
+    return fDistance + pNext->GetDistance();
+}
+
+Route* Route::Tsp2Opt(Route* pStart, CoordNode* pVisitedPoints)
+{
+    if (pStart == nullptr) return nullptr;
+
+    pStart = pStart->removeVisited(pStart, 3);
+
+    //get rid of non-commands
+
+    if (pVisitedPoints) {
+        pStart = pStart->cleanRoute(pStart, pVisitedPoints);
+    }
+
+
+}
+
+Route* Route::cleanRoute(Route* pStart, CoordNode* pVisitedPoints)
+{
+    if (pStart == nullptr) return nullptr;
+
+    std::queue<Route*> closeWaypoints;
+    float fTooClose = 100;
+    // First start off by checking each waypoint against the visited list
+    for (Route* pThis = pStart; pThis != nullptr; pThis = pThis->pNext) {
+        const CoordNode* pClosestPoint = pVisitedPoints->GetClosest(pThis->cmd.lat, pThis->cmd.lon);
+        if (pClosestPoint->GetDistance(pThis->cmd.lat, pThis->cmd.lon) < fTooClose) {
+            closeWaypoints.push(pThis);
+        }
+    }
+    // Start off seeing if we need to advance pStart as we delete the first things on the list
+    while (closeWaypoints.front() == pStart) {
+        pStart = pStart->pNext;
+        delete closeWaypoints.front();
+        closeWaypoints.pop();
+    }
+    // Then just look for pNext pointers that match the queue
+    for (Route* pThis = pStart; pThis != nullptr;) {
+        if (pThis->pNext == closeWaypoints.front()) {
+            pThis->pNext = pThis->pNext->pNext;
+            delete closeWaypoints.front();
+            closeWaypoints.pop();
+            continue; // Don't want to advance pThis since the new pNext might need to be deleted too
+        }
+        pThis = pThis->pNext;
+    }
+    return pStart;
+}
+
+Route* Route::removeVisited(Route* pStart, int iCurrentWaypoint)
+{
+    if (pStart == nullptr) return nullptr;
+
+    while (pStart->cmd.seq < iCurrentWaypoint) {
+        Route* pDelete = pStart;
+        pStart = pStart->pNext;
+        delete pDelete;
+    }
+}
+
+Route* Route::single2Opt(const Route& start)
+{
+/*best_distance = tspGetDistanceHS(route)
+    first = 1
+    last = len(route)
+    for i in range(last-2):
+        for j in range(last-3-i):
+            j += 2 + i
+            start = route[0:first+i]
+            middle = route[first+i:j+1]
+            end = route[j+1:last]
+            new_route = start + middle[::-1] + end
+            new_distance = tspGetDistanceHS(new_route)
+            if new_distance < best_distance:
+                best_distance = new_distance
+                route = new_route
+    return route*/
+    Route* pStart = new Route(start);
+    std::vector<const Route*> routeList;
+    for (const Route* pIndex = pStart; pIndex != nullptr; pIndex = pIndex->pNext) {
+        routeList.push_back(pIndex);
+    }
+
+    float fDistance = start.GetDistance();
+    size_t uLast = routeList.size();
+    size_t uFirst = 1;
+
+    for (int i = 0; i < uLast - 2;) {
+        for (int j = 0; j < uLast - 3 - i;) {
+            j += 2 + 1;
+            //from first + i --- j+1
+                //Swap these around
+        }
+    }
     return nullptr;
 }
 
