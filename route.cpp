@@ -20,7 +20,7 @@ CoordNode::~CoordNode()
 
 float CoordNode::GetDistance(float fLatQuery, float fLonQuery) const
 {
-    return 1.0;
+    return PointDistanceM(fLat, fLon, fLatQuery, fLonQuery);
 }
 
 const CoordNode* CoordNode::GetClosest(float fLatQuery, float fLonQuery) const
@@ -158,6 +158,7 @@ Route::Route(char* buffer, Route& prev)
     prev.pNext = this;
     this->pNext = nullptr;
 }
+
 Route::Route(char* buffer, size_t uBufferLen)
 {
     pNext = nullptr;
@@ -236,14 +237,18 @@ Route* Route::Tsp2Opt(Route* pStart, CoordNode* pVisitedPoints)
 {
     if (pStart == nullptr) return nullptr;
 
+    // Get rid of waypoints we've already been to
     pStart = pStart->removeVisited(pStart, 3);
 
     //get rid of non-commands
 
+    // If we have a list of points we've been to in guided, use that to clear out any waypoints
+    // that have already been "visited".
     if (pVisitedPoints) {
         pStart = pStart->cleanRoute(pStart, pVisitedPoints);
     }
 
+    // Now run the 2Opt algorithm on the remaining path
     float fCurrentDistance = pStart->GetDistance();
     Route* pNewRoute = single2Opt(*pStart);
     float fNewDistance = pNewRoute->GetDistance();
