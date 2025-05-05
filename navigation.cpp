@@ -390,6 +390,7 @@ Navigator::Navigator(FlightController& _control, DataLogger& _logger, CameraCont
 , control(_control)
 , logger(_logger)
 , camera(_camera)
+, pRouteOrig(nullptr)
 , sigMainRGB(_camera.GetSignalRGB())
 , pThread(nullptr)
 , detector(logger)
@@ -404,6 +405,9 @@ Navigator::~Navigator()
         ssMain.stop();
         if (pThread->joinable()) pThread->join();
         delete pThread;
+    }
+    if (pRouteOrig != nullptr) {
+        delete pRouteOrig;
     }
 }
     
@@ -457,10 +461,14 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
     detector.Start();
     segmenter.Start();
 
-    Route* pRoute = control.GetRoute();
-    if (pRoute) {
-        //printL(pRoute->toString().c_str());
-        delete pRoute;
+    Route* pRouteCurrent = nullptr;
+    pRouteOrig = control.GetRoute();
+    if (pRouteOrig) {
+        logger.LogString(pRouteOrig->toString().c_str());
+        pRouteCurrent = new Route(*pRouteOrig);
+    } else {
+        printL(" Failed to get route");
+        logger.LogString("Failed to get route");
     }
 
     while (!ss.shouldStop()) {
@@ -512,7 +520,7 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
                         tLastChange = time(nullptr);
                     } else {
                         // If it would be an invalid direction, then go back to grid search
-                        control.RestoreRoute();
+                        pRouteCurrent = RestoreRoute(pRouteCurrent);
                         sprintf(sc, "Good Habitat (Invalid Direction) -> %1.3f", segmenter.GetHabitatDirection());
                         bGridSearching = true;
                         tLastChange = time(nullptr);
@@ -524,7 +532,7 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
             } else { // No good terrain is visible right now
                 // So if there's been enough time we'll switch back to grid
                 if (time(nullptr) - tLastChange > tMinTimeBetweenChanges) {
-                    control.RestoreRoute();
+                    pRouteCurrent = RestoreRoute(pRouteCurrent);
                     logger.LogString("Good Habitat -> Grid Search");
                     bGridSearching = true;
                     tLastChange = time(nullptr);
@@ -535,6 +543,14 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
         }
     }
 
+    if (pRouteOrig) {
+        delete pRouteOrig;
+        pRouteOrig = nullptr;
+    }
+    if (pRouteCurrent) {
+        delete pRouteCurrent;
+        pRouteCurrent = nullptr;
+    }
     printL("Navigator::runNavigator loop done, stopping segmenter and detector");
     // Handle all the cleanup
     detector.SendStopSignal();
@@ -546,6 +562,15 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
         delete pThrBattery;
         if (bSendRTL) control.SetRTL();
     }
+}
+
+Route* Navigator::RestoreRoute(Route* pRoute)
+{
+    // Get list of visited pointes from the point logger thread
+    // call 2opt on pRoute
+    //send new route to flight controller
+    control.RestoreRoute();
+    return pRoute;
 }
 
 void Navigator::runBattery(StopSignal ss, StopSignal ssMainThread)

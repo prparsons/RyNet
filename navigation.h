@@ -100,6 +100,8 @@ public:
     void SetValidPixels(uint32_t uValidPixels);
 
 private:
+    Route* RestoreRoute(Route* pRoute);
+
     void runBattery(StopSignal ss, StopSignal ssMainThread);
     void runNavigator(Signal sig, StopSignal ss);
 
@@ -112,6 +114,7 @@ private:
     FlightController& control;
     DataLogger& logger;
     CameraController& camera;
+    Route* pRouteOrig;
 
     StopSignal ssMain;
     Signal sigMainRGB;
