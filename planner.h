@@ -40,7 +40,7 @@ public:
     bool GetMode(char* scMode, int iStrLen);
     int GetBattery();
     Route* GetRoute(); // Returns the current route. Caller owns object
-
+    CoordNode* GetVisitedPoints(); // From point logger thread
 
     // Can we travel in the indicated direction for the indicated time.
     //  0 == No. Positive number is distance direction is valid for.
@@ -74,6 +74,7 @@ private:
 
     DataLogger& logger;
     CameraController& camera;
+    CoordNode startLocation;
     std::thread* pThreadDepth;
     std::thread* pThreadPoint;
     std::thread* pThreadIr;
@@ -87,6 +88,7 @@ private:
     StopSignal ssRecv;
     ThreadMutex mtXML;
     ThreadMutex mtRecv;
+    ThreadMutex mtPoints;
 
     struct sockaddr_in addressMavLink;
     int socketDesc;

@@ -449,6 +449,7 @@ void Navigator::SetValidPixels(uint32_t uValidPixels)
 void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
 {
     printL("Navigator::runNavigator");
+    pthread_setname_np(pthread_self(), "Navigator::runNavigator");
 
     bool bGridSearching = true;
     float fMargin = 5;
@@ -466,6 +467,7 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
     if (pRouteOrig) {
         logger.LogString(pRouteOrig->toString().c_str());
         pRouteCurrent = new Route(*pRouteOrig);
+        printf("Orig Route %p\nCurrent Route %p\n", pRouteOrig, pRouteCurrent);
     } else {
         printL(" Failed to get route");
         logger.LogString("Failed to get route");
@@ -566,9 +568,17 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
 
 Route* Navigator::RestoreRoute(Route* pRoute)
 {
-    // Get list of visited pointes from the point logger thread
-    // call 2opt on pRoute
-    //send new route to flight controller
+    printf("Restoring route %p\n", pRoute);
+    // printL(pRoute->toString().c_str());
+    // Get any visited points
+    //CoordNode* pVisited = control.GetVisitedPoints();
+    // Clean the route via the 2opt method
+    pRoute = Route::Tsp2Opt(pRoute, nullptr);
+    //delete pVisited; // No longer needed
+    // printL("New Route:");
+    // printL(pRoute->toString().c_str());
+
+    // Send message with new route to the flight controller
     control.RestoreRoute();
     return pRoute;
 }

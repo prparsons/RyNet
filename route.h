@@ -5,6 +5,7 @@
 class CoordNode {
     public:
         CoordNode(float fLat, float fLon);
+        CoordNode(CoordNode& other, float fLat, float fLon); // Theft Constructor
         ~CoordNode();
     
         float GetDistance(float fLatQuery, float fLonQuery) const;
@@ -57,7 +58,7 @@ public:
 
 private:
     Route(const command& cmdCopy);
-    
+
     static Route* cleanRoute(Route* pStart, CoordNode* pVisitedPoints); // Takes over pStart, returns new start
     static Route* removeVisited(Route* pStart, int iCurrentWaypoint); // Takes over pStart, returns new start
     static Route* single2Opt(const Route& start); 

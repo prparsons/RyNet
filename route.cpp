@@ -13,6 +13,22 @@ CoordNode::CoordNode(float _fLat, float _fLon)
 {
 }
 
+CoordNode::CoordNode(CoordNode& other, float _fLat, float _fLon)
+: fLat(other.fLat)
+, fLon(other.fLon)
+, nw(other.nw)
+, ne(other.ne)
+, se(other.se)
+, sw(other.sw)
+{
+    other.fLat = _fLat;
+    other.fLon = _fLon;
+    other.nw = nullptr;
+    other.ne = nullptr;
+    other.se = nullptr;
+    other.sw = nullptr;
+}
+
 CoordNode::~CoordNode()
 {
     DestroyChildren();
@@ -34,25 +50,25 @@ const CoordNode* CoordNode::GetClosest(float fLatQuery, float fLonQuery, float& 
     fDistance = GetDistance(fLatQuery, fLonQuery);
     float fClosestChild = 9999999;
     const CoordNode* pNode = nullptr;
-
+    
     if (fLatQuery > fLat) {
         // It's north of this node center
         if (fLonQuery > fLon) {
             // It's west of this node center
-            pNode = nw->GetClosest(fLatQuery, fLonQuery, fClosestChild);
+            if (nw != nullptr) pNode = nw->GetClosest(fLatQuery, fLonQuery, fClosestChild);
             
         } else {
             // It's east of this node center
-            pNode = ne->GetClosest(fLatQuery,fLonQuery, fClosestChild);
+            if (ne != nullptr) pNode = ne->GetClosest(fLatQuery,fLonQuery, fClosestChild);
         }
     } else {
         // It's south of this node center
         if (fLonQuery > fLon) {
             // It's west of this node center
-            pNode = sw->GetClosest(fLatQuery, fLonQuery, fClosestChild);
+            if (sw != nullptr) pNode = sw->GetClosest(fLatQuery, fLonQuery, fClosestChild);
         } else {
             // It's east of this node center
-            pNode = se->GetClosest(fLatQuery, fLonQuery, fClosestChild);
+            if (se != nullptr) pNode = se->GetClosest(fLatQuery, fLonQuery, fClosestChild);
         }
     }
 
@@ -236,76 +252,98 @@ float Route::GetDistance() const
 Route* Route::Tsp2Opt(Route* pStart, CoordNode* pVisitedPoints)
 {
     if (pStart == nullptr) return nullptr;
-
+    //printf("Tsp2Opt start %p\n", pStart);
     // Get rid of waypoints we've already been to
-    pStart = pStart->removeVisited(pStart, 3);
+    //pStart = Route::removeVisited(pStart, 3);
 
+    printf("Tsp2Opt visited %p\n", pStart);
     //get rid of non-commands
-
+    CoordNode cheat(39.45893080,	-105.04784280);
     // If we have a list of points we've been to in guided, use that to clear out any waypoints
     // that have already been "visited".
-    if (pVisitedPoints) {
-        pStart = pStart->cleanRoute(pStart, pVisitedPoints);
-    }
+    // if (pVisitedPoints) {
+        pStart = Route::cleanRoute(pStart, &cheat);//pVisitedPoints);
+    // }
 
-    // Now run the 2Opt algorithm on the remaining path
-    float fCurrentDistance = pStart->GetDistance();
-    Route* pNewRoute = single2Opt(*pStart);
-    float fNewDistance = pNewRoute->GetDistance();
-    while (fNewDistance / fCurrentDistance < 1.0) {
-        Route* pTemp = pStart;
-        pStart = pNewRoute;
-        delete pTemp;
-        fCurrentDistance = fNewDistance;
+    // // Now run the 2Opt algorithm on the remaining path
+    // float fCurrentDistance = pStart->GetDistance();
+    // Route* pNewRoute = single2Opt(*pStart);
+    // float fNewDistance = pNewRoute->GetDistance();
+    // while (fNewDistance / fCurrentDistance < 1.0) {
+    //     Route* pTemp = pStart;
+    //     pStart = pNewRoute;
+    //     delete pTemp;
+    //     fCurrentDistance = fNewDistance;
 
-        pNewRoute = single2Opt(*pStart);
-        fNewDistance = pNewRoute->GetDistance();
-    }
-    delete pNewRoute;
+    //     pNewRoute = single2Opt(*pStart);
+    //     fNewDistance = pNewRoute->GetDistance();
+    // }
+    // delete pNewRoute;
     return pStart;
 }
 
 Route* Route::cleanRoute(Route* pStart, CoordNode* pVisitedPoints)
 {
     if (pStart == nullptr) return nullptr;
-
+    if (pVisitedPoints == nullptr) return nullptr;
+    printf("cleanRoute pstart %p\n", pStart);
     std::queue<Route*> closeWaypoints;
     float fTooClose = 100;
     // First start off by checking each waypoint against the visited list
     for (Route* pThis = pStart; pThis != nullptr; pThis = pThis->pNext) {
         const CoordNode* pClosestPoint = pVisitedPoints->GetClosest(pThis->cmd.lat, pThis->cmd.lon);
+        if (pClosestPoint == nullptr) {
+            printL("no closest point?");
+        }
         if (pClosestPoint->GetDistance(pThis->cmd.lat, pThis->cmd.lon) < fTooClose) {
             closeWaypoints.push(pThis);
         }
     }
+        printf("Close waypoints size: %d\n", int(closeWaypoints.size()));
+    if (closeWaypoints.size() == 0) {
+        printL("No points to remove, returning");
+        return pStart;
+    }
+    printL("done checking list");
     // Start off seeing if we need to advance pStart as we delete the first things on the list
     while (closeWaypoints.front() == pStart) {
         pStart = pStart->pNext;
+
+        closeWaypoints.front()->pNext = nullptr;
         delete closeWaypoints.front();
         closeWaypoints.pop();
     }
+    printL("done seeing if we need to advance pStart");
+
     // Then just look for pNext pointers that match the queue
-    for (Route* pThis = pStart; pThis != nullptr;) {
+    for (Route* pThis = pStart; pThis != nullptr && closeWaypoints.front() != nullptr;) {
         if (pThis->pNext == closeWaypoints.front()) {
             pThis->pNext = pThis->pNext->pNext;
+
+            closeWaypoints.front()->pNext = nullptr;
             delete closeWaypoints.front();
             closeWaypoints.pop();
             continue; // Don't want to advance pThis since the new pNext might need to be deleted too
         }
         pThis = pThis->pNext;
     }
+    printL("done cleanRoute");
     return pStart;
 }
 
 Route* Route::removeVisited(Route* pStart, int iCurrentWaypoint)
 {
     if (pStart == nullptr) return nullptr;
-
-    while (pStart->cmd.seq < iCurrentWaypoint) {
+    printL("removeVisited");
+    while (pStart && pStart->cmd.seq < iCurrentWaypoint) {
         Route* pDelete = pStart;
         pStart = pStart->pNext;
+
+        printf("Removing %p; New Head %p\n", pDelete, pStart);
+        pDelete->pNext = nullptr;
         delete pDelete;
     }
+    return pStart;
 }
 
 Route* Route::single2Opt(const Route& start)

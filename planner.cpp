@@ -17,6 +17,7 @@ FlightController* pInstance = nullptr;
 FlightController::FlightController(DataLogger& _logger, CameraController& _camera)
 : logger(_logger)
 , camera(_camera)
+, startLocation(0,0)
 , pThreadDepth(nullptr)
 , pThreadPoint(nullptr)
 , pThreadIr(nullptr)
@@ -293,6 +294,14 @@ Route* FlightController::GetRoute()
     return pRoute;
 }
 
+CoordNode* FlightController::GetVisitedPoints()
+{
+    mtPoints.lock();
+    CoordNode* pStolen = new CoordNode(startLocation, 0, 0);
+    mtPoints.unlock();
+    return pStolen;
+}
+
 int FlightController::CheckDirectionValid(float fDirection, time_t travelTime)
 {
     float fCurrentSpeedMS = 0;
@@ -315,7 +324,6 @@ int FlightController::CheckDirectionValid(float fDirection, time_t travelTime)
         printL("Failed to get position");
         return -1;
     }
-
 
     float fQueryLat = 0;
     float fQueryLon = 0;
@@ -512,13 +520,14 @@ void FlightController::runPointLogger(StopSignal ss)
     float fLat = 0;
     float fLon = 0;
     GetPosition(fLat, fLon);
-    CoordNode startLocation(fLat, fLon);
 
     while (!ss.shouldStop()) {
         if (bGuided) { // In GUIDED
             // Get the current position, add it to the list of visited points
             if (GetPosition(fLat, fLon)) {
+                mtPoints.lock();
                 startLocation.InsertPoint(fLat, fLon);
+                mtPoints.unlock();
             }
             // See if we're in guided or auto
             if (GetMode(scMode, 32)) {
@@ -527,12 +536,19 @@ void FlightController::runPointLogger(StopSignal ss)
             if (!bGuided) {
                 // Just switched to guided from auto, so clear visited points
                 GetPosition(fLat, fLon); // Doesn't matter if it fails...we still need to reset position
+                mtPoints.lock();
                 startLocation.ResetPosition(fLat, fLon);
+                mtPoints.unlock();
             }
         } else { // in AUTO            
             // See if we're in guided or auto
             if (GetMode(scMode, 32)) {
                 bGuided = strcmp(scMode, "GUIDED") == 0;
+                if (bGuided) {
+                    mtPoints.lock();
+                    startLocation.ResetPosition(fLat, fLon);
+                    mtPoints.unlock();
+                }
             }
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
