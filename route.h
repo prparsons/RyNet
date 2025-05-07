@@ -52,7 +52,7 @@ public:
 
     std::string toString() const;
     float GetDistance() const;
-    static Route* Tsp2Opt(Route* pStart, CoordNode* pVisitedPoints);
+    static Route* Tsp2Opt(Route* pStart, CoordNode* pVisitedPoints, int16_t iNextPoint);
 
     command cmd;
 
@@ -60,7 +60,7 @@ private:
     Route(const command& cmdCopy);
 
     static Route* cleanRoute(Route* pStart, CoordNode* pVisitedPoints); // Takes over pStart, returns new start
-    static Route* removeVisited(Route* pStart, int iCurrentWaypoint); // Takes over pStart, returns new start
+    static Route* removeVisited(Route* pStart, int16_t iNextPoint); // Takes over pStart, returns new start
     static Route* single2Opt(const Route& start); 
 
     Route* pNext;

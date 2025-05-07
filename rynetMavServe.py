@@ -99,6 +99,9 @@ Command Documentation:
         setauto -- will change the vehicle mode to AUTO 3 sec after takeoff
     --livetest disabled
 
+<waypoint_current_retrieve />
+    Gets the next waypoint
+
 
 SITL Testing instructions:
 https://ardupilot.org/dev/docs/sitl-simulator-software-in-the-loop.html
@@ -531,6 +534,11 @@ def cmdTakeoff(vehicle, element):
             while not vehicle.mode.name =='AUTO':
                 time.sleep(0.01)
 
+def cmdWaypointRetrieve(vehicle, UDPServerSocket, address, saltBytes):
+    cmds = vehicle.commands
+    strReply = "%d" % cmds.next
+    sendReply(UDPServerSocket, address, strReply, saltBytes)
+
 def cmdDir(vehicle, element):
     ptCurrent = (vehicle.location.global_frame.lat, vehicle.location.global_frame.lon)
     distanceM = 1000
@@ -682,6 +690,9 @@ def handleCommand(element, vehicle, UDPServerSocket, address, saltBytes):
             print("Current mode is RTL, not setting direction");
             return
         cmdTakeoff(vehicle, element)
+    
+    elif element.tag == 'waypoint_current_retrieve':
+        cmdWaypointRetrieve(vehicle, UDPServerSocket, address, saltBytes)
 
     elif element.tag == 'dir':
         if args.livetest == True:

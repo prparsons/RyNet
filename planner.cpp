@@ -302,6 +302,19 @@ CoordNode* FlightController::GetVisitedPoints()
     return pStolen;
 }
 
+bool FlightController::GetNextWaypoint(int16_t& iNextPoint)
+{
+    if (pInstance == nullptr) return false;
+    uint32_t uSalt = pInstance->SendRecXML("<waypoint_current_retrieve />");
+    char* sc = pInstance->GetUdp(uSalt, 100);
+    if (sc == nullptr) {
+        printL(" GetNextWaypoint fail");
+        return false;
+    }
+    iNextPoint = int16_t(atoi(sc));
+    return true;
+}
+
 int FlightController::CheckDirectionValid(float fDirection, time_t travelTime)
 {
     float fCurrentSpeedMS = 0;

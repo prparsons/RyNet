@@ -568,15 +568,13 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
 
 Route* Navigator::RestoreRoute(Route* pRoute)
 {
-    printf("Restoring route %p\n", pRoute);
-    // printL(pRoute->toString().c_str());
     // Get any visited points
     CoordNode* pVisited = control.GetVisitedPoints();
     // Clean the route via the 2opt method
-    pRoute = Route::Tsp2Opt(pRoute, pVisited);
+    int16_t iWaypoint = 1;
+    control.GetNextWaypoint(iWaypoint);
+    pRoute = Route::Tsp2Opt(pRoute, pVisited, iWaypoint);
     delete pVisited; // No longer needed
-    // printL("New Route:");
-    // printL(pRoute->toString().c_str());
 
     // Send message with new route to the flight controller
     control.RestoreRoute();

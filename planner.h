@@ -41,6 +41,7 @@ public:
     int GetBattery();
     Route* GetRoute(); // Returns the current route. Caller owns object
     CoordNode* GetVisitedPoints(); // From point logger thread
+    static bool GetNextWaypoint(int16_t& iNextPoint);
 
     // Can we travel in the indicated direction for the indicated time.
     //  0 == No. Positive number is distance direction is valid for.

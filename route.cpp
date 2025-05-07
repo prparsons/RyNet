@@ -249,12 +249,12 @@ float Route::GetDistance() const
     return fDistance + pNext->GetDistance();
 }
 #include <time.h>
-Route* Route::Tsp2Opt(Route* pStart, CoordNode* pVisitedPoints)
+Route* Route::Tsp2Opt(Route* pStart, CoordNode* pVisitedPoints, int16_t iNextPoint)
 {
     if (pStart == nullptr) return nullptr;
 
     // Get rid of waypoints we've already been to
-    pStart = Route::removeVisited(pStart, 3);
+    pStart = Route::removeVisited(pStart, iNextPoint);
 
 
     //@todo get rid of non-commands
@@ -335,11 +335,11 @@ Route* Route::cleanRoute(Route* pStart, CoordNode* pVisitedPoints)
     return pStart;
 }
 
-Route* Route::removeVisited(Route* pStart, int iCurrentWaypoint)
+Route* Route::removeVisited(Route* pStart, int16_t iNextPoint)
 {
     if (pStart == nullptr) return nullptr;
     printL("removeVisited");
-    while (pStart && pStart->cmd.seq < iCurrentWaypoint) {
+    while (pStart && pStart->cmd.seq < iNextPoint) {
         Route* pDelete = pStart;
         pStart = pStart->pNext;
 
