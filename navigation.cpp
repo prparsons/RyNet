@@ -571,10 +571,10 @@ Route* Navigator::RestoreRoute(Route* pRoute)
     printf("Restoring route %p\n", pRoute);
     // printL(pRoute->toString().c_str());
     // Get any visited points
-    //CoordNode* pVisited = control.GetVisitedPoints();
+    CoordNode* pVisited = control.GetVisitedPoints();
     // Clean the route via the 2opt method
-    pRoute = Route::Tsp2Opt(pRoute, nullptr);
-    //delete pVisited; // No longer needed
+    pRoute = Route::Tsp2Opt(pRoute, pVisited);
+    delete pVisited; // No longer needed
     // printL("New Route:");
     // printL(pRoute->toString().c_str());
 

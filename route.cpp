@@ -252,37 +252,37 @@ float Route::GetDistance() const
 Route* Route::Tsp2Opt(Route* pStart, CoordNode* pVisitedPoints)
 {
     if (pStart == nullptr) return nullptr;
-    //printf("Tsp2Opt start %p\n", pStart);
+
     // Get rid of waypoints we've already been to
     pStart = Route::removeVisited(pStart, 3);
 
-    printf("Tsp2Opt visited %p\n", pStart);
-    //get rid of non-commands
+
+    //@todo get rid of non-commands
     CoordNode cheat(39.45893080,	-105.04784280);
     // If we have a list of points we've been to in guided, use that to clear out any waypoints
     // that have already been "visited".
-    // if (pVisitedPoints) {
-        pStart = Route::cleanRoute(pStart, &cheat);//pVisitedPoints);
-    // }
+    if (pVisitedPoints) {
+        pStart = Route::cleanRoute(pStart, pVisitedPoints);
+    }
 
     // // Now run the 2Opt algorithm on the remaining path
-    // float fCurrentDistance = pStart->GetDistance();
+    float fCurrentDistance = pStart->GetDistance();
     clock_t start = clock();
     Route* pNewRoute = single2Opt(*pStart);
+    float fNewDistance = pNewRoute->GetDistance();
+    while (fNewDistance / fCurrentDistance < 1.0) {
+        Route* pTemp = pStart;
+        pStart = pNewRoute;
+        delete pTemp;
+        fCurrentDistance = fNewDistance;
+
+        pNewRoute = single2Opt(*pStart);
+        fNewDistance = pNewRoute->GetDistance();
+    }
     clock_t end = clock();
     printf("Time for single 2opt: %f\n", float(end - start) / CLOCKS_PER_SEC);
-    // float fNewDistance = pNewRoute->GetDistance();
-    // while (fNewDistance / fCurrentDistance < 1.0) {
-    //     Route* pTemp = pStart;
-    //     pStart = pNewRoute;
-    //     delete pTemp;
-    //     fCurrentDistance = fNewDistance;
-
-    //     pNewRoute = single2Opt(*pStart);
-    //     fNewDistance = pNewRoute->GetDistance();
-    // }
-     printL(pNewRoute->toString().c_str());
-    //  delete pNewRoute;
+    printL(pNewRoute->toString().c_str());
+    delete pNewRoute;
     return pStart;
 }
 
@@ -352,21 +352,6 @@ Route* Route::removeVisited(Route* pStart, int iCurrentWaypoint)
 
 Route* Route::single2Opt(const Route& start)
 {
-/*best_distance = tspGetDistanceHS(route)
-    first = 1
-    last = len(route)
-    for i in range(last-2):
-        for j in range(last-3-i):
-            j += 2 + i
-            start = route[0:first+i]
-            middle = route[first+i:j+1]
-            end = route[j+1:last]
-            new_route = start + middle[::-1] + end
-            new_distance = tspGetDistanceHS(new_route)
-            if new_distance < best_distance:
-                best_distance = new_distance
-                route = new_route
-    return route*/
     Route* pStart = new Route(start);
     std::vector<Route*> routeList;
     for (Route* pIndex = pStart; pIndex != nullptr; pIndex = pIndex->pNext) {
@@ -384,8 +369,8 @@ Route* Route::single2Opt(const Route& start)
             //printf("Left:%d    Right:%d\n", int(beg_index), int(end_index));
 
             //swap only the pointers around, leave the vector alone
-            for(int left = beg_index, right = end_index; left < end_index; left++, right--) {
-                routeList[right]->pNext = routeList[right - 1];
+            for(int left = beg_index; left < end_index; left++) {
+                routeList[left + 1]->pNext = routeList[left];
             }
             routeList[beg_index - 1]->pNext = routeList[end_index];
             routeList[beg_index]->pNext = routeList[end_index + 1];
