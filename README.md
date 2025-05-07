@@ -49,3 +49,6 @@ https://github.com/VainF/DeepLabV3Plus-Pytorch
 That's the project I was planning to use for training the terrain scanning network (image segmentation). Drone is running a Jetson Xavier NX, 8gb ram for whole system. So inference models need to fit in it. As for training, I have a 16gb card...memory is the limiting factor.
 
 I haven't really come up with what to use for detection...jetson inference has some decent models, and it might be worth just continuing to use that out of simplicity?
+
+release build:
+$ cmake -DCMAKE_BUILD_TYPE=Release ..
