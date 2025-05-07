@@ -248,13 +248,13 @@ float Route::GetDistance() const
     float fDistance = PointDistanceM(cmd.lat, cmd.lon, pNext->cmd.lat, pNext->cmd.lon);
     return fDistance + pNext->GetDistance();
 }
-
+#include <time.h>
 Route* Route::Tsp2Opt(Route* pStart, CoordNode* pVisitedPoints)
 {
     if (pStart == nullptr) return nullptr;
     //printf("Tsp2Opt start %p\n", pStart);
     // Get rid of waypoints we've already been to
-    //pStart = Route::removeVisited(pStart, 3);
+    pStart = Route::removeVisited(pStart, 3);
 
     printf("Tsp2Opt visited %p\n", pStart);
     //get rid of non-commands
@@ -267,7 +267,10 @@ Route* Route::Tsp2Opt(Route* pStart, CoordNode* pVisitedPoints)
 
     // // Now run the 2Opt algorithm on the remaining path
     // float fCurrentDistance = pStart->GetDistance();
-    // Route* pNewRoute = single2Opt(*pStart);
+    clock_t start = clock();
+    Route* pNewRoute = single2Opt(*pStart);
+    clock_t end = clock();
+    printf("Time for single 2opt: %f\n", float(end - start) / CLOCKS_PER_SEC);
     // float fNewDistance = pNewRoute->GetDistance();
     // while (fNewDistance / fCurrentDistance < 1.0) {
     //     Route* pTemp = pStart;
@@ -278,7 +281,8 @@ Route* Route::Tsp2Opt(Route* pStart, CoordNode* pVisitedPoints)
     //     pNewRoute = single2Opt(*pStart);
     //     fNewDistance = pNewRoute->GetDistance();
     // }
-    // delete pNewRoute;
+     printL(pNewRoute->toString().c_str());
+    //  delete pNewRoute;
     return pStart;
 }
 
@@ -364,32 +368,59 @@ Route* Route::single2Opt(const Route& start)
                 route = new_route
     return route*/
     Route* pStart = new Route(start);
-    std::vector<const Route*> routeList;
-    for (const Route* pIndex = pStart; pIndex != nullptr; pIndex = pIndex->pNext) {
+    std::vector<Route*> routeList;
+    for (Route* pIndex = pStart; pIndex != nullptr; pIndex = pIndex->pNext) {
         routeList.push_back(pIndex);
     }
 
     float fBestDistance = pStart->GetDistance();
-    size_t uLast = routeList.size();
+    size_t uLast = routeList.size() - 2;
     size_t uFirst = 1;
 
-    for (size_t i = 0; i < uLast - 2;) {
-        for (size_t j = 0; j < uLast - 3 - i;) {
-            j += 2 + 1;
-            //from first + i --- j+1
-            size_t beg_index = uFirst + i;
-            size_t end_index = j + 1;
-            while (beg_index < end_index) {
-                //swap only the pointers around, leave the vector alone
-                beg_index++;
-                end_index--;
+    for (size_t i = uFirst; i < uLast - 1; i++) {
+        for (size_t j = i + 2; j < uLast; j++) {
+            size_t beg_index = i;
+            size_t end_index = j;
+            //printf("Left:%d    Right:%d\n", int(beg_index), int(end_index));
+
+            //swap only the pointers around, leave the vector alone
+            for(int left = beg_index, right = end_index; left < end_index; left++, right--) {
+                routeList[right]->pNext = routeList[right - 1];
             }
+            routeList[beg_index - 1]->pNext = routeList[end_index];
+            routeList[beg_index]->pNext = routeList[end_index + 1];
+
             float fNewDistance = pStart->GetDistance();
             if (fNewDistance < fBestDistance) {
                 fBestDistance = fNewDistance;
+                printL("Found new best");
                 // now swap the vector too since we only swapped the pointers
+                for(int left = beg_index, right = end_index; left < right; left++, right--) {
+                    Route* temp = routeList[left];
+                    routeList[left] = routeList[right];
+                    routeList[right] = temp;
+                }
+                // for (int n = 0; n < routeList.size() - 1; n++) {
+                //     if (routeList[n]->pNext != routeList[n+1]) {
+                //         printf("Something is wrong[left,right,n]%d %d %d\n", beg_index, end_index, n);
+                //         delete pStart;
+                //         pStart = new Route(start);
+                //         return pStart;
+                //     }
+                // }
             } else {
                 //put the pointers back
+                for(int left = beg_index - 1; left <= end_index; left++) {
+                    routeList[left]->pNext = routeList[left + 1];
+                }
+                // for (int n = 0; n < routeList.size() - 1; n++) {
+                //     if (routeList[n]->pNext != routeList[n+1]) {
+                //         printf("Something is wrong2[left,right,n]%d %d %d\n", beg_index, end_index, n);
+                //         delete pStart;
+                //         pStart = new Route(start);
+                //         return pStart;
+                //     }
+                // }
             }
         }
     }
