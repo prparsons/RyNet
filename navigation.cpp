@@ -577,7 +577,8 @@ Route* Navigator::RestoreRoute(Route* pRoute)
     delete pVisited; // No longer needed
 
     // Send message with new route to the flight controller
-    control.RestoreRoute();
+    //control.RestoreRoute();
+    control.SetRoute(*pRoute, true);
     return pRoute;
 }
 

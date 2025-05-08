@@ -536,7 +536,9 @@ def cmdTakeoff(vehicle, element):
 
 def cmdWaypointRetrieve(vehicle, UDPServerSocket, address, saltBytes):
     cmds = vehicle.commands
+    print(cmds.next)
     strReply = "%d" % cmds.next
+    print(strReply)
     sendReply(UDPServerSocket, address, strReply, saltBytes)
 
 def cmdDir(vehicle, element):
@@ -801,7 +803,7 @@ def arm_and_takeoff(vehicle, aTargetAltitude):
 
 def recvUDP(sock, vehicle):
     # try:
-    message,address = sock.recvfrom(1024)
+    message,address = sock.recvfrom(8192)
     if args.udp_hmac != '':
         if len(message) < 32:
             print('message verification, too short failure')
@@ -809,6 +811,7 @@ def recvUDP(sock, vehicle):
             return
         if hmacVerifyMessage(message[:32], message[32:36], message[36:], args.udp_hmac) == False:
             print('message verification failure')
+            print(message[36:])
             return
         parseXML(message[32:], vehicle, sock, address)
     else:

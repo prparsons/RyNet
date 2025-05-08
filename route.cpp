@@ -223,7 +223,7 @@ std::string Route::toString() const
 {
     char stringstreamSucks[256];
 
-    snprintf(stringstreamSucks, 256, "%d %d %d %d %.1f %.1f %.1f %.1f %.6f %.6f %.1f %d",
+    snprintf(stringstreamSucks, 256, "%d\t%d\t%d\t%d\t%.1f\t%.1f\t%.1f\t%.1f\t%.6f\t%.6f\t%.1f\t%d",
         int(cmd.seq),
         int(cmd.current),
         int(cmd.frame),
@@ -338,8 +338,9 @@ Route* Route::cleanRoute(Route* pStart, CoordNode* pVisitedPoints)
 Route* Route::removeVisited(Route* pStart, int16_t iNextPoint)
 {
     if (pStart == nullptr) return nullptr;
-    printL("removeVisited");
-    while (pStart && pStart->cmd.seq < iNextPoint) {
+    printf("removeVisited[%d]\n", iNextPoint);
+    printf("First thing is %d\n", pStart->cmd.seq);
+    while ((pStart != nullptr) && (pStart->cmd.seq < iNextPoint)) {
         Route* pDelete = pStart;
         pStart = pStart->pNext;
 

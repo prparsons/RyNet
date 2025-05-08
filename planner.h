@@ -52,7 +52,7 @@ public:
     void SetRTL();
     void SetAltitude(float fAltitudeMeters);
     void RestoreRoute();
-    void SetRoute(Route* pNewRoute, bool bSetAuto); // Replaces current route with this one, will takeover ownership.
+    void SetRoute(const Route& NewRoute, bool bSetAuto); // Replaces current route with this one, will takeover ownership.
 
     void SetServerAddress(const char* scServerAddress);
     void SetUdpKey(const char* scUdpKey);

@@ -7,3 +7,5 @@ nav_target 0
 hmac_udp SecretKey
 valid_pixels 20
 log_visited
+guide_time 10
+guide_distance 40

@@ -184,6 +184,7 @@ bool FlightController::GetPosition(float& fLat, float& fLon)
 {
     if (pInstance == nullptr) return false;
     uint32_t uSalt = pInstance->SendRecXML("<pos_retrieve />");
+    printf("pos_retrieve %d\n", int(uSalt));
     char* sc = pInstance->GetUdp(uSalt, 100);
     if (sc == nullptr) {
         printL(" GetPosition fail");
@@ -207,6 +208,7 @@ bool FlightController::GetHeading(float& fHeading)
 {
     if (pInstance == nullptr) return false;
     uint32_t uSalt = pInstance->SendRecXML("<heading_retrieve />");
+    printf("heading_retrieve %d\n", int(uSalt));
     char* sc = pInstance->GetUdp(uSalt, 100);
     if (sc == nullptr) {
         printL(" GetHeading fail");
@@ -221,6 +223,7 @@ bool FlightController::GetSpeed(float& fSpeedMS)
 {
     if (pInstance == nullptr) return false;
     uint32_t uSalt = pInstance->SendRecXML("<speed_retrieve />");
+    printf("speed_retrieve %d\n", int(uSalt));
     char* sc = pInstance->GetUdp(uSalt, 100);
     if (sc == nullptr) {
         printL(" GetSpeed fail");
@@ -235,6 +238,7 @@ bool FlightController::GetAltitude(float& fAltitude)
 {
     if (pInstance == nullptr) return false;
     uint32_t uSalt = pInstance->SendRecXML("<altitude_retrieve />");
+    printf("altitude_retrieve %d\n", int(uSalt));
     char* sc = pInstance->GetUdp(uSalt, 100);
     if (sc == nullptr) {
         printL(" GetAltitude fail");
@@ -249,6 +253,7 @@ bool FlightController::GetMode(char* scMode, int iStrLen)
 {
     if (pInstance == nullptr) return false;
     uint32_t uSalt = pInstance->SendRecXML("<mode_retrieve />");
+    printf("mode_retrieve %d\n", int(uSalt));
     char* sc = pInstance->GetUdp(uSalt, 100);
     if (sc == nullptr) {
         printL(" GetMode fail");
@@ -263,6 +268,7 @@ int FlightController::GetBattery()
 {
     if (pInstance == nullptr) return false;
     uint32_t uSalt = pInstance->SendRecXML("<battery_retrieve />");
+    printf("battery_retrieve %d\n", int(uSalt));
     char* sc = pInstance->GetUdp(uSalt, 100);
     if (sc == nullptr) {
         printL(" GetBattery fail");
@@ -277,6 +283,7 @@ Route* FlightController::GetRoute()
 {
     if (pInstance == nullptr) return nullptr;
     uint32_t uSalt = pInstance->SendRecXML("<route_retrieve />");
+    printf("route_retrieve %d\n", int(uSalt));
     char* sc = pInstance->GetUdp(uSalt, 5000);
     if (sc == nullptr) {
         printL("GetRoute failed");
@@ -306,12 +313,13 @@ bool FlightController::GetNextWaypoint(int16_t& iNextPoint)
 {
     if (pInstance == nullptr) return false;
     uint32_t uSalt = pInstance->SendRecXML("<waypoint_current_retrieve />");
+    printf("waypoint_current_retrieve %d\n", int(uSalt));
     char* sc = pInstance->GetUdp(uSalt, 100);
     if (sc == nullptr) {
         printL(" GetNextWaypoint fail");
         return false;
     }
-    iNextPoint = int16_t(atoi(sc));
+    iNextPoint = int16_t(atoi(sc + RECV_OFFSET));
     return true;
 }
 
@@ -393,11 +401,18 @@ void FlightController::RestoreRoute()
     SendXML(scRouteString);
 }
 
-void FlightController::SetRoute(Route* pNewRoute, bool bSetAuto)
+void FlightController::SetRoute(const Route& NewRoute, bool bSetAuto)
 {
-    if (pNewRoute == nullptr) return;
+    std::string strRoute = "<route_set ";
+    if (bSetAuto) {
+        strRoute += "setauto='true'>";
+    } else {
+        strRoute += ">";
+    }
+    strRoute += NewRoute.toString();
+    strRoute += "</route_set>";
 
-    delete pNewRoute;
+    SendXML(strRoute.c_str());
 }
 
 void FlightController::SetServerAddress(const char* scServerAddress)
