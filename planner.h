@@ -51,7 +51,6 @@ public:
     void SetDestination(float fHeadingOffsetDeg, float fDistance); // Store route, adjust heading, after distance will automatically restore route
     void SetRTL();
     void SetAltitude(float fAltitudeMeters);
-    void RestoreRoute();
     void SetRoute(const Route& NewRoute, bool bSetAuto); // Replaces current route with this one, will takeover ownership.
 
     void SetServerAddress(const char* scServerAddress);

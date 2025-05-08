@@ -390,17 +390,6 @@ void FlightController::SetAltitude(float fAltitudeMeters)
     SendXML(sc);
 }
 
-void FlightController::RestoreRoute()
-{
-    const char* scRouteString = "<route_restore setauto='true'/>";
-    if (iRouteCleanType == 1) {
-        scRouteString = "<route_restore setauto='true' clean='simple'/>";
-    } else if (iRouteCleanType == 2) {
-        scRouteString = "<route_restore setauto='true' clean='2opt'/>";
-    }
-    SendXML(scRouteString);
-}
-
 void FlightController::SetRoute(const Route& NewRoute, bool bSetAuto)
 {
     std::string strRoute = "<route_set ";

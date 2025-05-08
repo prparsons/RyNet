@@ -11,7 +11,6 @@ import selectors
 import argparse  
 import hashlib
 import hmac
-from tsp import *
 import numpy as np
 from pymavlink.dialects.v20 import ardupilotmega as mavlink2
 import datetime
@@ -61,15 +60,6 @@ Command Documentation:
 
 <route_load setauto='true'>MISSION_FILENAME</route_load>
     Loads a waypoints file as the current mission
-        setauto -- if present and true, will set the autopilot's mode to auto after setting the route
-    --livetest disabled
-
-<route_restore loadsaved='true' lat='35.1' lon='-110.1' clean='simple' setauto='true' />
-    Restores a route, optionally cleaning it and setting vehicle mode to AUTO
-        loadsave -- if present and true, will load route from savedMission.txt[default:current mission]
-        lat,lon -- if present, will be used as the current location in cleaning routine
-        clean -- [simple] will find closest waypoint and remove everything prior to it
-                 [2opt] will remove visited waypoints and use 2opt to reconstruct route
         setauto -- if present and true, will set the autopilot's mode to auto after setting the route
     --livetest disabled
 
@@ -322,17 +312,6 @@ def mission_to_hex(missionList):
 
     return outputBytes
 
-def mission_cleanSimple(missionList, nextWaypoint, fLat, fLon):
-    missionListClean = []
-    fDistClosest = 9999999999.0
-    for cmd in missionList[nextWaypoint:]:
-        fDist = hs.haversine((fLat, fLon), (cmd.x, cmd.y), unit=hs.Unit.METERS)
-        if fDist < fDistClosest:
-            fDistClosest = fDist
-            missionListClean = []
-        missionListClean.append(cmd)
-    return missionListClean
-
 class reducedPoint:
     def __init__(self, pt):
         self.Xt = int(pt[0] * 10000) * 0.0001
@@ -345,173 +324,36 @@ class reducedPoint:
     def __repr__(self):
         return "(%f, %f)" % (self.Xt, self.Yt)
 
-
-def mission_sortVisted(visitedList):
-    sortedList = []
-    # Create a list of lists...reduce precision so that close latitude points will
-    #   be grouped in the same list, which is then sorted by longitude in the same
-    #   way.
-    for point in visitedList:
-        newPoint = reducedPoint(point)
-        inserted = False
-        for i in range(len(sortedList)):
-            if newPoint.Xt >= sortedList[i][0].Xt:
-                j = 0
-                if newPoint.Xt == sortedList[i][0].Xt:
-                    while j < len(sortedList[i]):
-                        if newPoint.Yt > sortedList[i][j].Yt:
-                            inserted = True
-                            sortedList[i].insert(j, newPoint)
-                            break
-                        j += 1
-                else:
-                    #Insert new sublist in sortedList
-                    inserted = True
-                    sortedList.insert(i, [newPoint])
-
-                if inserted is False:
-                    # If we make it here, it needs to go the end of the sublist [i]
-                    sortedList[i].append(newPoint)
-                    inserted = True
-                break
-        if inserted is False:
-            sortedList.append([newPoint])
-    return sortedList
-
-def sortLat(visitedList, point, clean_dist_way):
-    # VisitedList is the sublist of points that share the same reduced precision latitude.
-    #   Now search the sub list for the thing with the closest longitude to point. Once 
-    #   that is found, it should be the closest visited point to point, so then check the
-    #   distance of that and compare it to clean_dist_way, returning True if it's closer 
-    #   than that and should be removed
-    deltaToY = abs(point.y - visitedList[0].Yt)
-    bSearched = False
-    removePoint = False
-    lenMin1 = len(visitedList) - 1
-    for j in range(lenMin1):
-        newDelta = abs(point.y - visitedList[j+1].Yt)
-        if newDelta >= deltaToY:
-            #check the distance
-            bSearched = True
-            fDist = hs.haversine(visitedList[j].pt, (point.x, point.y), unit=hs.Unit.METERS)
-            if fDist < clean_dist_way:
-                removePoint = True
-            break
-
-        deltaToY = newDelta
-    if not bSearched:
-        fDist = hs.haversine(visitedList[lenMin1].pt, (point.x, point.y), unit=hs.Unit.METERS)
-        if fDist < clean_dist_way:
-            removePoint = True
-    
-    return removePoint
-
-def sort(visitedList, missionList, clean_dist_way):
-    # First, sort the mission list
-    visitedSortedList = mission_sortVisted(visitedList)
-    missionListClean = []
-    lenMin1 = len(visitedSortedList) - 1
-    for cmd in missionList:
-        removePoint = False
-        #Only check waypoints...but we need to get rid of takeoff, and all the waypoints we've
-        #visited while following the route before we went off Auto. so visitedList is a bad
-        #way to do this as currently implemented
-        if cmd.command == 16:
-            # Look for the points with the closest latitude, then we'll search that sublist
-            #   for things with the closest longitude
-            deltaToX = abs(cmd.x - visitedSortedList[0][0].Xt)
-            bSearched1 = False
-            for i in range(lenMin1):
-                newDelta = abs(cmd.x - visitedSortedList[i+1][0].Xt)
-                if newDelta >= deltaToX:
-                    bSearched1 = True
-                    removePoint = sortLat(visitedSortedList[i], cmd, clean_dist_way)
-                    break 
-                deltaToX = newDelta
-            if not bSearched1:
-                removePoint = sortLat(visitedSortedList[lenMin1], cmd, clean_dist_way)
+# def sort(visitedList, missionList, clean_dist_way):
+#     # First, sort the mission list
+#     visitedSortedList = mission_sortVisted(visitedList)
+#     missionListClean = []
+#     lenMin1 = len(visitedSortedList) - 1
+#     for cmd in missionList:
+#         removePoint = False
+#         #Only check waypoints...but we need to get rid of takeoff, and all the waypoints we've
+#         #visited while following the route before we went off Auto. so visitedList is a bad
+#         #way to do this as currently implemented
+#         if cmd.command == 16:
+#             # Look for the points with the closest latitude, then we'll search that sublist
+#             #   for things with the closest longitude
+#             deltaToX = abs(cmd.x - visitedSortedList[0][0].Xt)
+#             bSearched1 = False
+#             for i in range(lenMin1):
+#                 newDelta = abs(cmd.x - visitedSortedList[i+1][0].Xt)
+#                 if newDelta >= deltaToX:
+#                     bSearched1 = True
+#                     removePoint = sortLat(visitedSortedList[i], cmd, clean_dist_way)
+#                     break 
+#                 deltaToX = newDelta
+#             if not bSearched1:
+#                 removePoint = sortLat(visitedSortedList[lenMin1], cmd, clean_dist_way)
                 
-        if not removePoint:
-            missionListClean.append(cmd)
+#         if not removePoint:
+#             missionListClean.append(cmd)
     
-    return missionListClean
+#     return missionListClean
 
-def mission_removeVisited(missionList):
-    global visitedList
-    """
-    Best way to optimize this i've thought of so far, sort both lists. Then basically use a search algorithm for each point in
-    the missionList to see if it's been near a visited point.
-    """
-    #First, go over the visitedList and remove points that are too close to each other
-    pointLast = visitedList[0]
-    visitedReplace = [visitedList[0]]
-    for point in visitedList[1:]:
-        fDist = hs.haversine((pointLast[0], pointLast[1]), (point[0], point[1]), unit=hs.Unit.METERS)
-        if fDist > args.clean_dist_visit:
-            visitedReplace.append(point)
-            pointLast = point
-    visitedList = visitedReplace
-
-    testOptim = True
-    
-    #Now, go over missionList and remove any points close to one that we've visited while off the pre-programmed route
-    missionListClean = []
-
-    if not testOptim:
-        for cmd in missionList:
-            removePoint = False
-            #Only check waypoints...but we need to get rid of takeoff, and all the waypoints we've
-            #visited while following the route before we went off Auto. so visitedList is a bad
-            #way to do this as currently implemented
-            if cmd.command == 16:
-                for point in visitedList:
-                    fDist = hs.haversine((point[0], point[1]), (cmd.x, cmd.y), unit=hs.Unit.METERS)
-                    if fDist < args.clean_dist_way:
-                        removePoint = True
-                        break
-            if not removePoint:
-                missionListClean.append(cmd)
-    else:
-        missionListClean = sort(visitedList, missionList, args.clean_dist_way)
-
-    return missionListClean
-
-def mission_cleanBetter(missionList, nextWaypoint, fLat, fLon):
-    """
-    Assume the mission will be a grid search
-    So, this could be a traveling salesman problem I suppose.
-    One thing to consider is battery life: if you have just enough battery to finish your desired grid and
-    go off the grid search to follow something, you likely won't have enough battery to finish the original
-    route. So leave reserve (possibly not going as far as you could have), plan exactly enough and don't 
-    worry if you can't visit it all, or plan more than you could visit anyways knowing you can't visit it
-    all. 
-    Further thoughts on battery life...figure out the best route...do we have enough battery to do that?
-        no:
-            remove the furthest point, try again? (that's expensive)
-            or
-            figure out how much distance we need to remove, start at the furthest point...go to the next 
-            furthest point (whichever direction that is from the furthest). Continue that strategy until
-            the tour we remove matches the distance we need to recover, then re-run tsp
-    Avoid revisiting areas maximizes area covered...and we know the start point.
-
-    """
-    missionList = mission_removeVisited(missionList)
-    cmdCurrent = Command(missionList[0].target_system,
-                         missionList[0].target_component,
-                         missionList[0].seq,
-                         missionList[0].frame,
-                         missionList[0].command,
-                         0,
-                         0,
-                         missionList[0].param1,
-                         missionList[0].param2,
-                         missionList[0].param3,
-                         missionList[0].param4,
-                         vehicle.location.global_frame.lat,
-                         vehicle.location.global_frame.lon,
-                         100)#this needs to be a parameter
-    missionList.insert(0, cmdCurrent)
-    return tsp2opt(missionList)
 
 def parseXML(message, vehicle, UDPServerSocket, address):
     saltBytes = message[:4]
@@ -627,32 +469,6 @@ def cmdRouteLoad(vehicle, element):
             while not vehicle.mode.name =='AUTO':
                 time.sleep(0.01)
 
-def cmdRouteRestore(vehicle, element):
-    if 'loadsaved' in element.attrib:
-        if element.attrib['loadsaved'] == 'true':
-            missionList = readmissionF('savedMission.txt', vehicle)
-    else:
-        missionList = missionList = download_mission(vehicle, skipVisited=True)
-        
-    if 'lat' in element.attrib:
-        fLat = float(element.attrib['lat'])
-        fLon = float(element.attrib['lon'])
-    else:
-        fLat = vehicle.location.global_frame.lat
-        fLon = vehicle.location.global_frame.lon
-    if 'clean' in element.attrib:
-        if element.attrib['clean'] == 'simple':
-            missionList = mission_cleanSimple(missionList, 0, fLat, fLon)
-        elif element.attrib['clean'] == '2opt':
-            missionList = mission_cleanBetter(missionList, 0, fLat, fLon)
-
-    upload_mission(missionList, vehicle)
-    if 'setauto' in element.attrib:
-        if element.attrib['setauto'] == 'true':
-            vehicle.mode = VehicleMode("AUTO")
-            while not vehicle.mode.name=='AUTO':
-                time.sleep(0.01)
-
 def cmdRoutRetrieve(vehicle, UDPServerSocket, address, saltBytes):
     missionList = download_mission(vehicle)
     #missionStr = mission_to_str(missionList)
@@ -757,15 +573,6 @@ def handleCommand(element, vehicle, UDPServerSocket, address, saltBytes):
 
     elif element.tag == 'speed_retrieve':
         cmdSpeedRetrieve(vehicle, UDPServerSocket, address, saltBytes)
-        
-    elif element.tag == 'route_restore':
-        if args.livetest == True:
-            return
-        if vehicle.mode.name =='RTL':
-            print("Current mode is RTL, not restoring route");
-            return
-        cmdRouteRestore(vehicle, element)
-        visitedList = []
 
     else:
         print("Unknown command")
