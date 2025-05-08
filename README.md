@@ -1,7 +1,7 @@
 # RyNet
-Drone search project. Navigate by segmentation network (looking for proper terrain), detection network running simultaneously (looking for the actual target, and collect more training data). Eventual end goal is to allow some transfer learning in flight if detection network finds targets, allowing it to improve accuracy in specific terrains.
+Drone search project. Navigate by segmentation network (looking for proper terrain), detection network running simultaneously (looking for the actual target, and collect more training data). Eventual end goal is to allow some transfer learning in flight if detection network finds targets, allowing it to improve accuracy in specific terrains. Running software on an nVidia Jetson, connected via UART to an ardupilot drone controller (CubePilot).
 
-Currently is working (camera in portrain mode), testing with dronekit's simulator. Needs proper exception handling before live flight, as well as hardware failsafe to disconnect jetson from flight controller. Python server script needs creation (current .py file is just a notebook used to verify everything works)
+General "how it works": you program a route, and start the drone following that route in auto. The app will then switch it to guided when the segmentation network detects the desired category, and keep going so long as desired category is in frame. Once there's nothing else new in frame, it will remove any points it "visited" while in guided mode from the route, then re-arrange remaining waypoints for the shortest path possible before switching back to auto. Currently is working (camera in portrain mode), testing with dronekit's simulator as well as live flights without commanding drone (python script --livetest).
 
 Building/testing
 It "should" be able to be built in windows via WSL. This is what I can remember from looking at the little nvidia jetson nano.
