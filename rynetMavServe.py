@@ -312,58 +312,15 @@ def mission_to_hex(missionList):
 
     return outputBytes
 
-class reducedPoint:
-    def __init__(self, pt):
-        self.Xt = int(pt[0] * 10000) * 0.0001
-        self.Yt = int(pt[1] * 10000) * 0.0001
-        self.pt = (pt[0], pt[1])
-
-    def __str__(self):
-        return "(%f, %f)" % (self.Xt, self.Yt)
-
-    def __repr__(self):
-        return "(%f, %f)" % (self.Xt, self.Yt)
-
-# def sort(visitedList, missionList, clean_dist_way):
-#     # First, sort the mission list
-#     visitedSortedList = mission_sortVisted(visitedList)
-#     missionListClean = []
-#     lenMin1 = len(visitedSortedList) - 1
-#     for cmd in missionList:
-#         removePoint = False
-#         #Only check waypoints...but we need to get rid of takeoff, and all the waypoints we've
-#         #visited while following the route before we went off Auto. so visitedList is a bad
-#         #way to do this as currently implemented
-#         if cmd.command == 16:
-#             # Look for the points with the closest latitude, then we'll search that sublist
-#             #   for things with the closest longitude
-#             deltaToX = abs(cmd.x - visitedSortedList[0][0].Xt)
-#             bSearched1 = False
-#             for i in range(lenMin1):
-#                 newDelta = abs(cmd.x - visitedSortedList[i+1][0].Xt)
-#                 if newDelta >= deltaToX:
-#                     bSearched1 = True
-#                     removePoint = sortLat(visitedSortedList[i], cmd, clean_dist_way)
-#                     break 
-#                 deltaToX = newDelta
-#             if not bSearched1:
-#                 removePoint = sortLat(visitedSortedList[lenMin1], cmd, clean_dist_way)
-                
-#         if not removePoint:
-#             missionListClean.append(cmd)
-    
-#     return missionListClean
-
-
 def parseXML(message, vehicle, UDPServerSocket, address):
     saltBytes = message[:4]
     message = message[4:]
-    # try:
-    root = ET.fromstring(message)
-    print(root)
-    handleCommand(root, vehicle, UDPServerSocket, address, saltBytes)
-    # except:
-    # print("parseXML error")
+    try:
+        root = ET.fromstring(message)
+        print(root)
+        handleCommand(root, vehicle, UDPServerSocket, address, saltBytes)
+    except:
+        print("parseXML error")
     return
 
 def cmdTakeoff(vehicle, element):
@@ -609,22 +566,22 @@ def arm_and_takeoff(vehicle, aTargetAltitude):
         time.sleep(1)
 
 def recvUDP(sock, vehicle):
-    # try:
-    message,address = sock.recvfrom(8192)
-    if args.udp_hmac != '':
-        if len(message) < 32:
-            print('message verification, too short failure')
-            print(message)
-            return
-        if hmacVerifyMessage(message[:32], message[32:36], message[36:], args.udp_hmac) == False:
-            print('message verification failure')
-            print(message[36:])
-            return
-        parseXML(message[32:], vehicle, sock, address)
-    else:
-        parseXML(message, vehicle, sock, address)
-    # except:
-        # print('recv failure')
+    try:
+        message,address = sock.recvfrom(8192)
+        if args.udp_hmac != '':
+            if len(message) < 32:
+                print('message verification, too short failure')
+                print(message)
+                return
+            if hmacVerifyMessage(message[:32], message[32:36], message[36:], args.udp_hmac) == False:
+                print('message verification failure')
+                print(message[36:])
+                return
+            parseXML(message[32:], vehicle, sock, address)
+        else:
+            parseXML(message, vehicle, sock, address)
+    except:
+        print('recv failure')
 
 # Set up connection string to the drone
 connection_string = args.connect

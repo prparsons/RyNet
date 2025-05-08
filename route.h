@@ -34,7 +34,7 @@ public:
         int16_t seq;
         int16_t current;
         int16_t frame;
-        int16_t command;
+        int16_t command; // 16 is a waypoint
         float param1;
         float param2;
         float param3;
@@ -45,18 +45,20 @@ public:
         int16_t autocontinue;
     };
 
-    Route(char* buffer, Route& prev);
-    Route(char* buffer, size_t uBufferLen);
     Route(const Route& other);
     ~Route();
 
     std::string toString() const;
     float GetDistance() const;
+
+    static Route* CreateRoute(char* buffer, size_t uBufferLen);
     static Route* Tsp2Opt(Route* pStart, CoordNode* pVisitedPoints, int16_t iNextPoint);
 
     command cmd;
 
 private:
+    Route(char* buffer, Route& prev);
+    Route(char* buffer, size_t uBufferLen);
     Route(const command& cmdCopy);
 
     static Route* cleanRoute(Route* pStart, CoordNode* pVisitedPoints); // Takes over pStart, returns new start

@@ -292,10 +292,7 @@ Route* FlightController::GetRoute()
     char* scRoute = sc + RECV_OFFSET;
     
     uint32_t& uLen = *((uint32_t*)sc);
-    //@todo
-    // Since it's done in the constructor...either throw exception or have a not constructor static
-    // method that returns the pointer.
-    Route* pRoute = new Route(scRoute, uLen - RECV_OFFSET);
+    Route* pRoute = Route::CreateRoute(scRoute, uLen - RECV_OFFSET);
 
     delete[] sc;
     return pRoute;
@@ -598,7 +595,7 @@ void FlightController::runRecv(StopSignal ss)
         // Frame layout: { uint32_t size, char[32] digest, uint32_t salt, char[] message}
         buffer = recvUdp();
         if (buffer) {
-            // Verify that the message is valid
+            // Verify that the message is valid (start of digest, size - the size/digest/salt)
             if (!VerifyMessage(buffer + 4, *((uint32_t*)buffer) - 4 - 32 - 4)) {
                 printL("Verify Fail");
                 delete[] buffer;
@@ -641,7 +638,7 @@ char* FlightController::recvUdp()
         } else {
             bSuccess = true;
         }
-        // Don't cause problems with a too big "size" for the buffer need to hash or parity or crc message
+        // Don't cause problems with a too big "size" for the buffer
         if (*size > recvSize) {
             bSuccess = false;
             break;
@@ -715,9 +712,7 @@ void FlightController::SendXML(const char* _scMessage)
 bool FlightController::VerifyMessage(const char* _scMessage, uint32_t uMessageLength)
 {
     const char* scHmacOrig = _scMessage;
-    const char* scMessage = _scMessage + 32 + 4;
-    // size_t uMessageLength = strlen(scMessage);
-    // uint32_t uMessageLength = *((unit32_t*)_scMessage)
+    const char* scMessage = _scMessage + 32 + 4; // _scMessage is at start of digest...skip that and the salt for just the message
     const char* scMessageAndSalt = _scMessage + 32;
     bool bReturn = true;
 

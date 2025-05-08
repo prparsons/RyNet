@@ -3,6 +3,8 @@ Drone search project. Navigate by segmentation network (looking for proper terra
 
 Currently is working (camera in portrain mode), testing with dronekit's simulator. Needs proper exception handling before live flight, as well as hardware failsafe to disconnect jetson from flight controller. Python server script needs creation (current .py file is just a notebook used to verify everything works)
 
+The python DroneKit library was the most complete library I found, so there's a python script that communicates directly with the drone. It listens via UDP for the c++ program that does the actual work. Since the drone will have wifi, implemented a simple hmac based authentication scheme for the UDP packets (also provides verification of message correctness/completeness).
+
 Building/testing
 It "should" be able to be built in windows via WSL. This is what I can remember from looking at the little nvidia jetson nano.
 <ul>

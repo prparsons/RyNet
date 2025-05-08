@@ -248,7 +248,17 @@ float Route::GetDistance() const
     float fDistance = PointDistanceM(cmd.lat, cmd.lon, pNext->cmd.lat, pNext->cmd.lon);
     return fDistance + pNext->GetDistance();
 }
-#include <time.h>
+
+Route* Route::CreateRoute(char* buffer, size_t uBufferLen)
+{
+    const size_t sizeCmd = sizeof(command);
+    if (uBufferLen % sizeCmd != 0) {
+        return nullptr;
+    }
+
+    return new Route(buffer, uBufferLen);
+}
+
 Route* Route::Tsp2Opt(Route* pStart, CoordNode* pVisitedPoints, int16_t iNextPoint)
 {
     if (pStart == nullptr) return nullptr;
@@ -257,8 +267,7 @@ Route* Route::Tsp2Opt(Route* pStart, CoordNode* pVisitedPoints, int16_t iNextPoi
     pStart = Route::removeVisited(pStart, iNextPoint);
 
 
-    //@todo get rid of non-commands
-    CoordNode cheat(39.45893080,	-105.04784280);
+    //@todo get rid of non-commands?
     // If we have a list of points we've been to in guided, use that to clear out any waypoints
     // that have already been "visited".
     if (pVisitedPoints) {
@@ -267,7 +276,6 @@ Route* Route::Tsp2Opt(Route* pStart, CoordNode* pVisitedPoints, int16_t iNextPoi
 
     // // Now run the 2Opt algorithm on the remaining path
     float fCurrentDistance = pStart->GetDistance();
-    clock_t start = clock();
     Route* pNewRoute = single2Opt(*pStart);
     float fNewDistance = pNewRoute->GetDistance();
     while (fNewDistance / fCurrentDistance < 1.0) {
@@ -279,9 +287,6 @@ Route* Route::Tsp2Opt(Route* pStart, CoordNode* pVisitedPoints, int16_t iNextPoi
         pNewRoute = single2Opt(*pStart);
         fNewDistance = pNewRoute->GetDistance();
     }
-    clock_t end = clock();
-    printf("Time for single 2opt: %f\n", float(end - start) / CLOCKS_PER_SEC);
-    printL(pNewRoute->toString().c_str());
     delete pNewRoute;
     return pStart;
 }
@@ -290,7 +295,7 @@ Route* Route::cleanRoute(Route* pStart, CoordNode* pVisitedPoints)
 {
     if (pStart == nullptr) return nullptr;
     if (pVisitedPoints == nullptr) return nullptr;
-    printf("cleanRoute pstart %p\n", pStart);
+    
     std::queue<Route*> closeWaypoints;
     float fTooClose = 100;
     // First start off by checking each waypoint against the visited list
@@ -298,17 +303,18 @@ Route* Route::cleanRoute(Route* pStart, CoordNode* pVisitedPoints)
         const CoordNode* pClosestPoint = pVisitedPoints->GetClosest(pThis->cmd.lat, pThis->cmd.lon);
         if (pClosestPoint == nullptr) {
             printL("no closest point?");
+            //@todo
         }
         if (pClosestPoint->GetDistance(pThis->cmd.lat, pThis->cmd.lon) < fTooClose) {
             closeWaypoints.push(pThis);
         }
     }
-        printf("Close waypoints size: %d\n", int(closeWaypoints.size()));
+    
     if (closeWaypoints.size() == 0) {
-        printL("No points to remove, returning");
+        // No points to remove
         return pStart;
     }
-    printL("done checking list");
+    
     // Start off seeing if we need to advance pStart as we delete the first things on the list
     while (closeWaypoints.front() == pStart) {
         pStart = pStart->pNext;
@@ -317,7 +323,6 @@ Route* Route::cleanRoute(Route* pStart, CoordNode* pVisitedPoints)
         delete closeWaypoints.front();
         closeWaypoints.pop();
     }
-    printL("done seeing if we need to advance pStart");
 
     // Then just look for pNext pointers that match the queue
     for (Route* pThis = pStart; pThis != nullptr && closeWaypoints.front() != nullptr;) {
@@ -338,13 +343,11 @@ Route* Route::cleanRoute(Route* pStart, CoordNode* pVisitedPoints)
 Route* Route::removeVisited(Route* pStart, int16_t iNextPoint)
 {
     if (pStart == nullptr) return nullptr;
-    printf("removeVisited[%d]\n", iNextPoint);
-    printf("First thing is %d\n", pStart->cmd.seq);
+    
     while ((pStart != nullptr) && (pStart->cmd.seq < iNextPoint)) {
         Route* pDelete = pStart;
         pStart = pStart->pNext;
 
-        printf("Removing %p; New Head %p\n", pDelete, pStart);
         pDelete->pNext = nullptr;
         delete pDelete;
     }
@@ -367,7 +370,6 @@ Route* Route::single2Opt(const Route& start)
         for (size_t j = i + 2; j < uLast; j++) {
             size_t beg_index = i;
             size_t end_index = j;
-            //printf("Left:%d    Right:%d\n", int(beg_index), int(end_index));
 
             //swap only the pointers around, leave the vector alone
             for(int left = beg_index; left < end_index; left++) {
@@ -386,27 +388,11 @@ Route* Route::single2Opt(const Route& start)
                     routeList[left] = routeList[right];
                     routeList[right] = temp;
                 }
-                // for (int n = 0; n < routeList.size() - 1; n++) {
-                //     if (routeList[n]->pNext != routeList[n+1]) {
-                //         printf("Something is wrong[left,right,n]%d %d %d\n", beg_index, end_index, n);
-                //         delete pStart;
-                //         pStart = new Route(start);
-                //         return pStart;
-                //     }
-                // }
             } else {
                 //put the pointers back
                 for(int left = beg_index - 1; left <= end_index; left++) {
                     routeList[left]->pNext = routeList[left + 1];
                 }
-                // for (int n = 0; n < routeList.size() - 1; n++) {
-                //     if (routeList[n]->pNext != routeList[n+1]) {
-                //         printf("Something is wrong2[left,right,n]%d %d %d\n", beg_index, end_index, n);
-                //         delete pStart;
-                //         pStart = new Route(start);
-                //         return pStart;
-                //     }
-                // }
             }
         }
     }

@@ -467,10 +467,9 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
     if (pRouteOrig) {
         logger.LogString(pRouteOrig->toString().c_str());
         pRouteCurrent = new Route(*pRouteOrig);
-        printf("Orig Route %p\nCurrent Route %p\n", pRouteOrig, pRouteCurrent);
     } else {
-        printL(" Failed to get route");
-        logger.LogString("Failed to get route");
+        printL(" Failed to get route.");
+        logger.LogString("Failed to get route.");
     }
 
     while (!ss.shouldStop()) {
@@ -568,16 +567,17 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
 
 Route* Navigator::RestoreRoute(Route* pRoute)
 {
+    if (pRoute == nullptr) return nullptr;
+
     // Get any visited points
     CoordNode* pVisited = control.GetVisitedPoints();
-    // Clean the route via the 2opt method
+    // Clean the route (get next waypoint so we can skip every one we've visited)
     int16_t iWaypoint = 1;
     control.GetNextWaypoint(iWaypoint);
     pRoute = Route::Tsp2Opt(pRoute, pVisited, iWaypoint);
-    delete pVisited; // No longer needed
+    delete pVisited;
 
     // Send message with new route to the flight controller
-    //control.RestoreRoute();
     control.SetRoute(*pRoute, true);
     return pRoute;
 }
