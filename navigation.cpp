@@ -573,12 +573,28 @@ Route* Navigator::RestoreRoute(Route* pRoute)
     CoordNode* pVisited = control.GetVisitedPoints();
     // Clean the route (get next waypoint so we can skip every one we've visited)
     int16_t iWaypoint = 1;
-    control.GetNextWaypoint(iWaypoint);
+    if (control.GetNextWaypoint(iWaypoint)) {
+        bool bVisit = pVisited != nullptr;
+        char sc[512];
+        snprintf(sc, 512, "Restoring route; VisitedPoints: %s ; NextWaypoint: %d\n", bVisit ? "YES" : "NO", iWaypoint);
+        logger.LogString(sc);
+    } else {
+        char sc[512];
+        snprintf(sc, 512, "Restoring route; VisitedPoints: %s ; NextWaypoint: NO\n", pVisited != nullptr ? "YES" : "NO");
+        logger.LogString(sc);
+    }
+
     pRoute = Route::Tsp2Opt(pRoute, pVisited, iWaypoint);
     delete pVisited;
+    if (pRoute == nullptr) {
+        printL(" Route failure"); // This shouldn't happen
+        return nullptr;
+    }
 
     // Send message with new route to the flight controller
     control.SetRoute(*pRoute, true);
+    logger.LogString(pRoute->toString().c_str());
+    
     return pRoute;
 }
 
