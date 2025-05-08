@@ -390,6 +390,7 @@ Navigator::Navigator(FlightController& _control, DataLogger& _logger, CameraCont
 , control(_control)
 , logger(_logger)
 , camera(_camera)
+, pRouteOrig(nullptr)
 , sigMainRGB(_camera.GetSignalRGB())
 , pThread(nullptr)
 , detector(logger)
@@ -404,6 +405,9 @@ Navigator::~Navigator()
         ssMain.stop();
         if (pThread->joinable()) pThread->join();
         delete pThread;
+    }
+    if (pRouteOrig != nullptr) {
+        delete pRouteOrig;
     }
 }
     
@@ -445,6 +449,7 @@ void Navigator::SetValidPixels(uint32_t uValidPixels)
 void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
 {
     printL("Navigator::runNavigator");
+    pthread_setname_np(pthread_self(), "Navigator::runNavigator");
 
     bool bGridSearching = true;
     float fMargin = 5;
@@ -456,6 +461,16 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
     
     detector.Start();
     segmenter.Start();
+
+    Route* pRouteCurrent = nullptr;
+    pRouteOrig = control.GetRoute();
+    if (pRouteOrig) {
+        logger.LogString(pRouteOrig->toString().c_str());
+        pRouteCurrent = new Route(*pRouteOrig);
+    } else {
+        printL(" Failed to get route.");
+        logger.LogString("Failed to get route.");
+    }
 
     while (!ss.shouldStop()) {
         sigRGB.wait(1000);
@@ -506,7 +521,7 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
                         tLastChange = time(nullptr);
                     } else {
                         // If it would be an invalid direction, then go back to grid search
-                        control.RestoreRoute();
+                        pRouteCurrent = RestoreRoute(pRouteCurrent);
                         sprintf(sc, "Good Habitat (Invalid Direction) -> %1.3f", segmenter.GetHabitatDirection());
                         bGridSearching = true;
                         tLastChange = time(nullptr);
@@ -518,7 +533,7 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
             } else { // No good terrain is visible right now
                 // So if there's been enough time we'll switch back to grid
                 if (time(nullptr) - tLastChange > tMinTimeBetweenChanges) {
-                    control.RestoreRoute();
+                    pRouteCurrent = RestoreRoute(pRouteCurrent);
                     logger.LogString("Good Habitat -> Grid Search");
                     bGridSearching = true;
                     tLastChange = time(nullptr);
@@ -529,6 +544,14 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
         }
     }
 
+    if (pRouteOrig) {
+        delete pRouteOrig;
+        pRouteOrig = nullptr;
+    }
+    if (pRouteCurrent) {
+        delete pRouteCurrent;
+        pRouteCurrent = nullptr;
+    }
     printL("Navigator::runNavigator loop done, stopping segmenter and detector");
     // Handle all the cleanup
     detector.SendStopSignal();
@@ -540,6 +563,39 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
         delete pThrBattery;
         if (bSendRTL) control.SetRTL();
     }
+}
+
+Route* Navigator::RestoreRoute(Route* pRoute)
+{
+    if (pRoute == nullptr) return nullptr;
+
+    // Get any visited points
+    CoordNode* pVisited = control.GetVisitedPoints();
+    // Clean the route (get next waypoint so we can skip every one we've visited)
+    int16_t iWaypoint = 1;
+    if (control.GetNextWaypoint(iWaypoint)) {
+        bool bVisit = pVisited != nullptr;
+        char sc[512];
+        snprintf(sc, 512, "Restoring route; VisitedPoints: %s ; NextWaypoint: %d\n", bVisit ? "YES" : "NO", iWaypoint);
+        logger.LogString(sc);
+    } else {
+        char sc[512];
+        snprintf(sc, 512, "Restoring route; VisitedPoints: %s ; NextWaypoint: NO\n", pVisited != nullptr ? "YES" : "NO");
+        logger.LogString(sc);
+    }
+
+    pRoute = Route::Tsp2Opt(pRoute, pVisited, iWaypoint);
+    delete pVisited;
+    if (pRoute == nullptr) {
+        printL(" Route failure"); // This shouldn't happen
+        return nullptr;
+    }
+
+    // Send message with new route to the flight controller
+    control.SetRoute(*pRoute, true);
+    logger.LogString(pRoute->toString().c_str());
+    
+    return pRoute;
 }
 
 void Navigator::runBattery(StopSignal ss, StopSignal ssMainThread)

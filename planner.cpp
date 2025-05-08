@@ -14,153 +14,10 @@ bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** s
 
 FlightController* pInstance = nullptr;
 
-CoordNode::CoordNode(float _fLat, float _fLon)
-: fLat(_fLat)
-, fLon(_fLon)
-, nw(nullptr)
-, ne(nullptr)
-, se(nullptr)
-, sw(nullptr)
-{
-}
-
-CoordNode::~CoordNode()
-{
-    DestroyChildren();
-}
-
-float CoordNode::GetDistance(float fLatQuery, float fLonQuery) const
-{
-    return 1.0;
-}
-
-const CoordNode* CoordNode::GetClosest(float fLatQuery, float fLonQuery, float& fDistance) const
-{
-    fDistance = GetDistance(fLatQuery, fLonQuery);
-    float fClosestChild = 9999999;
-    const CoordNode* pNode = nullptr;
-
-    if (fLatQuery > fLat) {
-        // It's north of this node center
-        if (fLonQuery > fLon) {
-            // It's west of this node center
-            pNode = nw->GetClosest(fLatQuery, fLonQuery, fClosestChild);
-            
-        } else {
-            // It's east of this node center
-            pNode = ne->GetClosest(fLatQuery,fLonQuery, fClosestChild);
-        }
-    } else {
-        // It's south of this node center
-        if (fLonQuery > fLon) {
-            // It's west of this node center
-            pNode = sw->GetClosest(fLatQuery, fLonQuery, fClosestChild);
-        } else {
-            // It's east of this node center
-            pNode = se->GetClosest(fLatQuery, fLonQuery, fClosestChild);
-        }
-    }
-
-    if (pNode != nullptr) {
-        if (fClosestChild < fDistance) {
-            fDistance = fClosestChild;
-            return pNode;
-        }
-    }
-    return this;
-}
-
-void CoordNode::InsertPoint(float fLatNew, float fLonNew)
-{
-  if (fLatNew > fLat) {
-        // It's north of this node center
-        if (fLonNew > fLon) {
-            // It's west of this node center
-            if (nw == nullptr) {
-                nw = new CoordNode(fLatNew, fLonNew);
-            } else {
-                nw->InsertPoint(fLatNew, fLonNew);
-            }
-        } else {
-            // It's east of this node center
-            if (ne == nullptr) {
-                ne = new CoordNode(fLatNew, fLonNew);
-            } else {
-                ne->InsertPoint(fLatNew, fLonNew);
-            }
-        }
-    } else {
-        // It's south of this node center
-        if (fLonNew > fLon) {
-            // It's west of this node center
-            if (sw == nullptr) {
-                sw = new CoordNode(fLatNew, fLonNew);
-            } else {
-                sw->InsertPoint(fLatNew, fLonNew);
-            }
-        } else {
-            // It's east of this node center
-            if (se == nullptr) {
-                se = new CoordNode(fLatNew, fLonNew);
-            } else {
-                se->InsertPoint(fLatNew, fLonNew);
-            }
-        }
-    }
-}
-
-void CoordNode::ResetPosition(float _fLat, float _fLon)
-{
-    DestroyChildren();
-    fLat = _fLat;
-    fLon = _fLon;
-}
-
-void CoordNode::DestroyChildren()
-{
-    if (ne != nullptr) {
-        delete ne;
-        ne = nullptr;
-    }
-    if (se != nullptr) {
-        delete se;
-        se = nullptr;
-    }
-    if (sw != nullptr) {
-        delete sw;
-        sw = nullptr;
-    }
-    if (nw != nullptr) {
-        delete nw;
-        nw = nullptr;
-    }
-}
-
-void CoordNode::Print() const
-{
-    printf("{%.3f,%.3f\nNE:", fLat, fLon);
-    if (ne != nullptr) ne->Print();
-    else printf("nullptr\n");
-    
-    printf("SE:");
-    if (se != nullptr) se->Print();
-    else printf("nullptr\n");
-    
-    printf("SW:");
-    if (sw != nullptr) sw->Print();
-    else printf("nullptr\n");
-    
-    printf("NW:");
-    if (nw != nullptr) nw->Print();
-    else printf("nullptr\n");
-
-    printf("}\n");
-}
-
-
 FlightController::FlightController(DataLogger& _logger, CameraController& _camera)
 : logger(_logger)
 , camera(_camera)
+, startLocation(0,0)
 , pThreadDepth(nullptr)
 , pThreadPoint(nullptr)
 , pThreadIr(nullptr)
@@ -398,7 +255,7 @@ bool FlightController::GetMode(char* scMode, int iStrLen)
         return false;
     }
     strncpy(scMode, sc + RECV_OFFSET, iStrLen);
-    delete sc;
+    delete[] sc;
     return true;
 }
 
@@ -412,13 +269,47 @@ int FlightController::GetBattery()
         return false;
     }
     int iBattery = atoi(sc + RECV_OFFSET);
-    delete sc;
+    delete[] sc;
     return iBattery;
 }
 
 Route* FlightController::GetRoute()
 {
-    return nullptr;
+    if (pInstance == nullptr) return nullptr;
+    uint32_t uSalt = pInstance->SendRecXML("<route_retrieve />");
+    char* sc = pInstance->GetUdp(uSalt, 5000);
+    if (sc == nullptr) {
+        printL("GetRoute failed");
+        return nullptr;
+    }
+    char* scRoute = sc + RECV_OFFSET;
+    
+    uint32_t& uLen = *((uint32_t*)sc);
+    Route* pRoute = Route::CreateRoute(scRoute, uLen - RECV_OFFSET);
+
+    delete[] sc;
+    return pRoute;
+}
+
+CoordNode* FlightController::GetVisitedPoints()
+{
+    mtPoints.lock();
+    CoordNode* pStolen = new CoordNode(startLocation, 0, 0);
+    mtPoints.unlock();
+    return pStolen;
+}
+
+bool FlightController::GetNextWaypoint(int16_t& iNextPoint)
+{
+    if (pInstance == nullptr) return false;
+    uint32_t uSalt = pInstance->SendRecXML("<waypoint_current_retrieve />");
+    char* sc = pInstance->GetUdp(uSalt, 100);
+    if (sc == nullptr) {
+        printL(" GetNextWaypoint fail");
+        return false;
+    }
+    iNextPoint = int16_t(atoi(sc + RECV_OFFSET));
+    return true;
 }
 
 int FlightController::CheckDirectionValid(float fDirection, time_t travelTime)
@@ -443,7 +334,6 @@ int FlightController::CheckDirectionValid(float fDirection, time_t travelTime)
         printL("Failed to get position");
         return -1;
     }
-
 
     float fQueryLat = 0;
     float fQueryLon = 0;
@@ -489,22 +379,18 @@ void FlightController::SetAltitude(float fAltitudeMeters)
     SendXML(sc);
 }
 
-void FlightController::RestoreRoute()
+void FlightController::SetRoute(const Route& NewRoute, bool bSetAuto)
 {
-    const char* scRouteString = "<route_restore setauto='true'/>";
-    if (iRouteCleanType == 1) {
-        scRouteString = "<route_restore setauto='true' clean='simple'/>";
-    } else if (iRouteCleanType == 2) {
-        scRouteString = "<route_restore setauto='true' clean='2opt'/>";
+    std::string strRoute = "<route_set ";
+    if (bSetAuto) {
+        strRoute += "setauto='true'>";
+    } else {
+        strRoute += ">";
     }
-    SendXML(scRouteString);
-}
+    strRoute += NewRoute.toString();
+    strRoute += "</route_set>";
 
-void FlightController::SetRoute(Route* pNewRoute, bool bSetAuto)
-{
-    if (pNewRoute == nullptr) return;
-
-    delete pNewRoute;
+    SendXML(strRoute.c_str());
 }
 
 void FlightController::SetServerAddress(const char* scServerAddress)
@@ -640,13 +526,14 @@ void FlightController::runPointLogger(StopSignal ss)
     float fLat = 0;
     float fLon = 0;
     GetPosition(fLat, fLon);
-    CoordNode startLocation(fLat, fLon);
 
     while (!ss.shouldStop()) {
         if (bGuided) { // In GUIDED
             // Get the current position, add it to the list of visited points
             if (GetPosition(fLat, fLon)) {
+                mtPoints.lock();
                 startLocation.InsertPoint(fLat, fLon);
+                mtPoints.unlock();
             }
             // See if we're in guided or auto
             if (GetMode(scMode, 32)) {
@@ -655,12 +542,19 @@ void FlightController::runPointLogger(StopSignal ss)
             if (!bGuided) {
                 // Just switched to guided from auto, so clear visited points
                 GetPosition(fLat, fLon); // Doesn't matter if it fails...we still need to reset position
+                mtPoints.lock();
                 startLocation.ResetPosition(fLat, fLon);
+                mtPoints.unlock();
             }
         } else { // in AUTO            
             // See if we're in guided or auto
             if (GetMode(scMode, 32)) {
                 bGuided = strcmp(scMode, "GUIDED") == 0;
+                if (bGuided) {
+                    mtPoints.lock();
+                    startLocation.ResetPosition(fLat, fLon);
+                    mtPoints.unlock();
+                }
             }
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -693,8 +587,8 @@ void FlightController::runRecv(StopSignal ss)
         // Frame layout: { uint32_t size, char[32] digest, uint32_t salt, char[] message}
         buffer = recvUdp();
         if (buffer) {
-            // Verify that the message is valid
-            if (!VerifyMessage(buffer + 4)) {
+            // Verify that the message is valid (start of digest, size - the size/digest/salt)
+            if (!VerifyMessage(buffer + 4, *((uint32_t*)buffer) - 4 - 32 - 4)) {
                 printL("Verify Fail");
                 delete[] buffer;
                 continue;
@@ -714,27 +608,30 @@ void FlightController::runRecv(StopSignal ss)
 char* FlightController::recvUdp()
 {
     mtXML.lock();
-    char* scResponse = new char[1024];
+    char* scResponse = new char[16384];
     char* scBufferStart = scResponse;
     uint32_t* size = (uint32_t*)scResponse; // Mesage length is beginning of message
+    *size = 0;
     int iLength = 0;
     int iCount = 0;
     bool bSuccess = true;
+    size_t recvSize = 16383;
 
     if (socketDesc < 0) { // Not initialized yet, let send do it
         mtXML.unlock();
         return nullptr;
     }
     do {
-        iLength = recv(socketDesc, scBufferStart, 1023, 0);
+        iLength = recv(socketDesc, scBufferStart, recvSize, 0);
 
         // If we didn't get 4 byte, we don't have a valid message length, so fail
         if (iLength < 4 + 32 + 4) {
             bSuccess = false;
-            break;
+        } else {
+            bSuccess = true;
         }
-        // Don't cause problems with a too big "size" for the buffer need to hash or parity or crc message
-        if (*size > 1023) {
+        // Don't cause problems with a too big "size" for the buffer
+        if (*size > recvSize) {
             bSuccess = false;
             break;
         }
@@ -804,11 +701,10 @@ void FlightController::SendXML(const char* _scMessage)
     #endif
 }
 
-bool FlightController::VerifyMessage(const char* _scMessage)
+bool FlightController::VerifyMessage(const char* _scMessage, uint32_t uMessageLength)
 {
     const char* scHmacOrig = _scMessage;
-    const char* scMessage = _scMessage + 32 + 4;
-    size_t uMessageLength = strlen(scMessage);
+    const char* scMessage = _scMessage + 32 + 4; // _scMessage is at start of digest...skip that and the salt for just the message
     const char* scMessageAndSalt = _scMessage + 32;
     bool bReturn = true;
 
@@ -886,6 +782,16 @@ bool FlightController::VerifyMessage(const char* _scMessage)
         for (int i = 0; i < slen; i++) {
             if (scHmac[i] != scHmacOrig[i]) {
                 bReturn = false;
+                printf(" Digest mismatch[Ours]: ");
+                for (int i = 0; i < slen; i++) {
+                    printf("%02x", scHmac[i]);
+                }
+                printf("\n Digest mismatch[Theirs]: ");
+                for (int i = 0; i < slen; i++) {
+                    printf("%02x", scHmacOrig[i]);
+                }
+                printf("\n");
+                break;
             }
         }
     }
@@ -968,7 +874,7 @@ char* FlightController::GetUdp(uint32_t uSalt, int iTimeoutMs)
             // Didn't find anything, so unlock mutex and check timeout. If time left, then wait.
             mtRecv.unlock();
             if (iTimeoutMs <= 0) return nullptr;
-            std::this_thread::sleep_for(std::chrono::milliseconds(iTimeoutMs));
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
             iTimeoutMs -= 10;
         }
     } while (!bFound);

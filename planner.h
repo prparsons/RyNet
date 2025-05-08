@@ -5,6 +5,7 @@
 #include "cameraMulti.h"
 #include "data_types.h"
 #include "dataLogger.h"
+#include "route.h"
 
 /*
     Plan for connecting to drone:
@@ -15,36 +16,6 @@
 
 */
 
-class CoordNode {
-public:
-    CoordNode(float fLat, float fLon);
-    ~CoordNode();
-
-    float GetDistance(float fLatQuery, float fLonQuery) const;
-    const CoordNode* GetClosest(float fLatQuery, float fLonQuery) const;
-    const CoordNode* GetClosest(float fLatQuery, float fLonQuery, float& fDistance) const;
-    void InsertPoint(float fLatNew, float fLonNew);
-    void ResetPosition(float fLat, float fLon); // Clears list and reset position
-
-    void DestroyChildren();
-    void Print() const;
-
-private:
-    float fLat;
-    float fLon;
-
-    CoordNode* nw;
-    CoordNode* ne;
-    CoordNode* se;
-    CoordNode* sw;
-};
-
-class Route
-{
-    float fLat;
-    float fLon;
-    Route* pNext;
-};
 
 class FlightController {
 public:
@@ -69,7 +40,8 @@ public:
     bool GetMode(char* scMode, int iStrLen);
     int GetBattery();
     Route* GetRoute(); // Returns the current route. Caller owns object
-
+    CoordNode* GetVisitedPoints(); // From point logger thread
+    static bool GetNextWaypoint(int16_t& iNextPoint);
 
     // Can we travel in the indicated direction for the indicated time.
     //  0 == No. Positive number is distance direction is valid for.
@@ -79,8 +51,7 @@ public:
     void SetDestination(float fHeadingOffsetDeg, float fDistance); // Store route, adjust heading, after distance will automatically restore route
     void SetRTL();
     void SetAltitude(float fAltitudeMeters);
-    void RestoreRoute();
-    void SetRoute(Route* pNewRoute, bool bSetAuto); // Replaces current route with this one, will takeover ownership.
+    void SetRoute(const Route& NewRoute, bool bSetAuto); // Replaces current route with this one, will takeover ownership.
 
     void SetServerAddress(const char* scServerAddress);
     void SetUdpKey(const char* scUdpKey);
@@ -92,7 +63,7 @@ private:
     void SendXML(const char* sc);
     uint32_t SendRecXML(const char* sc); // Used to send message if you want to be able to get a response
     char* GetUdp(uint32_t uSalt, int iTimeoutMs); // Used to get any response
-    bool VerifyMessage(const char* _scMessage);
+    bool VerifyMessage(const char* _scMessage, uint32_t uMessageLength);
     void ConnectMavLink();
 
     void runDepth(Signal sig, StopSignal ss); // Thread function to continuously send depth info for obstacle avoidance
@@ -103,6 +74,7 @@ private:
 
     DataLogger& logger;
     CameraController& camera;
+    CoordNode startLocation;
     std::thread* pThreadDepth;
     std::thread* pThreadPoint;
     std::thread* pThreadIr;
@@ -116,6 +88,7 @@ private:
     StopSignal ssRecv;
     ThreadMutex mtXML;
     ThreadMutex mtRecv;
+    ThreadMutex mtPoints;
 
     struct sockaddr_in addressMavLink;
     int socketDesc;
