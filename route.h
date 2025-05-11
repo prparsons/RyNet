@@ -52,7 +52,7 @@ public:
     float GetDistance() const;
 
     static Route* CreateRoute(char* buffer, size_t uBufferLen);
-    static Route* Tsp2Opt(Route* pStart, CoordNode* pVisitedPoints, int16_t iNextPoint);
+    static Route* CleanRoute(Route* pStart, CoordNode* pVisitedPoints, int16_t iNextPoint, bool b2opt);
 
     command cmd;
 

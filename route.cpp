@@ -259,7 +259,7 @@ Route* Route::CreateRoute(char* buffer, size_t uBufferLen)
     return new Route(buffer, uBufferLen);
 }
 
-Route* Route::Tsp2Opt(Route* pStart, CoordNode* pVisitedPoints, int16_t iNextPoint)
+Route* Route::CleanRoute(Route* pStart, CoordNode* pVisitedPoints, int16_t iNextPoint, bool b2opt)
 {
     if (pStart == nullptr) return nullptr;
 
@@ -273,6 +273,8 @@ Route* Route::Tsp2Opt(Route* pStart, CoordNode* pVisitedPoints, int16_t iNextPoi
     if (pVisitedPoints) {
         pStart = Route::cleanRoute(pStart, pVisitedPoints);
     }
+
+    if (!b2opt) return pStart;
 
     // // Now run the 2Opt algorithm on the remaining path
     float fCurrentDistance = pStart->GetDistance();

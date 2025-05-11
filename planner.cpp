@@ -30,7 +30,6 @@ FlightController::FlightController(DataLogger& _logger, CameraController& _camer
 , fHomeLon(0)
 , iMissionSpeedMS(8)
 , iExtraGuidedDistance(10)
-, iRouteCleanType(0)
 {
     scKey[0] = 0;
     strcpy(scMavLinkAddress, "127.0.0.1");
@@ -141,11 +140,6 @@ void FlightController::SetMissionSpeed(int _iMissionSpeedMS)
 void FlightController::SetExtraDistance(int _iExtraGuidedDistance)
 {
     iExtraGuidedDistance = _iExtraGuidedDistance;
-}
-
-void FlightController::SetRouteClean(int iClean)
-{
-    iRouteCleanType = iClean;
 }
 
 FlightController::~FlightController()

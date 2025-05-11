@@ -28,7 +28,6 @@ public:
     void SetUdpTimout(int iTimeoutUs);
     void SetMissionSpeed(int iMissionSpeedMS);
     void SetExtraDistance(int iExtraGuidedDistance);
-    void SetRouteClean(int iClean); // 1 = simple, 2 = 2opt
 
     void Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr, int iMaxDist);
     void Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr);
@@ -102,7 +101,6 @@ private:
     float fHomeLon;
     int iMissionSpeedMS;
     int iExtraGuidedDistance;
-    int iRouteCleanType;
     std::map<uint32_t, char*> mapRecv;
 };
 

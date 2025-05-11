@@ -385,6 +385,7 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iImageId, uint32_t uWidth
 Navigator::Navigator(FlightController& _control, DataLogger& _logger, CameraController& _camera, bool _bStartBatteryMonitor)
 : bSendRTL(false)
 , bStartBatteryMonitor(_bStartBatteryMonitor)
+, iRouteCleanType(0)
 , tLastChange(0)
 , tMinTimeBetweenChanges(5)
 , control(_control)
@@ -444,6 +445,11 @@ void Navigator::SetTimeBetweenChanges(int iTime)
 void Navigator::SetValidPixels(uint32_t uValidPixels)
 {
     segmenter.SetNumberPixelsValid(uValidPixels);
+}
+
+void Navigator::SetRouteClean(int iClean)
+{
+    iRouteCleanType = iClean;
 }
 
 void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
@@ -569,6 +575,8 @@ Route* Navigator::RestoreRoute(Route* pRoute)
 {
     if (pRoute == nullptr) return nullptr;
 
+    if (iRouteCleanType == 0) return pRoute;
+
     // Get any visited points
     CoordNode* pVisited = control.GetVisitedPoints();
     // Clean the route (get next waypoint so we can skip every one we've visited)
@@ -584,7 +592,7 @@ Route* Navigator::RestoreRoute(Route* pRoute)
         logger.LogString(sc);
     }
 
-    pRoute = Route::Tsp2Opt(pRoute, pVisited, iWaypoint);
+    pRoute = Route::CleanRoute(pRoute, pVisited, iWaypoint, iRouteCleanType == 2);
     delete pVisited;
     if (pRoute == nullptr) {
         printL(" Route failure"); // This shouldn't happen

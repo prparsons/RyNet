@@ -123,7 +123,6 @@ int main(int argc, char** argv)
         if (args.iUdpTimeoutUs != -1) pController->SetUdpTimout(args.iUdpTimeoutUs);
         if (args.iGuideSpeed != -1) pController->SetMissionSpeed(args.iGuideSpeed);
         if (args.iGuideExtraDistance != -1) pController->SetExtraDistance(args.iGuideExtraDistance);
-        if (args.iCleanRoute != 0) pController->SetRouteClean(args.iCleanRoute);
 
         printL(">>>Creating Navigator");
         Navigator nav(*pController, logger, *pCamera, args.bBatteryMonitor);
@@ -134,6 +133,7 @@ int main(int argc, char** argv)
         if (args.iNumSlices != -1) nav.SetNumberImageSlices(args.iNumSlices);
         if (args.iGuideTime != -1) nav.SetTimeBetweenChanges(args.iGuideTime);
         if (args.iValidPixels != -1) nav.SetValidPixels(uint32_t(args.iValidPixels));
+        if (args.iCleanRoute != 0) nav.SetRouteClean(args.iCleanRoute);
 
         printL(">>>Starting DataLogger");
         logger.Start();

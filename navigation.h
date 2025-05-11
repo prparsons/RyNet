@@ -98,6 +98,7 @@ public:
     void SetNumberImageSlices(int iNumSlices);
     void SetTimeBetweenChanges(int iTime);
     void SetValidPixels(uint32_t uValidPixels);
+    void SetRouteClean(int iClean); // 1 = simple, 2 = 2opt
 
 private:
     Route* RestoreRoute(Route* pRoute);
@@ -108,6 +109,7 @@ private:
     // ONLY access from runBattery. runNavigator will access it AFTER it has joined runBattery
     bool bSendRTL;
     bool bStartBatteryMonitor;
+    int8_t iRouteCleanType;
     time_t tLastChange;
     time_t tMinTimeBetweenChanges;
 
