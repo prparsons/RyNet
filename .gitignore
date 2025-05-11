@@ -1,6 +1,5 @@
 #Build directory
-build/
-build_0.3.4/
+build*/
 
 #Log files
 logUDP.txt
