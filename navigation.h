@@ -85,7 +85,7 @@ private:
     CameraFrame frmRecent;
 };
 
-class Navigator:public InterruptStop {
+class Navigator:public I_InterruptStop {
 public:
     Navigator(FlightController& control, DataLogger& logger, CameraController& camera, bool bStartBatteryMonitor);
     ~Navigator();
@@ -113,9 +113,9 @@ private:
     time_t tLastChange;
     time_t tMinTimeBetweenChanges;
 
-    FlightController& control;
-    DataLogger& logger;
-    CameraController& camera;
+    FlightController& control;//todo can replace with pipe?
+    DataLogger& logger;//todo should replace with pipe
+    CameraController& camera;//todo should replace with pipe
     Route* pRouteOrig;
 
     StopSignal ssMain;

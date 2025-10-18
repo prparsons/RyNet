@@ -71,8 +71,8 @@ private:
     void runRecv(StopSignal ss); // Thread that recv's UDP packet and stores them in a map according to salt
     char* recvUdp(); // Contains the udp code itself for runRecv()
 
-    DataLogger& logger;
-    CameraController& camera;
+    DataLogger& logger;//todo should replace with pipe
+    CameraController& camera;//todo should replace with pipe
     CoordNode startLocation;
     std::thread* pThreadDepth;
     std::thread* pThreadPoint;

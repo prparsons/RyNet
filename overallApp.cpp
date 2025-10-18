@@ -86,7 +86,7 @@ void handle_segfault(int iSigNum);
 // Simplest way I can think of at the moment is signal for depth to stop, let the main thread finishing joining
 // it, then we'll have a pointer to bStopNavOnDepthFail that the interrupt can set to True.
 // Or, if we used --continue then need to signal nav to stop
-InterruptStop* pSignal_interrupt = nullptr;
+I_InterruptStop* pSignal_interrupt = nullptr;
 bool* pSignal_bStopNavOnDepthFail = nullptr;
 bool* pSignal_bAbortTakeoff = nullptr;
 

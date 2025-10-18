@@ -77,59 +77,19 @@ CameraController* CameraController::OpenCamera(uint32_t features, const char* sc
     return pReturn;
 }
 
-cameraFrame_depth* CameraController::GetFrameDepth()
+PipeReceiverRGB* CameraController::GetPipeRGB()
 {
-    m.lock();
-    if (pFrameCurrentDepth == nullptr) {
-        m.unlock();
-        return nullptr;
-    }
-    cameraFrame_depth* pFrameReturn = new cameraFrame_depth(*pFrameCurrentDepth);
-    m.unlock();
-    return pFrameReturn;
+    return pipeRGB.CreateReceiver(false);
 }
 
-rs2_vector CameraController::GetFrameAccel()
+PipeReceiverRGB* CameraController::GetPipeIR()
 {
-    m.lock();
-    rs2_vector ret = FrameCurrentAccel;
-    m.unlock();
-    return ret;
+    return pipeIR.CreateReceiver(true);
 }
 
-bool CameraController::GetFrameRGB(CameraFrame& frmCopy)
+PipeReceiverDepth* CameraController::GetPipeDepth()
 {
-    bool bReturn = true;
-    m.lock();
-    if (FrameCurrentRGB.empty()) bReturn = false;
-    else frmCopy = FrameCurrentRGB;
-    m.unlock();
-    return bReturn;
-}
-
-bool CameraController::GetFrameIR(CameraFrame& frmCopy)
-{
-    bool bReturn = true;
-    m.lock();
-    if (FrameCurrentIR.empty()) bReturn = false;
-    else frmCopy = FrameCurrentIR;
-    m.unlock();
-    return true;
-}
-
-Signal CameraController::GetSignalDepth()
-{
-    return sigDepth;
-}
-
-Signal CameraController::GetSignalRGB()
-{
-    return sigRGB;
-}
-
-Signal CameraController::GetSignalIR()
-{
-    return sigIR;
+    return pipeDepth.CreateReceiver(true);
 }
 
 CameraController::CameraController(uint32_t _features, const char* _scSimulationFile)
@@ -196,14 +156,14 @@ void CameraController::Start()
     if (features & CameraController_RGBSimulation) {
         printf("CameraController::Start starting simulation using file: %s\n", scSimulationFile);
         if (pthrCamera[1] == nullptr) {
-            pthrCamera[1] = new std::thread(&CameraController::run_simulation, this, &FrameCurrentRGB, &sigRGB, &ss[1]);
+            pthrCamera[1] = new std::thread(&CameraController::run_simulation, this, &FrameCurrentRGB, std::ref(pipeRGB), &ss[1]);
         } else {
             printL("CameraController::Start pthrCamera[1] already started");
         }
     } else if (features & CameraController_RGB) { // Can't run actual RGB camera if the simulation is enabled
         printL("CameraController::Start starting RGB");
         if (pthrCamera[1] == nullptr) {
-            pthrCamera[1] = new std::thread(&CameraController::run_CV, this, scGStream_RGB, &FrameCurrentRGB, &sigRGB, &ss[1]);
+            pthrCamera[1] = new std::thread(&CameraController::run_CV, this, scGStream_RGB, &FrameCurrentRGB, std::ref(pipeRGB), &ss[1]);
         } else {
             printL("CameraController::Start cv1 already started");
         }
@@ -211,7 +171,7 @@ void CameraController::Start()
 
     if (features & CameraController_IR) {
         if (pthrCamera[2] == nullptr) {
-            pthrCamera[2] = new std::thread(&CameraController::run_CV, this, scGStream_IR, &FrameCurrentIR, &sigIR, &ss[2]);
+            pthrCamera[2] = new std::thread(&CameraController::run_CV, this, scGStream_IR, &FrameCurrentIR, std::ref(pipeIR), &ss[2]);
         } else {
             printL("CameraController::Start cv2 already started");
         }
@@ -325,7 +285,7 @@ void CameraController::run_RS()
     }
 }
 
-void CameraController::run_CV(const char* scGStream, Mat* pFrameCurrent, Signal* pSig, StopSignal* pss)
+void CameraController::run_CV(const char* scGStream, Mat* pFrameCurrent, PipeSenderRGB& pipe, StopSignal* pss)
 {
     printL("CameraController::run_CV");
     if (pFrameCurrent == nullptr) {
@@ -354,9 +314,9 @@ void CameraController::run_CV(const char* scGStream, Mat* pFrameCurrent, Signal*
     }
 
     while (!pss->shouldStop()) { // We need a separate stop signal for each thread
-        Mat frame;
-        pCap->read(frame);
-        if (frame.empty()) {
+        Mat* pFrame = new Mat();
+        pCap->read(*pFrame);
+        if (pFrame->empty()) {
             printL("CameraController::run_CV empty frame");
             // The only mentioned reasons for failure are camera has been disconnected, or there are
             //  no more frames in the video file (not applicable here). So, we'll try reconnecting
@@ -367,20 +327,17 @@ void CameraController::run_CV(const char* scGStream, Mat* pFrameCurrent, Signal*
                 printL("CameraController::run_CV, reconnect attempt failed");
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             }
+            delete pFrame;
             continue;
         }
         // Do something with frame
-        m.lock();
-        frame.copyTo(*pFrameCurrent);
-        m.unlock();
-
-        pSig->signal();
+        pipe.AddData(pFrame);
     }
     // According to opencv: the camera will be deinitialized automatically in VideoCapture destructor
     delete pCap;
 }
 
-void CameraController::run_simulation(cv::Mat* pFrameCurrent, Signal* pSig, StopSignal* pss)
+void CameraController::run_simulation(cv::Mat* pFrameCurrent, PipeSenderRGB& pipe, StopSignal* pss)
 {
     cv::VideoCapture cap(scSimulationFile);
     if (!cap.isOpened()) {
@@ -405,23 +362,21 @@ void CameraController::run_simulation(cv::Mat* pFrameCurrent, Signal* pSig, Stop
     //  failure, and keep trying until it overflows
     uint8_t uFrameFail = 0;
     while (!pss->shouldStop()) {
-        cv::Mat frame;
-        if (!cap.read(frame)) {
+        cv::Mat* pFrame;
+        if (!cap.read(*pFrame)) {
             if (++uFrameFail == 0) {
                 // It's overflowed, so 255 failures, so time to give up
                 printL("CameraController::run_simulation no more frames");
                 break;
             }
+            delete pFrame;
             continue;
         }
         uFrameFail = 0; // Reset this now that we got a frame
         iFramesRead++;
         
-        m.lock();
-        frame.copyTo(*pFrameCurrent);
-        m.unlock();
+        pipe.AddData(pFrame);
 
-        pSig->signal();
         std::this_thread::sleep_for(std::chrono::milliseconds(iSimulationFrameDelay));
     }
     printf("CameraController::run_simulation Frames Read: %d\n", iFramesRead);
