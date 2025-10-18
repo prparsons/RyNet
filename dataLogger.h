@@ -23,18 +23,34 @@ struct ImageLogData {
 };
 
 // // std::tuple<CameraFrame, std::string>
-// using LogSenderImage = ThreadPipeSender<cameraFrame_depth, ThreadPipeShared<cameraFrame_depth>>;
-// // CameraFrame
-// using LogSenderIR = ThreadPipeSender<cameraFrame_depth, ThreadPipeShared<cameraFrame_depth>>;
+// using LogSenderImage = ThreadPipeSender<CameraFrame, ThreadPipeShared<CameraFrame>>;
 // // std::tuple<std::shared_ptr<float4>, int, int, int>? on the float4?
-// using LogSenderMask = ThreadPipeSender<cameraFrame_depth, ThreadPipeShared<cameraFrame_depth>>;
-// std::string
+// using LogSenderMask = ThreadPipeSender<CameraFrame, ThreadPipeShared<CameraFrame>>;
+
+using LogSender_Image = ThreadPipeSender<
+                            std::pair<CameraFrame, ImageLogData>, 
+                            ThreadPipeShared< std::pair<CameraFrame, ImageLogData> >
+                        >;
+using LogReceiver_Image = ThreadPipeReceiver<
+                        std::pair<CameraFrame, ImageLogData>, 
+                        ThreadPipeShared< std::tuple<CameraFrame, ImageLogData> >
+                    >;
 using LogSender_String = ThreadPipeSender<std::string, ThreadPipeShared<std::string>>;
 using LogReceiver_String = ThreadPipeReceiver<std::string, ThreadPipeShared<std::string>>;
 
 class DataLoggerWriter
 {
 public:
+    DataLoggerWriter(LogReceiver_String* pStrings, LogReceiver_Image* pIr, LogReceiver_Image* pImages);
+
+    void LogImage(CameraFrame& frm, std::string strIdSource);
+    void LogImageIr(CameraFrame& frm);
+    // void LogMask(float4* pImg, int iImageId, int width, int height);
+    void LogString(const char* scData);
+
+private:
+    std::unique_ptr<LogReceiver_Image> images;
+    std::unique_ptr<LogReceiver_Image> ir;
     std::unique_ptr<LogReceiver_String> strings;
 };
 
@@ -69,6 +85,8 @@ private:
 
     cv::Mat image;
     cv::Mat imageIr;
+    LogReceiver_Image pipeImage
+    LogReceiver_Image pipeIR;
     ImageLogData dataImage;
     ImageLogData dataImageIr;
     ImageLogData dataMask;

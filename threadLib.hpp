@@ -116,28 +116,6 @@ protected:
 
 template<class T, class P> class ThreadPipeReceiver;
 
-template<class T>
-class ThreadPipeShared
-{
-public:
-    ThreadPipeShared(std::shared_ptr<ThreadPipe<T>> _pipe): pipe(_pipe), iIdRecvr(-1) {}
-
-    virtual bool AddData(T* pData) { return pipe->AddData(pData); } // shared memory
-    virtual bool RetrieveData(std::shared_ptr<T>& pData) { return pipe->RetrieveData(pData, iIdRecvr); } // shared memory 
-
-protected:
-    void AddReceiver() { iIdRecvr = pipe->AddReceiver(); }
-    void RemoveReceiver() { pipe->RemoveReceiver(iIdRecvr); }
-
-    virtual bool AddData(const T& data) { return false; } // message passing (copying)
-    virtual bool RetrieveData(T& data) { return false; } // message passing
-
-    int iIdRecvr;
-    std::shared_ptr<ThreadPipe<T>> pipe;
-};
-
-template<class T, class P> class ThreadPipeReceiver;
-
 template<class T, class P>
 class ThreadPipeSender: public P {
 public:
@@ -199,7 +177,7 @@ public:
     bool DataReady()
     {
         if (!bRequiredReceiver) return true;
-        return P::pipe.DataReady(iIdRecvr);
+        return P::pipe.DataReady(P::iIdRecvr);
     }
 
 protected:

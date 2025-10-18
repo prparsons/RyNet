@@ -15,11 +15,58 @@ void printL(const char* sc)
     printf("%s\n", sc);
 }
 
+DataLoggerWriter::DataLoggerWriter(LogReceiver_String* pStrings, LogReceiver_Image* pIr, LogReceiver_Image* pImages)
+: images(pImages)
+, ir(pIr)
+, strings(pStrings)
+{}
+
+void DataLoggerWriter::LogImage(CameraFrame& frm, std::string strIdSource)
+{
+    std::pair<CameraFrame, ImageLogData>* pNewLogEntry = new std::pair<CameraFrame, ImageLogData>();
+    ImageLogData& data = pNewLogEntry->second;
+    data.strData = strIdSource;
+    time_t timeNow = time(nullptr);
+    time_t timeDifference = timeNow - data.timeLast;
+    data.timeLast = timeNow;
+    if (timeDifference < SEC_BETWEEN_IMAGES) return;
+    data.id = frm.GetId();
+    if (!FlightController::GetPosition(data.fLat, data.fLon)) {
+        data.fLat = 0;
+        data.fLon = 0;
+    }
+    if (!FlightController::GetHeading(data.fHeading)) {
+        data.fHeading = 999; // Obvious incorrect value
+    }
+    if (!FlightController::GetAltitude(data.fAltitude)) {
+        data.fAltitude = -999;
+    }
+
+    pNewLogEntry->first.DeepCopy(frm);
+
+    if (!images->AddData(pNewLogEntry)) {
+        //todo Figure out what to do here
+        delete pNewLogEntry;
+    }
+}
+
+void DataLoggerWriter::LogImageIr(CameraFrame& frm)
+{
+
+}
+
+void DataLoggerWriter::LogString(const char* scData)
+{
+
+}
+
 DataLogger::DataLogger()
 : bWriteImg(false)
 , bWriteImgIr(false)
 , bWriteMask(false)
 , pThread(nullptr)
+, pipeImage(9, true)
+, pipeIR(3, true)
 {
 }
 
@@ -127,6 +174,11 @@ void DataLogger::run(Signal sigImage, StopSignal ss)
             bWriteImgLocal = false;
             SaveImage("img", imageWrite, dataWrite);
         }
+        //timeout or not to timeout
+        std::shared_ptr<std::pair<CameraFrame, ImageLogData>> pNewImage;
+        while (pipeImage.RetrieveData(pNewImage)) {
+            SaveImage("img", pNewImage->first, pNewImage->second);
+        }
 
         // Check if there's a mask we should write
         mt.lock();
@@ -167,6 +219,11 @@ void DataLogger::run(Signal sigImage, StopSignal ss)
         if (bWriteImgLocal) {
             bWriteImgLocal = false;
             SaveImage("flir", imageWrite, dataWrite);
+        }
+        //pipeIR
+        std::shared_ptr<CameraFrame> pNewImage;
+        if (pipeIR.HasNewData()) {
+            //imagelogdata
         }
     }
 }

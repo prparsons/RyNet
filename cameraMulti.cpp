@@ -97,6 +97,9 @@ CameraController::CameraController(uint32_t _features, const char* _scSimulation
 , pCameraRS(nullptr)
 , features(_features)
 , iSimulationFrameDelay(33)
+, pipeDepth(4)
+, pipeRGB(2)
+, pipeIr(4)
 {
     printL("CameraController::CameraController");
 

@@ -89,10 +89,7 @@ private:
     std::thread* pthrCamera[NUM_CAMERA_THREADS];
     StopSignal ss[NUM_CAMERA_THREADS];
 
-    // Signal sigDepth;cameraFrame_depth
     PipeSenderDepth pipeDepth;
-    // Signal sigRGB;
     PipeSenderRGB pipeRGB;
-    // Signal sigIR;
     PipeSenderRGB pipeIr;
 };
