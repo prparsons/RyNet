@@ -79,13 +79,12 @@ public:
 protected:
     CameraController(uint32_t features, const char* scSimulationFile);
     void run_RS();
-    void run_CV(const char* scGStream, cv::Mat* pFrameCurrent, PipeSenderRGB& pipe, StopSignal* pss);
-    void run_simulation(cv::Mat* pFrameCurrent, PipeSenderRGB& pipe, StopSignal* pss);
+    void run_CV(const char* scGStream, PipeSenderRGB& pipe, StopSignal* pss);
+    void run_simulation(PipeSenderRGB& pipe, StopSignal* pss);
 
 private:
     cameraFrame_depth* pFrameCurrentDepth;
     rs2_vector FrameCurrentAccel;
-    cv::Mat FrameCurrentRGB;
     cv::Mat FrameCurrentIR;
     ThreadMutex m;
 

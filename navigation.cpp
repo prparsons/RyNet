@@ -382,7 +382,7 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iImageId, uint32_t uWidth
     return true;
 }
 
-Navigator::Navigator(FlightController& _control, DataLogger& _logger, CameraController& _camera, bool _bStartBatteryMonitor)
+Navigator::Navigator(FlightController& _control, DataLogger& _logger, PipeReceiverRGB* _pPipeRGB, bool _bStartBatteryMonitor)
 : bSendRTL(false)
 , bStartBatteryMonitor(_bStartBatteryMonitor)
 , iRouteCleanType(0)
@@ -392,7 +392,8 @@ Navigator::Navigator(FlightController& _control, DataLogger& _logger, CameraCont
 , logger(_logger)
 , camera(_camera)
 , pRouteOrig(nullptr)
-, sigMainRGB(_camera.GetSignalRGB())
+//, sigMainRGB(_camera.GetSignalRGB())
+, pPipeRGB(_pPipeRGB)
 , pThread(nullptr)
 , detector(logger)
 , segmenter(logger)
@@ -410,11 +411,14 @@ Navigator::~Navigator()
     if (pRouteOrig != nullptr) {
         delete pRouteOrig;
     }
+    if (pPipeRGB != nullptr) {
+        delete pPipeRGB;
+    }
 }
     
 void Navigator::Start()
 {
-    pThread = new std::thread(&Navigator::runNavigator, this, sigMainRGB, ssMain);
+    pThread = new std::thread(&Navigator::runNavigator, this, std::ref(*pPipeRGB), ssMain);
 }
 
 void Navigator::Join()
@@ -452,7 +456,7 @@ void Navigator::SetRouteClean(int iClean)
     iRouteCleanType = iClean;
 }
 
-void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
+void Navigator::runNavigator(PipeReceiverRGB pipeRGB, StopSignal ss)
 {
     printL("Navigator::runNavigator");
     pthread_setname_np(pthread_self(), "Navigator::runNavigator");
@@ -479,13 +483,15 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
     }
 
     while (!ss.shouldStop()) {
-        sigRGB.wait(1000);
+        //sigRGB.wait(1000);//todo???timeout?
+        std::shared_ptr<cv::Mat> pNewImage;
+        pipeRGB.RetrieveData(pNewImage);
         // Get new image and process it
-        CameraFrame frameNew;
-        if (!camera.GetFrameRGB(frameNew)) {
+        if (!pipeRGB.RetrieveData(pNewImage)) {
             printL("runNavigator frame was not valid");
             continue;
         }
+        CameraFrame frameNew(*pNewImage);
         detector.SetNewImage(frameNew);
         segmenter.SetNewImage(frameNew);
 

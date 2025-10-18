@@ -14,14 +14,14 @@ bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** s
 
 FlightController* pInstance = nullptr;
 
-FlightController::FlightController(DataLogger& _logger, CameraController& _camera)
+FlightController::FlightController(DataLogger& _logger, PipeReceiverDepth* _pPipeDepth, PipeReceiverRGB* _pPipeIR)
 : logger(_logger)
-, camera(_camera)
 , startLocation(0,0)
 , pThreadDepth(nullptr)
 , pThreadPoint(nullptr)
 , pThreadIr(nullptr)
-, sigCameraDepth(_camera.GetSignalDepth())
+, pPipeDepth(_pPipeDepth)
+, pPipeIR(_pPipeIR)
 , socketDesc(-1)
 , uSalt(1)
 , iUdpTimeoutUs(100000)
@@ -36,10 +36,10 @@ FlightController::FlightController(DataLogger& _logger, CameraController& _camer
     memset(&addressMavLink, 0, sizeof(addressMavLink));
 }
 
-FlightController* FlightController::GetFlightController(DataLogger& logger, CameraController& camera)
+FlightController* FlightController::GetFlightController(DataLogger& logger, PipeReceiverDepth* pPipeDepth, PipeReceiverRGB* pPipeIR)
 {
     if (pInstance == nullptr) {
-        pInstance = new FlightController(logger, camera);
+        pInstance = new FlightController(logger, pPipeDepth, pPipeIR);
         return pInstance;
     }
     return nullptr;
@@ -77,7 +77,7 @@ void FlightController::Start(bool bStartDepth, bool bStartPointLogger, bool bSta
     printL("FlightController::Start");
     pThreadRecv = new std::thread(&FlightController::runRecv, this, ssRecv);
     if (bStartDepth) {
-        pThreadDepth = new std::thread(&FlightController::runDepth, this, sigCameraDepth, ssDepth);
+        pThreadDepth = new std::thread(&FlightController::runDepth, this, std::ref(*pPipeDepth), ssDepth);
     }
     if (bStartPointLogger) {
         pThreadPoint = new std::thread(&FlightController::runPointLogger, this, ssPtLog);
@@ -163,6 +163,12 @@ FlightController::~FlightController()
         ssIr.stop();
         if (pThreadIr->joinable()) pThreadIr->join();
         delete pThreadIr;
+    }
+    if (pPipeDepth != nullptr) {
+        delete pPipeDepth;
+    }
+    if (pPipeIR != nullptr) {
+        delete pPipeIR;
     }
 
     // Clear out any unwanted, unclaimed or orphaned messages.
@@ -404,7 +410,7 @@ void FlightController::SaveRoute()
     SendXML(sc);
 }
 
-void FlightController::runDepth(Signal sig, StopSignal ss)
+void FlightController::runDepth(PipeReceiverDepth& pipeDepth, StopSignal ss)
 {
     printL("FlightController::runDepth");
 
@@ -416,8 +422,9 @@ void FlightController::runDepth(Signal sig, StopSignal ss)
     while (!ss.shouldStop()) {
         sig.wait(1000);
         
-        cameraFrame_depth* pFrameDepth = camera.GetFrameDepth();
-        if (pFrameDepth == nullptr) {
+        // No timeout used here
+        std::ptr<cameraFrame_depth> pFrameDepth;
+        if (!pipeDepth.RetreiveData(pFrameDepth)) {
             continue;
         }
         cameraFrame_depth& frameDepth = *pFrameDepth;
@@ -555,13 +562,19 @@ void FlightController::runPointLogger(StopSignal ss)
     }
 }
 
-void FlightController::runIr(Signal sig, StopSignal ss)
+void FlightController::runIr(PipeReceiverRGB& pipeIR, StopSignal ss)
 {
     printL("FlightController::runIr");
-    CameraFrame frmIr;
+
     while (!ss.shouldStop()) {
-        sig.wait(1000);
-        camera.GetFrameIR(frmIr);
+        //sig.wait(1000);//todo//timeout??
+        std::shared_ptr<cv::Mat> pNewImage;
+        pipeIR.RetrieveData(pNewImage);
+        // Get new image and process it
+        if (!pipeIR.RetrieveData(pNewImage)) {
+            continue;
+        }
+        CameraFrame frmIr(*pNewImage);
         if (frmIr.matrix.empty()) continue;
         logger.LogImageIr(frmIr);
     }

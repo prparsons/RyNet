@@ -117,7 +117,7 @@ int main(int argc, char** argv)
         else pCamera = CameraController::OpenCamera(uCameraFeatures);
 
         printL(">>>Getting Flight Controller");
-        FlightController* pController = FlightController::GetFlightController(logger, *pCamera);
+        FlightController* pController = FlightController::GetFlightController(logger, pCamera->GetPipeDepth(), pCamera->GetPipeIR());
         if (args.bManualServerAddress) pController->SetServerAddress(args.scServerAddress);
         if (args.bHmacUdp) pController->SetUdpKey(args.scUdpKey);
         if (args.iUdpTimeoutUs != -1) pController->SetUdpTimout(args.iUdpTimeoutUs);
@@ -125,7 +125,7 @@ int main(int argc, char** argv)
         if (args.iGuideExtraDistance != -1) pController->SetExtraDistance(args.iGuideExtraDistance);
 
         printL(">>>Creating Navigator");
-        Navigator nav(*pController, logger, *pCamera, args.bBatteryMonitor);
+        Navigator nav(*pController, logger, pCamera->GetPipeRGB(), args.bBatteryMonitor);
         if (args.bRunDepth) pSignal_interrupt = pCamera;
         else pSignal_interrupt = &nav;
         // If we specified a target class, need to set that now

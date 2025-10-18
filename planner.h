@@ -21,7 +21,7 @@ class FlightController {
 public:
     ~FlightController();
 
-    static FlightController* GetFlightController(DataLogger& logger, CameraController& camera);
+    static FlightController* GetFlightController(DataLogger& logger, PipeReceiverDepth* pPipeDepth, PipeReceiverRGB* pPipeIR);
     static void DestroyFlightController();
 
     void WaitForTakeoff(int iAltitude, const bool& bAbort);
@@ -56,7 +56,7 @@ public:
     void SetUdpKey(const char* scUdpKey);
 
 private:
-    FlightController(DataLogger& logger, CameraController& camera);
+    FlightController(DataLogger& logger, PipeReceiverDepth* pPipeDepth, PipeReceiverRGB* pPipeIR);
 
     void SaveRoute();
     void SendXML(const char* sc);
@@ -65,22 +65,21 @@ private:
     bool VerifyMessage(const char* _scMessage, uint32_t uMessageLength);
     void ConnectMavLink();
 
-    void runDepth(Signal sig, StopSignal ss); // Thread function to continuously send depth info for obstacle avoidance
+    void runDepth(PipeReceiverDepth& pipeDepth, StopSignal ss); // Thread function to continuously send depth info for obstacle avoidance
     void runPointLogger(StopSignal ss); // Thread function to continuously retrieve and store visited points when in guided mode
-    void runIr(Signal sig, StopSignal ss);
+    void runIr(PipeReceiverRGB& pipeIR, StopSignal ss);
     void runRecv(StopSignal ss); // Thread that recv's UDP packet and stores them in a map according to salt
     char* recvUdp(); // Contains the udp code itself for runRecv()
 
     DataLogger& logger;//todo should replace with pipe
-    CameraController& camera;//todo should replace with pipe
     CoordNode startLocation;
     std::thread* pThreadDepth;
     std::thread* pThreadPoint;
     std::thread* pThreadIr;
     std::thread* pThreadRecv;
     
-    Signal sigCameraDepth;
-    Signal sigIr;
+    PipeReceiverDepth* pPipeDepth;
+    PipeReceiverRGB* pPipeIR;
     StopSignal ssDepth;
     StopSignal ssPtLog;
     StopSignal ssIr;

@@ -87,7 +87,7 @@ private:
 
 class Navigator:public I_InterruptStop {
 public:
-    Navigator(FlightController& control, DataLogger& logger, CameraController& camera, bool bStartBatteryMonitor);
+    Navigator(FlightController& control, DataLogger& logger, PipeReceiverRGB* pPipeRGB, bool bStartBatteryMonitor);
     ~Navigator();
     
     void Start();
@@ -104,7 +104,7 @@ private:
     Route* RestoreRoute(Route* pRoute);
 
     void runBattery(StopSignal ss, StopSignal ssMainThread);
-    void runNavigator(Signal sig, StopSignal ss);
+    void runNavigator(PipeReceiverRGB& pipeRGB, StopSignal ss);
 
     // ONLY access from runBattery. runNavigator will access it AFTER it has joined runBattery
     bool bSendRTL;
@@ -119,7 +119,8 @@ private:
     Route* pRouteOrig;
 
     StopSignal ssMain;
-    Signal sigMainRGB;
+    // Signal sigMainRGB;
+    PipeReceiverRGB* pPipeRGB;
     std::thread* pThread;
     ObjectDetection detector;
     TerrainSegmentation segmenter;

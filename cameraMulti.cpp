@@ -156,14 +156,14 @@ void CameraController::Start()
     if (features & CameraController_RGBSimulation) {
         printf("CameraController::Start starting simulation using file: %s\n", scSimulationFile);
         if (pthrCamera[1] == nullptr) {
-            pthrCamera[1] = new std::thread(&CameraController::run_simulation, this, &FrameCurrentRGB, std::ref(pipeRGB), &ss[1]);
+            pthrCamera[1] = new std::thread(&CameraController::run_simulation, this, std::ref(pipeRGB), &ss[1]);
         } else {
             printL("CameraController::Start pthrCamera[1] already started");
         }
     } else if (features & CameraController_RGB) { // Can't run actual RGB camera if the simulation is enabled
         printL("CameraController::Start starting RGB");
         if (pthrCamera[1] == nullptr) {
-            pthrCamera[1] = new std::thread(&CameraController::run_CV, this, scGStream_RGB, &FrameCurrentRGB, std::ref(pipeRGB), &ss[1]);
+            pthrCamera[1] = new std::thread(&CameraController::run_CV, this, scGStream_RGB, std::ref(pipeRGB), &ss[1]);
         } else {
             printL("CameraController::Start cv1 already started");
         }
@@ -285,13 +285,9 @@ void CameraController::run_RS()
     }
 }
 
-void CameraController::run_CV(const char* scGStream, Mat* pFrameCurrent, PipeSenderRGB& pipe, StopSignal* pss)
+void CameraController::run_CV(const char* scGStream, PipeSenderRGB& pipe, StopSignal* pss)
 {
     printL("CameraController::run_CV");
-    if (pFrameCurrent == nullptr) {
-        printL("CameraController::run_CV current fame nullptr");
-        return;
-    }
     if (pSig == nullptr) {
         printL("CameraController::run_CV Signal nullptr");
         return;
@@ -337,16 +333,12 @@ void CameraController::run_CV(const char* scGStream, Mat* pFrameCurrent, PipeSen
     delete pCap;
 }
 
-void CameraController::run_simulation(cv::Mat* pFrameCurrent, PipeSenderRGB& pipe, StopSignal* pss)
+void CameraController::run_simulation(PipeSenderRGB& pipe, StopSignal* pss)
 {
     cv::VideoCapture cap(scSimulationFile);
     if (!cap.isOpened()) {
         printL("CameraController::run_simulation failed to open file");
         throw std::invalid_argument("cv::VideoCapture failed");
-        return;
-    }
-    if (pFrameCurrent == nullptr) {
-        printL("CameraController::run_simulation current fame nullptr");
         return;
     }
     if (pSig == nullptr) {
