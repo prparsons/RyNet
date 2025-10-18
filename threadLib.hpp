@@ -275,35 +275,39 @@ bool ThreadPipe<T>::RetrieveData(std::shared_ptr<T>& pData, int iIdRecvr)
         return true;
     }
     
-    for (size_t u = 0; u < uNumReceivers; u++) {
-        if (arReadThisRound[u].first == iIdRecvr) {
-            if (arReadThisRound[u].second == bThisRoundParity) return false; // This one has already read it
-            break;
-        }
-    }
     if (uWaitingCount == 0) return false;
-    
-    pData = arSharedData[uReadIndex];
-    arReadThisRound[iIdRecvr] = bThisRoundParity;
+    //todo ^This is where reading could wait on a signal
 
+    // Get the data
+    pData = arSharedData[uReadIndex];
     // See if this was the last one to be read
+    bool bAllOthersHaveRead = true;
     for (size_t u = 0; u < uNumReceivers; u++) {
         // Set this one as "it's been read"
         if (arReadThisRound[u].first == iIdRecvr) {
+            if (arReadThisRound[u].second == bThisRoundParity) {
+                // If this has read it before, then at least one other is still waiting to read, 
+                // otherwise we'd have moved on
+                return false;
+            }
             arReadThisRound[u].second = bThisRoundParity;
         }
         // Check all the others
         else if (arReadThisRound[u].second != bThisRoundParity) {
-            // All haven't been read, so nothing else to update
-            return true;
+            bAllOthersHaveRead = false;
         }
     }
+    if (!bAllOthersHaveRead) {
+        return true;
+    }
+    // If all have been read, this can't be a re-read, because otherwise the last call
+    // would have moved us to the next value.
 
     // All have been read now
     bThisRoundParity = !bThisRoundParity;
     uWaitingCount--;
     uReadIndex++;
-    if (uReadIndex == arData.size())
+    if (uReadIndex == arSharedData.size())
         uReadIndex = 0;
 
     return true;

@@ -76,7 +76,7 @@ private:
     StopSignal ssThread;
     std::thread* pThread;
 
-    LogReceiver_Image pipeImage
+    LogReceiver_Image pipeImage;
     LogReceiver_Image pipeIR;
     LogReceiver_String pipeStrings;
     bool bWriteMask;

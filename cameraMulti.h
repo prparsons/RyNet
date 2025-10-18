@@ -59,7 +59,7 @@ public:
 
     // Must delete returned pointers
     PipeReceiverRGB* GetPipeRGB();
-    PipeRecieverRGB* GetPipeIR();
+    PipeReceiverRGB* GetPipeIR();
     PipeReceiverDepth* GetPipeDepth();
 
     void Start();

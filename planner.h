@@ -56,7 +56,7 @@ public:
     void SetUdpKey(const char* scUdpKey);
 
 private:
-    FlightControllerDataLoggerWriter* pLogger, PipeReceiverDepth* pPipeDepth, PipeReceiverRGB* pPipeIR);
+    FlightController(DataLoggerWriter* pLogger, PipeReceiverDepth* pPipeDepth, PipeReceiverRGB* pPipeIR);
 
     void SaveRoute();
     void SendXML(const char* sc);
