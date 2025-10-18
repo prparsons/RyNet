@@ -59,6 +59,9 @@ public:
     int AddReceiver();
     void RemoveReceiver(int iRegistration);
 
+    bool HasNewData(); // Whether there is new data in the pipe
+    bool DataReady(int iIdRecvr); //New Data and this one hasn't read it yet (a read will succeed)
+
 private:
     bool bThisRoundParity;
     size_t uNumReceivers; // If 0, each read will increment read index
@@ -186,6 +189,17 @@ public:
     ThreadPipeSender<T, P>* CreateSender()
     {
         return new ThreadPipeSender<T, P>(P::pipe);
+    }
+
+    bool HasNewData()
+    {
+        if (!bRequiredReceiver) return true; //todo wrong if pipe has never had anything
+        return P::pipe.HasNewData();
+    }
+    bool DataReady()
+    {
+        if (!bRequiredReceiver) return true;
+        return P::pipe.DataReady(iIdRecvr);
     }
 
 protected:
@@ -375,6 +389,27 @@ void ThreadPipe<T>::RemoveReceiver(int iIdRecvr)
             break;
         }
     }
+}
+
+template<class T>
+bool ThreadPipe<T>::HasNewData()
+{
+    std::lock_guard<ThreadMutex> lock(mtData);
+    return uWaitingCount > 0;
+}
+
+template<class T>
+bool ThreadPipe<T>::DataReady(int iIdRecvr)
+{
+    std::lock_guard<ThreadMutex> lock(mtData);
+    if (uWaitingCount == 0) return false;
+
+    for (size_t u = 0; u < uNumReceivers; u++) {
+        if (arReadThisRound[u].first == iIdRecvr) {
+            return arReadThisRound[u].second != bThisRoundParity;
+        }
+    }
+    return false;
 }
 
 inline StopSignal::StopSignal()

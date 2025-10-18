@@ -45,6 +45,12 @@ void DataLogger::Stop()
     }
 }
 
+DataLoggerWriter* DataLogger::GetLogger()
+{
+    DataLoggerWriter* pNew = new DataLoggerWriter();
+    pNew->strings.reset(pipeStrings.CreateSender());
+    return pNew;
+}
 
 void DataLogger::run(Signal sigImage, StopSignal ss)
 {
@@ -91,6 +97,19 @@ void DataLogger::run(Signal sigImage, StopSignal ss)
                     delete[] sc;
                     listStringsT.pop_back();
                 } while (listStringsT.size() > 0);
+                fileLog.close();
+            }
+        }
+        //no timeout
+        std::shared_ptr<std::string> pNewString;
+        if (pipeStrings.HasNewData()) {
+            fileLog.open(scFileNameText, ios::out | ios::app);
+            if (!fileLog) {
+                printf("Failed to open log files\n");
+            } else {
+                while (pipeStrings.RetrieveData(pNewString)) {
+                    fileLog << *pNewString << endl;
+                }
                 fileLog.close();
             }
         }

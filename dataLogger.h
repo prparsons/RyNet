@@ -22,6 +22,22 @@ struct ImageLogData {
     //  be able to use that to correct any error in our pitch calculation
 };
 
+// // std::tuple<CameraFrame, std::string>
+// using LogSenderImage = ThreadPipeSender<cameraFrame_depth, ThreadPipeShared<cameraFrame_depth>>;
+// // CameraFrame
+// using LogSenderIR = ThreadPipeSender<cameraFrame_depth, ThreadPipeShared<cameraFrame_depth>>;
+// // std::tuple<std::shared_ptr<float4>, int, int, int>? on the float4?
+// using LogSenderMask = ThreadPipeSender<cameraFrame_depth, ThreadPipeShared<cameraFrame_depth>>;
+// std::string
+using LogSender_String = ThreadPipeSender<std::string, ThreadPipeShared<std::string>>;
+using LogReceiver_String = ThreadPipeReceiver<std::string, ThreadPipeShared<std::string>>;
+
+class DataLoggerWriter
+{
+public:
+    std::unique_ptr<LogReceiver_String> strings;
+};
+
 class DataLogger {
 public:
     DataLogger();
@@ -29,6 +45,8 @@ public:
 
     void Start();
     void Stop();
+
+    DataLoggerWriter* GetLogger();
 
     void LogImage(CameraFrame& frm, std::string strIdSource);
     void LogImageIr(CameraFrame& frm);
@@ -56,5 +74,6 @@ private:
     ImageLogData dataMask;
     cv::Mat mask;
     std::vector<char*> listStrings;
+    LogReceiver_String pipeStrings;
     std::map<std::string, ImageLogData> mapImageData;
 };
