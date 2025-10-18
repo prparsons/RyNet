@@ -355,7 +355,7 @@ bool ThreadPipe<T>::DataReady(int iIdRecvr)
 }
 
 template<class T, class P>
-ThreadPipeReceiver::ThreadPipeReceiver(int iSize, bool _bRequiredReceiver)
+ThreadPipeReceiver<T, P>::ThreadPipeReceiver(int iSize, bool _bRequiredReceiver)
 : P(std::make_shared<ThreadPipe<T>>(iSize))
 , bRequiredReceiver(_bRequiredReceiver)
 {
@@ -364,52 +364,52 @@ ThreadPipeReceiver::ThreadPipeReceiver(int iSize, bool _bRequiredReceiver)
 }
 
 template<class T, class P>
-ThreadPipeReceiver::~ThreadPipeReceiver()
+ThreadPipeReceiver<T, P>::~ThreadPipeReceiver()
 {
     if (bRequiredReceiver)
         P::RemoveReceiver();
 }
 
 template<class T, class P>
-ThreadPipeReceiver<T, P>* ThreadPipeReceiver::CreateReceiver(bool bRequiredReceiver)
+ThreadPipeReceiver<T, P>* ThreadPipeReceiver<T, P>::CreateReceiver(bool bRequiredReceiver)
 {
     return new ThreadPipeReceiver<T, P>(P::pipe, bRequiredReceiver);
 }
 
 template<class T, class P>
-ThreadPipeSender<T, P>* ThreadPipeReceiver::CreateSender()
+ThreadPipeSender<T, P>* ThreadPipeReceiver<T, P>::CreateSender()
 {
     return new ThreadPipeSender<T, P>(P::pipe);
 }
 
 template<class T, class P>
-bool ThreadPipeReceiver::HasNewData()
+bool ThreadPipeReceiver<T, P>::HasNewData()
 {
     if (!bRequiredReceiver) return true; //todo wrong if pipe has never had anything
     return P::pipe.HasNewData();
 }
 
 template<class T, class P>
-bool ThreadPipeReceiver::DataReady()
+bool ThreadPipeReceiver<T, P>::DataReady()
 {
     if (!bRequiredReceiver) return true;
     return P::pipe.DataReady(P::iIdRecvr);
 }
 
 template<class T, class P>
-bool ThreadPipeReceiver::AddData(const T& data)
+bool ThreadPipeReceiver<T, P>::AddData(const T& data)
 {
     return false;
 }
 
 template<class T, class P>
-bool ThreadPipeReceiver::AddData(T* pData)
+bool ThreadPipeReceiver<T, P>::AddData(T* pData)
 {
     return false;
 }
 
 template<class T, class P>
-ThreadPipeReceiver::ThreadPipeReceiver(std::shared_ptr<ThreadPipe<T>>& pipe, bool _bRequiredReceiver)
+ThreadPipeReceiver<T, P>::ThreadPipeReceiver(std::shared_ptr<ThreadPipe<T>>& pipe, bool _bRequiredReceiver)
 : P(pipe)
 , bRequiredReceiver(_bRequiredReceiver)
 {
