@@ -37,14 +37,6 @@ public:
     virtual void SignalStop() = 0;
 };
 
-class I_CameraPipeCreator
-{
-public:
-    virtual PipeReceiverRGB* GetPipeRGB() = 0;
-    virtual PipeRecieverRGB* GetPipeIR() = 0;
-    virtual PipeReceiverDepth* GetPipeDepth() = 0;
-};
-
 class camera_RS {
 public:
     rs2::pipeline pipe;
@@ -59,16 +51,16 @@ public:
 #define CameraController_Accel 0x20
 #define CameraController_LowResDepth 0x40
 
-class CameraController:public I_InterruptStop, public I_CameraPipeCreator {
+class CameraController:public I_InterruptStop {
 public:
     ~CameraController();
 
     static CameraController* OpenCamera(uint32_t features, const char* scSimulationFile = nullptr);
 
     // Must delete returned pointers
-    PipeReceiverRGB* GetPipeRGB() override;
-    PipeRecieverRGB* GetPipeIR() override;
-    PipeReceiverDepth* GetPipeDepth() override;
+    PipeReceiverRGB* GetPipeRGB();
+    PipeRecieverRGB* GetPipeIR();
+    PipeReceiverDepth* GetPipeDepth();
 
     void Start();
     void Stop();
