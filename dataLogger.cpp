@@ -21,6 +21,12 @@ DataLoggerWriter::DataLoggerWriter(LogReceiver_String* pStrings, LogReceiver_Ima
 , strings(pStrings)
 {}
 
+DataLoggerWriter(const DataLoggerWriter& other)
+: images(other.images->CreateSender())
+, ir(other.ir->CreateSender())
+, strings(other.strings->CreateSender())
+{}
+
 void DataLoggerWriter::LogImage(CameraFrame& frm, std::string strIdSource)
 {
     std::pair<CameraFrame, ImageLogData>* pNewLogEntry = new std::pair<CameraFrame, ImageLogData>();
@@ -52,21 +58,64 @@ void DataLoggerWriter::LogImage(CameraFrame& frm, std::string strIdSource)
 
 void DataLoggerWriter::LogImageIr(CameraFrame& frm)
 {
+    std::pair<CameraFrame, ImageLogData>* pNewLogEntry = new std::pair<CameraFrame, ImageLogData>();
+    ImageLogData& data = pNewLogEntry->second;
+    time_t timeNow = time(nullptr);
+    time_t timeDifference = timeNow - data.timeLast;
+    data.timeLast = timeNow;
+    if (timeDifference < SEC_BETWEEN_IMAGES) return;
+    data.id = frm.GetId();
+    if (!FlightController::GetPosition(data.fLat, data.fLon)) {
+        data.fLat = 0;
+        data.fLon = 0;
+    }
+    if (!FlightController::GetHeading(data.fHeading)) {
+        data.fHeading = 999; // Obvious incorrect value
+    }
+    if (!FlightController::GetAltitude(data.fAltitude)) {
+        data.fAltitude = -999;
+    }
 
+    pNewLogEntry->first.DeepCopy(frm);
+
+    if (!ir->AddData(pNewLogEntry)) {
+        //todo
+        delete pNewLogEntry;
+    }
 }
 
 void DataLoggerWriter::LogString(const char* scData)
 {
+    std::string* pNewLogEntry = new std::string();
 
+    // No, I don't care that this is silly...c++ string formatting sucks
+    char* scText = new char[strlen(scData) + 32];
+    time_t timeNow = time(nullptr);
+    struct tm* pTimeStruct;
+    pTimeStruct = localtime(&timeNow);
+    snprintf(scText,
+            strlen(scData) + 31,
+            "%02d:%02d:%02d %s",
+            pTimeStruct->tm_hour,
+            pTimeStruct->tm_min,
+            pTimeStruct->tm_sec,
+            scData);
+    
+    *pNewLogEntry = scText;
+    delete[] scText;
+
+    if (!strings->AddData(pNewLogEntry)) {
+        //todo
+        delete pNewLogEntry;
+    }
 }
 
 DataLogger::DataLogger()
-: bWriteImg(false)
-, bWriteImgIr(false)
-, bWriteMask(false)
+: bWriteMask(false)
 , pThread(nullptr)
 , pipeImage(9, true)
 , pipeIR(3, true)
+, pipeStrings(9, true)
 {
 }
 
@@ -81,7 +130,7 @@ DataLogger::~DataLogger()
 
 void DataLogger::Start()
 {
-    pThread = new std::thread(&DataLogger::run, this, sigNewData, ssThread);
+    pThread = new std::thread(&DataLogger::run, this, ssThread);
 }
 
 void DataLogger::Stop()
@@ -96,10 +145,12 @@ DataLoggerWriter* DataLogger::GetLogger()
 {
     DataLoggerWriter* pNew = new DataLoggerWriter();
     pNew->strings.reset(pipeStrings.CreateSender());
+    pNew->images.reset(pipeImage.CreateSender());
+    pNew->ir.reset(pipeIR.CreateSender());
     return pNew;
 }
 
-void DataLogger::run(Signal sigImage, StopSignal ss)
+void DataLogger::run(StopSignal ss)
 {
     printf("DataLogger Thread\n");
 
@@ -126,27 +177,9 @@ void DataLogger::run(Signal sigImage, StopSignal ss)
 
     while (!ss.shouldStop()) {
         // Wait on signal
-        sigImage.wait(1000);
+        //sigImage.wait(1000);
 
-        // check text list, if not empty write
-        mt.lock();
-        listStringsT.assign(listStrings.begin(), listStrings.end());
-        listStrings.clear();
-        mt.unlock();
-        if (listStringsT.size() > 0) {
-            fileLog.open(scFileNameText, ios::out | ios::app);
-            if (!fileLog) {
-                printf("Failed to open log files\n");
-            } else {
-                do {
-                    char* sc = listStringsT.back();
-                    fileLog << sc << endl;
-                    delete[] sc;
-                    listStringsT.pop_back();
-                } while (listStringsT.size() > 0);
-                fileLog.close();
-            }
-        }
+        // Text
         //no timeout
         std::shared_ptr<std::string> pNewString;
         if (pipeStrings.HasNewData()) {
@@ -161,23 +194,17 @@ void DataLogger::run(Signal sigImage, StopSignal ss)
             }
         }
 
-        // Check if there's an image we should write
-        mt.lock();
-        if (bWriteImg) {
-            bWriteImg = false;
-            bWriteImgLocal = true;
-            imageWrite = image;
-            dataWrite = dataImage;
-        }
-        mt.unlock();
-        if (bWriteImgLocal) {
-            bWriteImgLocal = false;
-            SaveImage("img", imageWrite, dataWrite);
-        }
+        // Image
         //timeout or not to timeout
         std::shared_ptr<std::pair<CameraFrame, ImageLogData>> pNewImage;
         while (pipeImage.RetrieveData(pNewImage)) {
             SaveImage("img", pNewImage->first, pNewImage->second);
+        }
+
+        //IR
+        std::shared_ptr<CameraFrame> pNewImage;
+        while (pipeIR.RetrieveData(pNewImage)) {
+            SaveImage("flir", pNewImage->first, pNewImage->second);
         }
 
         // Check if there's a mask we should write
@@ -206,80 +233,7 @@ void DataLogger::run(Signal sigImage, StopSignal ss)
                     pTimeStruct->tm_sec);
             cv::imwrite(scFileName, imageWrite);
         }
-
-        // Check if there's an IR image we should write
-        mt.lock();
-        if (bWriteImgIr) {
-            bWriteImgIr = false;
-            bWriteImgLocal = true;
-            imageWrite = imageIr;
-            dataWrite = dataImageIr;
-        }
-        mt.unlock();
-        if (bWriteImgLocal) {
-            bWriteImgLocal = false;
-            SaveImage("flir", imageWrite, dataWrite);
-        }
-        //pipeIR
-        std::shared_ptr<CameraFrame> pNewImage;
-        if (pipeIR.HasNewData()) {
-            //imagelogdata
-        }
     }
-}
-
-void DataLogger::LogImage(CameraFrame& frm, std::string strIdSource)
-{
-    ImageLogData& data = mapImageData[strIdSource];
-    time_t timeNow = time(nullptr);
-    time_t timeDifference = timeNow - data.timeLast;
-    data.timeLast = timeNow;
-    if (timeDifference < SEC_BETWEEN_IMAGES) return;
-    data.id = frm.GetId();
-    if (!FlightController::GetPosition(data.fLat, data.fLon)) {
-        data.fLat = 0;
-        data.fLon = 0;
-    }
-    if (!FlightController::GetHeading(data.fHeading)) {
-        data.fHeading = 999; // Obvious incorrect value
-    }
-    if (!FlightController::GetAltitude(data.fAltitude)) {
-        data.fAltitude = -999;
-    }
-    
-    mt.lock();
-    image = frm.matrix.clone();
-    dataImage = data;
-    bWriteImg = true;
-    mt.unlock();
-    sigNewData.signal();
-}
-
-void DataLogger::LogImageIr(CameraFrame& frm)
-{
-    ImageLogData& data = mapImageData["IR"];
-    time_t timeNow = time(nullptr);
-    time_t timeDifference = timeNow - data.timeLast;
-    data.timeLast = timeNow;
-    if (timeDifference < SEC_BETWEEN_IMAGES) return;
-    data.id = frm.GetId();
-    if (!FlightController::GetPosition(data.fLat, data.fLon)) {
-        data.fLat = 0;
-        data.fLon = 0;
-    }
-    if (!FlightController::GetHeading(data.fHeading)) {
-        data.fHeading = 999; // Obvious incorrect value
-    }
-    if (!FlightController::GetAltitude(data.fAltitude)) {
-        data.fAltitude = -999;
-    }
-    
-    mt.lock();
-    imageIr = frm.matrix.clone();
-    dataImageIr = data;
-    bWriteImgIr = true;
-    mt.unlock();
-    sigNewData.signal();
 }
 
 void DataLogger::LogMask(float4* pImg, int iImageId, int width, int height)
@@ -289,26 +243,6 @@ void DataLogger::LogMask(float4* pImg, int iImageId, int width, int height)
     dataMask.id = iImageId;
     mask = tempMat.clone();
     bWriteMask = true;
-    mt.unlock();
-    sigNewData.signal();
-}
-
-void DataLogger::LogString(const char* scData)
-{
-    char* scText = new char[strlen(scData) + 32];
-    time_t timeNow = time(nullptr);
-    struct tm* pTimeStruct;
-    pTimeStruct = localtime(&timeNow);
-    snprintf(scText,
-            strlen(scData) + 31,
-            "%02d:%02d:%02d %s",
-            pTimeStruct->tm_hour,
-            pTimeStruct->tm_min,
-            pTimeStruct->tm_sec,
-            scData);
-
-    mt.lock();
-    listStrings.insert(listStrings.begin(), scText);
     mt.unlock();
     sigNewData.signal();
 }

@@ -27,6 +27,8 @@ struct ImageLogData {
 // // std::tuple<std::shared_ptr<float4>, int, int, int>? on the float4?
 // using LogSenderMask = ThreadPipeSender<CameraFrame, ThreadPipeShared<CameraFrame>>;
 
+using LogSender_String = ThreadPipeSender<std::string, ThreadPipeShared<std::string>>;
+using LogReceiver_String = ThreadPipeReceiver<std::string, ThreadPipeShared<std::string>>;
 using LogSender_Image = ThreadPipeSender<
                             std::pair<CameraFrame, ImageLogData>, 
                             ThreadPipeShared< std::pair<CameraFrame, ImageLogData> >
@@ -35,23 +37,22 @@ using LogReceiver_Image = ThreadPipeReceiver<
                         std::pair<CameraFrame, ImageLogData>, 
                         ThreadPipeShared< std::tuple<CameraFrame, ImageLogData> >
                     >;
-using LogSender_String = ThreadPipeSender<std::string, ThreadPipeShared<std::string>>;
-using LogReceiver_String = ThreadPipeReceiver<std::string, ThreadPipeShared<std::string>>;
 
 class DataLoggerWriter
 {
 public:
     DataLoggerWriter(LogReceiver_String* pStrings, LogReceiver_Image* pIr, LogReceiver_Image* pImages);
+    DataLoggerWriter(const DataLoggerWriter& other); // Creates new Sender on same set of pipes
 
+    void LogString(const char* scData);
     void LogImage(CameraFrame& frm, std::string strIdSource);
     void LogImageIr(CameraFrame& frm);
     // void LogMask(float4* pImg, int iImageId, int width, int height);
-    void LogString(const char* scData);
 
 private:
+    std::unique_ptr<LogReceiver_String> strings;
     std::unique_ptr<LogReceiver_Image> images;
     std::unique_ptr<LogReceiver_Image> ir;
-    std::unique_ptr<LogReceiver_String> strings;
 };
 
 class DataLogger {
@@ -64,34 +65,22 @@ public:
 
     DataLoggerWriter* GetLogger();
 
-    void LogImage(CameraFrame& frm, std::string strIdSource);
-    void LogImageIr(CameraFrame& frm);
     void LogMask(float4* pImg, int iImageId, int width, int height);
-    void LogString(const char* scData);
 
 private:
-    void run(Signal sigImage, StopSignal ss);
+    void run(StopSignal ss);
     void WriteImageData(cv::Mat& image, ImageLogData& imageData);
     void SaveImage(std::string strPrefix, cv::Mat& image, ImageLogData& imageData);
 
-    bool bWriteImg;
-    bool bWriteImgIr;
-    bool bWriteMask;
-
     ThreadMutex mt;
-    Signal sigNewData;
     StopSignal ssThread;
     std::thread* pThread;
 
-    cv::Mat image;
-    cv::Mat imageIr;
     LogReceiver_Image pipeImage
     LogReceiver_Image pipeIR;
-    ImageLogData dataImage;
-    ImageLogData dataImageIr;
+    LogReceiver_String pipeStrings;
+    bool bWriteMask;
     ImageLogData dataMask;
     cv::Mat mask;
-    std::vector<char*> listStrings;
-    LogReceiver_String pipeStrings;
     std::map<std::string, ImageLogData> mapImageData;
 };

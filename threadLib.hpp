@@ -121,14 +121,8 @@ class ThreadPipeSender: public P {
 public:
     ThreadPipeSender(int iSize): P(std::make_shared<ThreadPipe<T>>(iSize)) {}
 
-    ThreadPipeReceiver<T, P>* CreateReceiver(bool bRequiredReceiver)
-    {
-        return new ThreadPipeReceiver<T, P>(P::pipe, bRequiredReceiver);
-    }
-    ThreadPipeSender<T, P>* CreateSender()
-    {
-        return new ThreadPipeSender<T, P>(P::pipe);
-    }
+    ThreadPipeReceiver<T, P>* CreateReceiver(bool bRequiredReceiver) { return new ThreadPipeReceiver<T, P>(P::pipe, bRequiredReceiver); }
+    ThreadPipeSender<T, P>* CreateSender() { return new ThreadPipeSender<T, P>(P::pipe); }
 
 protected:
     // Both sends are left public, only P's will work. Override both recvs (we don't know which one is right)
@@ -147,51 +141,21 @@ private:
 template<class T, class P>
 class ThreadPipeReceiver: public P {
 public:
-    ThreadPipeReceiver(int iSize, bool _bRequiredReceiver)
-    : P(std::make_shared<ThreadPipe<T>>(iSize))
-    , bRequiredReceiver(_bRequiredReceiver)
-    {
-        if (bRequiredReceiver)
-            P::AddReceiver();
-    }
-    ~ThreadPipeReceiver()
-    {
-        if (bRequiredReceiver)
-            P::RemoveReceiver();
-    }
+    ThreadPipeReceiver(int iSize, bool bRequiredReceiver);
+    ~ThreadPipeReceiver();
 
-    ThreadPipeReceiver<T, P>* CreateReceiver(bool bRequiredReceiver)
-    {
-        return new ThreadPipeReceiver<T, P>(P::pipe, bRequiredReceiver);
-    }
-    ThreadPipeSender<T, P>* CreateSender()
-    {
-        return new ThreadPipeSender<T, P>(P::pipe);
-    }
+    ThreadPipeReceiver<T, P>* CreateReceiver(bool bRequiredReceiver);
+    ThreadPipeSender<T, P>* CreateSender();
 
-    bool HasNewData()
-    {
-        if (!bRequiredReceiver) return true; //todo wrong if pipe has never had anything
-        return P::pipe.HasNewData();
-    }
-    bool DataReady()
-    {
-        if (!bRequiredReceiver) return true;
-        return P::pipe.DataReady(P::iIdRecvr);
-    }
+    bool HasNewData();
+    bool DataReady();
 
 protected:
-    bool AddData(const T& data) override { return false; } // message passing (copying)
-    bool AddData(T* pData) override { return false; } // shared memory (takes ownership, puts it in a shared_ptr)
+    bool AddData(const T& data) override; // message passing (copying)
+    bool AddData(T* pData) override; // shared memory (takes ownership, puts it in a shared_ptr)
 
 private:
-    ThreadPipeReceiver(std::shared_ptr<ThreadPipe<T>>& pipe, bool _bRequiredReceiver)
-    : P(pipe)
-    , bRequiredReceiver(_bRequiredReceiver)
-    {
-        if (bRequiredReceiver)
-            P::AddReceiver();
-    }
+    ThreadPipeReceiver(std::shared_ptr<ThreadPipe<T>>& pipe, bool bRequiredReceiver);
 
     bool bRequiredReceiver;
 
@@ -388,6 +352,69 @@ bool ThreadPipe<T>::DataReady(int iIdRecvr)
         }
     }
     return false;
+}
+
+template<class T, class P>
+ThreadPipeReceiver::ThreadPipeReceiver(int iSize, bool _bRequiredReceiver)
+: P(std::make_shared<ThreadPipe<T>>(iSize))
+, bRequiredReceiver(_bRequiredReceiver)
+{
+    if (bRequiredReceiver)
+        P::AddReceiver();
+}
+
+template<class T, class P>
+ThreadPipeReceiver::~ThreadPipeReceiver()
+{
+    if (bRequiredReceiver)
+        P::RemoveReceiver();
+}
+
+template<class T, class P>
+ThreadPipeReceiver<T, P>* ThreadPipeReceiver::CreateReceiver(bool bRequiredReceiver)
+{
+    return new ThreadPipeReceiver<T, P>(P::pipe, bRequiredReceiver);
+}
+
+template<class T, class P>
+ThreadPipeSender<T, P>* ThreadPipeReceiver::CreateSender()
+{
+    return new ThreadPipeSender<T, P>(P::pipe);
+}
+
+template<class T, class P>
+bool ThreadPipeReceiver::HasNewData()
+{
+    if (!bRequiredReceiver) return true; //todo wrong if pipe has never had anything
+    return P::pipe.HasNewData();
+}
+
+template<class T, class P>
+bool ThreadPipeReceiver::DataReady()
+{
+    if (!bRequiredReceiver) return true;
+    return P::pipe.DataReady(P::iIdRecvr);
+}
+
+template<class T, class P>
+bool ThreadPipeReceiver::AddData(const T& data)
+{
+    return false;
+}
+
+template<class T, class P>
+bool ThreadPipeReceiver::AddData(T* pData)
+{
+    return false;
+}
+
+template<class T, class P>
+ThreadPipeReceiver::ThreadPipeReceiver(std::shared_ptr<ThreadPipe<T>>& pipe, bool _bRequiredReceiver)
+: P(pipe)
+, bRequiredReceiver(_bRequiredReceiver)
+{
+    if (bRequiredReceiver)
+        P::AddReceiver();
 }
 
 inline StopSignal::StopSignal()

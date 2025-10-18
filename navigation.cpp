@@ -9,9 +9,9 @@ segNet::NetworkType networkSegmentation = segNet::FCN_RESNET18_VOC_512x320;
 
 // ** ObjectDetection
 
-ObjectDetection::ObjectDetection(DataLogger& _logger)
+ObjectDetection::ObjectDetection(DataLoggerWriter* _pLogger)
 : iNumSlices(3)
-, logger(_logger)
+, pLogger(_pLogger)
 , pNetwork(nullptr)
 , pThread(nullptr)
 {
@@ -81,7 +81,7 @@ bool ObjectDetection::ProcessImage(CameraFrame& frm)
                     int(arDetections[i].Top), 
                     int(arDetections[i].Right), 
                     int(arDetections[i].Bottom));
-            logger.LogString(sc);
+            pLogger->LogString(sc);
         }
     }
 
@@ -103,7 +103,7 @@ void ObjectDetection::run(Signal sig, StopSignal ss)
         iFramesProcessed++;
 
         if (ProcessImage(frmProcess)) {
-            logger.LogImage(frmProcess, "detect");
+            pLogger->LogImage(frmProcess, "detect");
         }
     }
     printf("ObjectDetection::run Frames Processed:%d\n", iFramesProcessed);
@@ -140,12 +140,12 @@ bool ObjectDetection::SetNetwork(const char* scNetwork)
 
 // ** TerrainSegmentation
 
-TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
+TerrainSegmentation::TerrainSegmentation(DataLoggerWriter* _pLogger)
 : bHabitatVisible(false)
 , uTargetClass(HABITAT)
 , iNumSlices(3)
 , fImageFOV(50) // I calculated this number based on the imx477 sensor size with a 6mm lens
-, logger(_logger)
+, pLogger(_pLogger)
 , pMask(nullptr)
 , pThread(nullptr)
 , uMaskWidth(0)
@@ -211,12 +211,12 @@ void TerrainSegmentation::run(Signal sig, StopSignal ss)
         
         iFramesProcessed++;
         if (ProcessImage(frmProcess)) {
-            logger.LogImage(frmProcess, "segment");
+            pLogger->LogImage(frmProcess, "segment");
             char sc[128];
             mt.lock();
             sprintf(sc, "Good Habitat Found %2.2f [Image:%d]", fBestDirection, frmProcess.GetId());
             mt.unlock();
-            logger.LogString(sc);
+            pLogger->LogString(sc);
         }
     }
     printf("TerrainSegmentation::run Frames Processed: %d\n", iFramesProcessed);
@@ -330,7 +330,7 @@ bool TerrainSegmentation::ProcessImage(CameraFrame& frm)
             bRet = true;
             char sc[64];
             sprintf(sc, "ScanMask success: slice %d", s);
-            logger.LogString(sc);
+            pLogger->LogString(sc);
             break;
         }
     }
@@ -358,7 +358,7 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iImageId, uint32_t uWidth
     // Log the count, and if less than valid pixel count, we return false
     char sc[64];
     sprintf(sc, "ScanMask: count %u[%u %u]", uAngleAvgCount, uWidth, uHeight);
-    logger.LogString(sc);
+    pLogger->LogString(sc);
     if (uAngleAvgCount < uValidNumPixels) {
         mt.lock();
         bHabitatVisible = false;
@@ -371,7 +371,7 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iImageId, uint32_t uWidth
     float4* imgMask;
     if (!CUDA_FAILED(cudaHostAlloc(&imgMask, maskWidth*maskHeight*16, cudaHostAllocMapped))) {
         pNetwork->Mask(imgMask, maskWidth, maskHeight, segNet::FILTER_POINT);
-        logger.LogMask(imgMask, iImageId, maskWidth, maskHeight);
+        pLogger->LogMask(imgMask, iImageId, maskWidth, maskHeight);
         cudaFreeHost(imgMask);
     }
     // Set direction and that we found something
@@ -382,21 +382,19 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iImageId, uint32_t uWidth
     return true;
 }
 
-Navigator::Navigator(FlightController& _control, DataLogger& _logger, PipeReceiverRGB* _pPipeRGB, bool _bStartBatteryMonitor)
+Navigator::Navigator(FlightController& _control, DataLoggerWriter* pLogger, PipeReceiverRGB* _pPipeRGB, bool _bStartBatteryMonitor)
 : bSendRTL(false)
 , bStartBatteryMonitor(_bStartBatteryMonitor)
 , iRouteCleanType(0)
 , tLastChange(0)
 , tMinTimeBetweenChanges(5)
 , control(_control)
-, logger(_logger)
-, camera(_camera)
+, pLogger(_pLogger)
 , pRouteOrig(nullptr)
-//, sigMainRGB(_camera.GetSignalRGB())
 , pPipeRGB(_pPipeRGB)
 , pThread(nullptr)
-, detector(logger)
-, segmenter(logger)
+, detector(*pLogger)
+, segmenter(*pLogger)
 {
 
 }
@@ -413,6 +411,9 @@ Navigator::~Navigator()
     }
     if (pPipeRGB != nullptr) {
         delete pPipeRGB;
+    }
+    if (pLogger != nullptr) {
+        delete pLogger;
     }
 }
     
@@ -475,11 +476,11 @@ void Navigator::runNavigator(PipeReceiverRGB pipeRGB, StopSignal ss)
     Route* pRouteCurrent = nullptr;
     pRouteOrig = control.GetRoute();
     if (pRouteOrig) {
-        logger.LogString(pRouteOrig->toString().c_str());
+        pLogger->LogString(pRouteOrig->toString().c_str());
         pRouteCurrent = new Route(*pRouteOrig);
     } else {
         printL(" Failed to get route.");
-        logger.LogString("Failed to get route.");
+        pLogger->LogString("Failed to get route.");
     }
 
     while (!ss.shouldStop()) {
@@ -516,7 +517,7 @@ void Navigator::runNavigator(PipeReceiverRGB pipeRGB, StopSignal ss)
                 } else {
                     sprintf(sc, "[delay]Grid Search -> Good Habitat %1.3f", segmenter.GetHabitatDirection());
                 }
-                logger.LogString(sc);
+                pLogger->LogString(sc);
             }
         } else { // Habitat already visible
             // Good terrain still visible?
@@ -541,16 +542,16 @@ void Navigator::runNavigator(PipeReceiverRGB pipeRGB, StopSignal ss)
                 } else {
                     sprintf(sc, "[delay]Good Habitat Change -> %1.3f", segmenter.GetHabitatDirection());
                 }
-                logger.LogString(sc);
+                pLogger->LogString(sc);
             } else { // No good terrain is visible right now
                 // So if there's been enough time we'll switch back to grid
                 if (time(nullptr) - tLastChange > tMinTimeBetweenChanges) {
                     pRouteCurrent = RestoreRoute(pRouteCurrent);
-                    logger.LogString("Good Habitat -> Grid Search");
+                    pLogger->LogString("Good Habitat -> Grid Search");
                     bGridSearching = true;
                     tLastChange = time(nullptr);
                 } else {
-                    logger.LogString("[delay]Good Habitat -> Grid Search");
+                    pLogger->LogString("[delay]Good Habitat -> Grid Search");
                 }
             }
         }
@@ -591,11 +592,11 @@ Route* Navigator::RestoreRoute(Route* pRoute)
         bool bVisit = pVisited != nullptr;
         char sc[512];
         snprintf(sc, 512, "Restoring route; VisitedPoints: %s ; NextWaypoint: %d\n", bVisit ? "YES" : "NO", iWaypoint);
-        logger.LogString(sc);
+        pLogger->LogString(sc);
     } else {
         char sc[512];
         snprintf(sc, 512, "Restoring route; VisitedPoints: %s ; NextWaypoint: NO\n", pVisited != nullptr ? "YES" : "NO");
-        logger.LogString(sc);
+        pLogger->LogString(sc);
     }
 
     pRoute = Route::CleanRoute(pRoute, pVisited, iWaypoint, iRouteCleanType == 2);
@@ -607,7 +608,7 @@ Route* Navigator::RestoreRoute(Route* pRoute)
 
     // Send message with new route to the flight controller
     control.SetRoute(*pRoute, true);
-    logger.LogString(pRoute->toString().c_str());
+    pLogger->LogString(pRoute->toString().c_str());
     
     return pRoute;
 }

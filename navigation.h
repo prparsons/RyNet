@@ -11,7 +11,7 @@ class segNet;
 
 class ObjectDetection {
 public:
-    ObjectDetection(DataLogger& logger);
+    ObjectDetection(DataLoggerWriter* pLogger);
     ~ObjectDetection();
 
     void SetNewImage(CameraFrame& frm);
@@ -26,7 +26,7 @@ private:
     void run(Signal sig, StopSignal ss);
 
     int iNumSlices;
-    DataLogger& logger;
+    DataLoggerWriter* pLogger;
     detectNet* pNetwork;
     std::thread* pThread;
     ThreadMutex mt;
@@ -37,7 +37,7 @@ private:
 
 class TerrainSegmentation {
 public:
-    TerrainSegmentation(DataLogger& logger);
+    TerrainSegmentation(DataLoggerWriter* pLogger);
     ~TerrainSegmentation();
 
     bool IsHabitatVisible();
@@ -75,7 +75,7 @@ private:
     uint32_t uMaskHeight;
     uint32_t uValidNumPixels;
 
-    DataLogger& logger;
+    DataLoggerWriter* pLogger;
     segNet* pNetwork;
     std::thread* pThread;
 
@@ -87,7 +87,7 @@ private:
 
 class Navigator:public I_InterruptStop {
 public:
-    Navigator(FlightController& control, DataLogger& logger, PipeReceiverRGB* pPipeRGB, bool bStartBatteryMonitor);
+    Navigator(FlightController& control, DataLoggerWriter* pLogger, PipeReceiverRGB* pPipeRGB, bool bStartBatteryMonitor);
     ~Navigator();
     
     void Start();
@@ -114,12 +114,10 @@ private:
     time_t tMinTimeBetweenChanges;
 
     FlightController& control;//todo can replace with pipe?
-    DataLogger& logger;//todo should replace with pipe
-    CameraController& camera;//todo should replace with pipe
     Route* pRouteOrig;
 
     StopSignal ssMain;
-    // Signal sigMainRGB;
+    DataLoggerWriter* pLogger;
     PipeReceiverRGB* pPipeRGB;
     std::thread* pThread;
     ObjectDetection detector;

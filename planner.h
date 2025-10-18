@@ -21,7 +21,7 @@ class FlightController {
 public:
     ~FlightController();
 
-    static FlightController* GetFlightController(DataLogger& logger, PipeReceiverDepth* pPipeDepth, PipeReceiverRGB* pPipeIR);
+    static FlightController* GetFlightController(DataLoggerWriter* pLogger, PipeReceiverDepth* pPipeDepth, PipeReceiverRGB* pPipeIR);
     static void DestroyFlightController();
 
     void WaitForTakeoff(int iAltitude, const bool& bAbort);
@@ -56,7 +56,7 @@ public:
     void SetUdpKey(const char* scUdpKey);
 
 private:
-    FlightController(DataLogger& logger, PipeReceiverDepth* pPipeDepth, PipeReceiverRGB* pPipeIR);
+    FlightControllerDataLoggerWriter* pLogger, PipeReceiverDepth* pPipeDepth, PipeReceiverRGB* pPipeIR);
 
     void SaveRoute();
     void SendXML(const char* sc);
@@ -71,7 +71,7 @@ private:
     void runRecv(StopSignal ss); // Thread that recv's UDP packet and stores them in a map according to salt
     char* recvUdp(); // Contains the udp code itself for runRecv()
 
-    DataLogger& logger;//todo should replace with pipe
+    DataLoggerWriter* pLogger;
     CoordNode startLocation;
     std::thread* pThreadDepth;
     std::thread* pThreadPoint;

@@ -14,8 +14,8 @@ bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** s
 
 FlightController* pInstance = nullptr;
 
-FlightController::FlightController(DataLogger& _logger, PipeReceiverDepth* _pPipeDepth, PipeReceiverRGB* _pPipeIR)
-: logger(_logger)
+FlightController::FlightController(DataLoggerWriter* _pLogger, PipeReceiverDepth* _pPipeDepth, PipeReceiverRGB* _pPipeIR)
+: pLogger(_pLogger)
 , startLocation(0,0)
 , pThreadDepth(nullptr)
 , pThreadPoint(nullptr)
@@ -36,10 +36,10 @@ FlightController::FlightController(DataLogger& _logger, PipeReceiverDepth* _pPip
     memset(&addressMavLink, 0, sizeof(addressMavLink));
 }
 
-FlightController* FlightController::GetFlightController(DataLogger& logger, PipeReceiverDepth* pPipeDepth, PipeReceiverRGB* pPipeIR)
+FlightController* FlightController::GetFlightController(DataLoggerWriter* pLogger, PipeReceiverDepth* pPipeDepth, PipeReceiverRGB* pPipeIR)
 {
     if (pInstance == nullptr) {
-        pInstance = new FlightController(logger, pPipeDepth, pPipeIR);
+        pInstance = new FlightController(pLogger, pPipeDepth, pPipeIR);
         return pInstance;
     }
     return nullptr;
@@ -103,14 +103,14 @@ void FlightController::WaitForTakeoff(int iAltitude, const bool& bAbort)
                 if (bTakeoffMessage) {
                     bTakeoffMessage = false;
                     printL("Has entered auto");
-                    logger.LogString("Has entered auto");
+                    pLogger->LogString("Has entered auto");
                 }
                 GetAltitude(fCurrentAltitude);
             }
         }
     }
     printf("Has reached startup altitude %.3f", fCurrentAltitude);
-    logger.LogString("Has reached startup altitude");
+    pLogger->LogString("Has reached startup altitude");
 
     float fLat;
     float fLon;
@@ -146,6 +146,7 @@ FlightController::~FlightController()
 {
     printL("FlightController::~FlightController");
     ssRecv.stop();
+
     if (pThreadRecv->joinable()) pThreadRecv->join();
     delete pThreadRecv;
 
@@ -175,6 +176,10 @@ FlightController::~FlightController()
     for (std::map<uint32_t, char*>::iterator iter(mapRecv.begin()); iter != mapRecv.end(); iter++)
     {
         delete[] iter->second;
+    }
+
+    if (pLogger != nullptr) {
+        delete pLogger;
     }
 
     //socket
@@ -576,7 +581,7 @@ void FlightController::runIr(PipeReceiverRGB& pipeIR, StopSignal ss)
         }
         CameraFrame frmIr(*pNewImage);
         if (frmIr.matrix.empty()) continue;
-        logger.LogImageIr(frmIr);
+        pLogger->LogImageIr(frmIr);
     }
 }
 
