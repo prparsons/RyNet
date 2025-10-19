@@ -7,7 +7,9 @@
 
 void printL(const char* sc);
 
-struct ImageLogData {
+class ImageLogData {
+public:
+    cv::Mat matrix;
     time_t timeLast;
     std::string strData;
     int id;
@@ -22,37 +24,29 @@ struct ImageLogData {
     //  be able to use that to correct any error in our pitch calculation
 };
 
-// // std::tuple<CameraFrame, std::string>
-// using LogSenderImage = ThreadPipeSender<CameraFrame, ThreadPipeShared<CameraFrame>>;
 // // std::tuple<std::shared_ptr<float4>, int, int, int>? on the float4?
 // using LogSenderMask = ThreadPipeSender<CameraFrame, ThreadPipeShared<CameraFrame>>;
 
 using LogSender_String = ThreadPipeSender<std::string, ThreadPipeShared<std::string>>;
 using LogReceiver_String = ThreadPipeReceiver<std::string, ThreadPipeShared<std::string>>;
-using LogSender_Image = ThreadPipeSender<
-                            std::pair<CameraFrame, ImageLogData>, 
-                            ThreadPipeShared< std::pair<CameraFrame, ImageLogData> >
-                        >;
-using LogReceiver_Image = ThreadPipeReceiver<
-                        std::pair<CameraFrame, ImageLogData>, 
-                        ThreadPipeShared< std::tuple<CameraFrame, ImageLogData> >
-                    >;
+using LogSender_Image = ThreadPipeSender<ImageLogData, ThreadPipeShared<ImageLogData>>;
+using LogReceiver_Image = ThreadPipeReceiver<ImageLogData, ThreadPipeShared<ImageLogData>>;
 
 class DataLoggerWriter
 {
 public:
-    DataLoggerWriter(LogReceiver_String* pStrings, LogReceiver_Image* pIr, LogReceiver_Image* pImages);
-    DataLoggerWriter(const DataLoggerWriter& other); // Creates new Sender on same set of pipes
+    DataLoggerWriter(LogSender_String* pStrings, LogSender_Image* pImages, LogSender_Image* pIr);
+    DataLoggerWriter(DataLoggerWriter& other); // Creates new Sender on same set of pipes
 
     void LogString(const char* scData);
     void LogImage(CameraFrame& frm, std::string strIdSource);
     void LogImageIr(CameraFrame& frm);
-    // void LogMask(float4* pImg, int iImageId, int width, int height);
+    void LogMask(float4* pImg, int iImageId, int width, int height){}
 
 private:
-    std::unique_ptr<LogReceiver_String> strings;
-    std::unique_ptr<LogReceiver_Image> images;
-    std::unique_ptr<LogReceiver_Image> ir;
+    std::unique_ptr<LogSender_String> strings;
+    std::unique_ptr<LogSender_Image> images;
+    std::unique_ptr<LogSender_Image> ir;
 };
 
 class DataLogger {

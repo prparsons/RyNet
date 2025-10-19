@@ -83,7 +83,7 @@ void FlightController::Start(bool bStartDepth, bool bStartPointLogger, bool bSta
         pThreadPoint = new std::thread(&FlightController::runPointLogger, this, ssPtLog);
     }
     if (bStartIr) {
-        pThreadIr = new std::thread(&FlightController::runIr, this, sigIr, ssIr);
+        pThreadIr = new std::thread(&FlightController::runIr, this, std::ref(*pPipeIR), ssIr);
     }
 }
 
@@ -425,11 +425,11 @@ void FlightController::runDepth(PipeReceiverDepth& pipeDepth, StopSignal ss)
     const uint16x8_t u8Underflow = vld1q_dup_u16(&uUnderflow);
 
     while (!ss.shouldStop()) {
-        sig.wait(1000);
+        //todo sig.wait(1000);
         
         // No timeout used here
-        std::ptr<cameraFrame_depth> pFrameDepth;
-        if (!pipeDepth.RetreiveData(pFrameDepth)) {
+        std::shared_ptr<cameraFrame_depth> pFrameDepth;
+        if (!pipeDepth.RetrieveData(pFrameDepth)) {
             continue;
         }
         cameraFrame_depth& frameDepth = *pFrameDepth;
@@ -517,7 +517,6 @@ void FlightController::runDepth(PipeReceiverDepth& pipeDepth, StopSignal ss)
             int(uResultRight * frameDepth.getMetersPerUnit() * 100));
         SendXML(sc);
 
-        delete pFrameDepth;
         // Limit distance messages to 20hz
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
@@ -579,7 +578,8 @@ void FlightController::runIr(PipeReceiverRGB& pipeIR, StopSignal ss)
         if (!pipeIR.RetrieveData(pNewImage)) {
             continue;
         }
-        CameraFrame frmIr(*pNewImage);
+        CameraFrame frmIr;
+        frmIr = *pNewImage;
         if (frmIr.matrix.empty()) continue;
         pLogger->LogImageIr(frmIr);
     }

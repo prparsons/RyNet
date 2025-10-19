@@ -390,14 +390,14 @@ template<class T, class P>
 bool ThreadPipeReceiver<T, P>::HasNewData()
 {
     if (!bRequiredReceiver) return true; //todo wrong if pipe has never had anything
-    return P::pipe.HasNewData();
+    return P::pipe->HasNewData();
 }
 
 template<class T, class P>
 bool ThreadPipeReceiver<T, P>::DataReady()
 {
     if (!bRequiredReceiver) return true;
-    return P::pipe.DataReady(P::iIdRecvr);
+    return P::pipe->DataReady(P::iIdRecvr);
 }
 
 template<class T, class P>

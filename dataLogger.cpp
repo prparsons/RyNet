@@ -15,22 +15,24 @@ void printL(const char* sc)
     printf("%s\n", sc);
 }
 
-DataLoggerWriter::DataLoggerWriter(LogReceiver_String* pStrings, LogReceiver_Image* pIr, LogReceiver_Image* pImages)
-: images(pImages)
+DataLoggerWriter::DataLoggerWriter(LogSender_String* pStrings, LogSender_Image* pImages, LogSender_Image* pIr)
+: strings(pStrings)
+, images(pImages)
 , ir(pIr)
-, strings(pStrings)
-{}
+{
+}
 
-DataLoggerWriter(const DataLoggerWriter& other)
-: images(other.images->CreateSender())
+DataLoggerWriter::DataLoggerWriter(DataLoggerWriter& other)
+: strings(other.strings->CreateSender())
+, images(other.images->CreateSender())
 , ir(other.ir->CreateSender())
-, strings(other.strings->CreateSender())
-{}
+{
+}
 
 void DataLoggerWriter::LogImage(CameraFrame& frm, std::string strIdSource)
 {
-    std::pair<CameraFrame, ImageLogData>* pNewLogEntry = new std::pair<CameraFrame, ImageLogData>();
-    ImageLogData& data = pNewLogEntry->second;
+    ImageLogData* pNewLogEntry = new ImageLogData();
+    ImageLogData& data = *pNewLogEntry;
     data.strData = strIdSource;
     time_t timeNow = time(nullptr);
     time_t timeDifference = timeNow - data.timeLast;
@@ -48,7 +50,7 @@ void DataLoggerWriter::LogImage(CameraFrame& frm, std::string strIdSource)
         data.fAltitude = -999;
     }
 
-    pNewLogEntry->first.DeepCopy(frm);
+    frm.matrix.copyTo(pNewLogEntry->matrix);
 
     if (!images->AddData(pNewLogEntry)) {
         //todo Figure out what to do here
@@ -58,8 +60,8 @@ void DataLoggerWriter::LogImage(CameraFrame& frm, std::string strIdSource)
 
 void DataLoggerWriter::LogImageIr(CameraFrame& frm)
 {
-    std::pair<CameraFrame, ImageLogData>* pNewLogEntry = new std::pair<CameraFrame, ImageLogData>();
-    ImageLogData& data = pNewLogEntry->second;
+    ImageLogData* pNewLogEntry = new ImageLogData();
+    ImageLogData& data = *pNewLogEntry;
     time_t timeNow = time(nullptr);
     time_t timeDifference = timeNow - data.timeLast;
     data.timeLast = timeNow;
@@ -76,7 +78,7 @@ void DataLoggerWriter::LogImageIr(CameraFrame& frm)
         data.fAltitude = -999;
     }
 
-    pNewLogEntry->first.DeepCopy(frm);
+    frm.matrix.copyTo(pNewLogEntry->matrix);
 
     if (!ir->AddData(pNewLogEntry)) {
         //todo
@@ -143,11 +145,7 @@ void DataLogger::Stop()
 
 DataLoggerWriter* DataLogger::GetLogger()
 {
-    DataLoggerWriter* pNew = new DataLoggerWriter();
-    pNew->strings.reset(pipeStrings.CreateSender());
-    pNew->images.reset(pipeImage.CreateSender());
-    pNew->ir.reset(pipeIR.CreateSender());
-    return pNew;
+    return new DataLoggerWriter(pipeStrings.CreateSender(), pipeImage.CreateSender(), pipeIR.CreateSender());
 }
 
 void DataLogger::run(StopSignal ss)
@@ -196,15 +194,14 @@ void DataLogger::run(StopSignal ss)
 
         // Image
         //timeout or not to timeout
-        std::shared_ptr<std::pair<CameraFrame, ImageLogData>> pNewImage;
+        std::shared_ptr<ImageLogData> pNewImage;
         while (pipeImage.RetrieveData(pNewImage)) {
-            SaveImage("img", pNewImage->first, pNewImage->second);
+            SaveImage("img", pNewImage->matrix, *pNewImage);
         }
 
         //IR
-        std::shared_ptr<CameraFrame> pNewImage;
         while (pipeIR.RetrieveData(pNewImage)) {
-            SaveImage("flir", pNewImage->first, pNewImage->second);
+            SaveImage("flir", pNewImage->matrix, *pNewImage);
         }
 
         // Check if there's a mask we should write
@@ -244,7 +241,7 @@ void DataLogger::LogMask(float4* pImg, int iImageId, int width, int height)
     mask = tempMat.clone();
     bWriteMask = true;
     mt.unlock();
-    sigNewData.signal();
+    // sigNewData.signal();
 }
 
 void DataLogger::WriteImageData(cv::Mat& image, ImageLogData& imageData)

@@ -45,7 +45,7 @@ inline void PointFromBearing(float fLatCurrent, float fLonCurrent, float fDistan
 class CameraFrame {
 public:
     CameraFrame();
-
+    CameraFrame(CameraFrame& other);
     CameraFrame& operator=(cv::Mat& source); // Deep copy
     CameraFrame& operator=(CameraFrame& other); // Not a deep copy
     void DeepCopy(CameraFrame& other);
@@ -55,7 +55,6 @@ public:
     cv::Mat matrix;
 
 private:
-    CameraFrame(CameraFrame& other);
 
     int id;
 };

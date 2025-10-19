@@ -28,6 +28,11 @@ CameraFrame::CameraFrame()
 
 }
 
+CameraFrame::CameraFrame(CameraFrame& other)
+{
+    *this = other;
+}
+
 CameraFrame& CameraFrame::operator=(Mat& source)
 {
     id = iUniqueId++;
@@ -46,8 +51,47 @@ void CameraFrame::DeepCopy(CameraFrame& source)
     source.matrix.copyTo(matrix);
 }
 
+cameraFrame_depth::cameraFrame_depth()
+: pFrame(nullptr)
+, pDownsample(nullptr)
+{
+}
+
+cameraFrame_depth::cameraFrame_depth(cameraFrame_depth& other)
+: pFrame(nullptr)
+, pDownsample(nullptr)
+{
+    if (other.pFrame != nullptr) {
+        pFrame = new rs2::depth_frame(*other.pFrame);
+    }
+}
+
+float cameraFrame_depth::getMetersPerUnit() const
+{
+    if (pFrame == nullptr) return 0;
+    return pFrame->get_units();
+}
+
+int cameraFrame_depth::getWidth() const
+{
+    if (pFrame == nullptr) return 0;
+    return pFrame->get_width();
+}
+
+int cameraFrame_depth::getHeight() const
+{
+    if (pFrame == nullptr) return 0;
+    return pFrame->get_height();
+}
+
+const uint16_t* cameraFrame_depth::getData() const
+{
+    if (pFrame == nullptr) return nullptr;
+    return (const uint16_t*)(pFrame->get_data());
+}
+
 cameraFrame_depth::cameraFrame_depth(const rs2::depth_frame& _frame)
-: rs2::depth_frame(_frame)
+: pFrame(new rs2::depth_frame(_frame))
 , pDownsample(nullptr)
 {
 
@@ -58,14 +102,18 @@ cameraFrame_depth::~cameraFrame_depth()
     if (pDownsample) {
         delete pDownsample;
     }
+    if (pFrame) {
+        delete pFrame;
+    }
 }
 
 void cameraFrame_depth::applyDecimationFilter()
 {
+    if (pFrame == nullptr) return;
     if (pDownsample == nullptr) {
         pDownsample = new rs2::decimation_filter(8);
     }
-    *this = apply_filter(*pDownsample).as<rs2::depth_frame>();
+    *this = pFrame->apply_filter(*pDownsample).as<rs2::depth_frame>();
 }
 
 // ***********
@@ -99,7 +147,7 @@ CameraController::CameraController(uint32_t _features, const char* _scSimulation
 , iSimulationFrameDelay(33)
 , pipeDepth(4)
 , pipeRGB(2)
-, pipeIr(4)
+, pipeIR(4)
 {
     printL("CameraController::CameraController");
 
@@ -174,7 +222,7 @@ void CameraController::Start()
 
     if (features & CameraController_IR) {
         if (pthrCamera[2] == nullptr) {
-            pthrCamera[2] = new std::thread(&CameraController::run_CV, this, scGStream_IR, &FrameCurrentIR, std::ref(pipeIR), &ss[2]);
+            pthrCamera[2] = new std::thread(&CameraController::run_CV, this, scGStream_IR, std::ref(pipeIR), &ss[2]);
         } else {
             printL("CameraController::Start cv2 already started");
         }
@@ -278,7 +326,7 @@ void CameraController::run_RS()
                 m.unlock();
             }
 
-            sigDepth.signal();
+            //todo this should be using a pipe obviously sigDepth.signal();
         } while (!ss[0].shouldStop());
         pCameraRS->pipe.stop();
     } catch (rs2::error e) {
@@ -291,10 +339,6 @@ void CameraController::run_RS()
 void CameraController::run_CV(const char* scGStream, PipeSenderRGB& pipe, StopSignal* pss)
 {
     printL("CameraController::run_CV");
-    if (pSig == nullptr) {
-        printL("CameraController::run_CV Signal nullptr");
-        return;
-    }
     if (pss == nullptr) {
         printL("CameraController::run_CV StopSignal nullptr");
         return;
@@ -342,10 +386,6 @@ void CameraController::run_simulation(PipeSenderRGB& pipe, StopSignal* pss)
     if (!cap.isOpened()) {
         printL("CameraController::run_simulation failed to open file");
         throw std::invalid_argument("cv::VideoCapture failed");
-        return;
-    }
-    if (pSig == nullptr) {
-        printL("CameraController::run_simulation Signal nullptr");
         return;
     }
     if (pss == nullptr) {

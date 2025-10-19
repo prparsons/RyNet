@@ -11,19 +11,22 @@
 
 class CameraController;
 
-class cameraFrame_depth:protected rs2::depth_frame {
+class cameraFrame_depth {
 public:
+    cameraFrame_depth();
+    cameraFrame_depth(cameraFrame_depth& other);
     cameraFrame_depth(const rs2::depth_frame& _frame);
     ~cameraFrame_depth();
 
-    float getMetersPerUnit() const { return get_units(); }
+    float getMetersPerUnit() const;
 
-    int getWidth() const { return get_width(); }
-    int getHeight() const { return get_height(); }
-    const uint16_t* getData() const { return (const uint16_t*)get_data(); }
+    int getWidth() const;
+    int getHeight() const;
+    const uint16_t* getData() const;
     void applyDecimationFilter();
 
 private:
+    rs2::depth_frame* pFrame;
     rs2::decimation_filter* pDownsample;
 };
 
@@ -91,5 +94,5 @@ private:
 
     PipeSenderDepth pipeDepth;
     PipeSenderRGB pipeRGB;
-    PipeSenderRGB pipeIr;
+    PipeSenderRGB pipeIR;
 };

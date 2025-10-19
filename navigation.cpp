@@ -14,6 +14,7 @@ ObjectDetection::ObjectDetection(DataLoggerWriter* _pLogger)
 , pLogger(_pLogger)
 , pNetwork(nullptr)
 , pThread(nullptr)
+, sigNewImage(mt)
 {
     pNetwork = detectNet::Create(networkDetection);
 	//detectNet* net = detectNet::Create(detectNet::SSD_MOBILENET_V2, 0.5f, 1, TYPE_FASTEST, DEVICE_DLA_0);DEVICE_DLA_1 DEVICE_GPU
@@ -148,6 +149,7 @@ TerrainSegmentation::TerrainSegmentation(DataLoggerWriter* _pLogger)
 , pLogger(_pLogger)
 , pMask(nullptr)
 , pThread(nullptr)
+, sigNewImage(mt)
 , uMaskWidth(0)
 , uMaskHeight(0)
 , uValidNumPixels(18)
@@ -382,7 +384,7 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iImageId, uint32_t uWidth
     return true;
 }
 
-Navigator::Navigator(FlightController& _control, DataLoggerWriter* pLogger, PipeReceiverRGB* _pPipeRGB, bool _bStartBatteryMonitor)
+Navigator::Navigator(FlightController& _control, DataLoggerWriter* _pLogger, PipeReceiverRGB* _pPipeRGB, bool _bStartBatteryMonitor)
 : bSendRTL(false)
 , bStartBatteryMonitor(_bStartBatteryMonitor)
 , iRouteCleanType(0)
@@ -393,8 +395,8 @@ Navigator::Navigator(FlightController& _control, DataLoggerWriter* pLogger, Pipe
 , pRouteOrig(nullptr)
 , pPipeRGB(_pPipeRGB)
 , pThread(nullptr)
-, detector(*pLogger)
-, segmenter(*pLogger)
+, detector(new DataLoggerWriter(*pLogger))
+, segmenter(new DataLoggerWriter(*pLogger))
 {
 
 }
@@ -457,7 +459,7 @@ void Navigator::SetRouteClean(int iClean)
     iRouteCleanType = iClean;
 }
 
-void Navigator::runNavigator(PipeReceiverRGB pipeRGB, StopSignal ss)
+void Navigator::runNavigator(PipeReceiverRGB& pipeRGB, StopSignal ss)
 {
     printL("Navigator::runNavigator");
     pthread_setname_np(pthread_self(), "Navigator::runNavigator");
@@ -492,7 +494,8 @@ void Navigator::runNavigator(PipeReceiverRGB pipeRGB, StopSignal ss)
             printL("runNavigator frame was not valid");
             continue;
         }
-        CameraFrame frameNew(*pNewImage);
+        CameraFrame frameNew;
+        frameNew = *pNewImage;
         detector.SetNewImage(frameNew);
         segmenter.SetNewImage(frameNew);
 
