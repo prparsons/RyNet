@@ -95,7 +95,7 @@ void ObjectDetection::run(Signal sig, StopSignal ss)
     CameraFrame frmProcess;
     int iFramesProcessed = 0;
     while (!ss.shouldStop()) {
-        sig.wait(1000);
+        sig.waitFor(1000);
         mt.lock();
         frmProcess = frmRecent; // This doesn't need to be a deep copy
         mt.unlock();
@@ -203,7 +203,7 @@ void TerrainSegmentation::run(Signal sig, StopSignal ss)
     int iFramesProcessed = 0;
 
     while (!ss.shouldStop()) {
-        sig.wait(1000);
+        sig.waitFor(1000);
         mt.lock();
         frmProcess = frmRecent; // This doesn't need to be a deep copy?
         mt.unlock();
@@ -479,7 +479,7 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
     }
 
     while (!ss.shouldStop()) {
-        sigRGB.wait(1000);
+        sigRGB.waitFor(1000);
         // Get new image and process it
         CameraFrame frameNew;
         if (!camera.GetFrameRGB(frameNew)) {

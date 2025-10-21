@@ -7,6 +7,7 @@
 #include <thread>
 
 #include "locksignal.h"
+#include "threadLib/threadLib.hpp"
 #include "data_types.h"
 
 class CameraController;

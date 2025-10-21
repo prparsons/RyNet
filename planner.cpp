@@ -414,7 +414,7 @@ void FlightController::runDepth(Signal sig, StopSignal ss)
     const uint16x8_t u8Underflow = vld1q_dup_u16(&uUnderflow);
 
     while (!ss.shouldStop()) {
-        sig.wait(1000);
+        sig.waitFor(1000);
         
         cameraFrame_depth* pFrameDepth = camera.GetFrameDepth();
         if (pFrameDepth == nullptr) {
@@ -560,7 +560,7 @@ void FlightController::runIr(Signal sig, StopSignal ss)
     printL("FlightController::runIr");
     CameraFrame frmIr;
     while (!ss.shouldStop()) {
-        sig.wait(1000);
+        sig.waitFor(1000);
         camera.GetFrameIR(frmIr);
         if (frmIr.matrix.empty()) continue;
         logger.LogImageIr(frmIr);

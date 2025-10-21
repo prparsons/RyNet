@@ -73,7 +73,7 @@ void DataLogger::run(Signal sigImage, StopSignal ss)
 
     while (!ss.shouldStop()) {
         // Wait on signal
-        sigImage.wait(1000);
+        sigImage.waitFor(1000);
 
         // check text list, if not empty write
         mt.lock();

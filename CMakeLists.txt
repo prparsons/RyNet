@@ -41,4 +41,10 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 cuda_add_executable(overallApp overallApp.cpp dataLogger.cpp cameraMulti.cpp planner.cpp navigation.cpp route.cpp )
 
 # link my-recognition to jetson-inference library
-target_link_libraries(overallApp jetson-inference realsense2 OpenSSL::SSL ${OpenCV_LIBS})
+target_link_libraries(overallApp 
+    jetson-inference 
+    realsense2 
+    OpenSSL::SSL 
+    ${OpenCV_LIBS}
+    threadLib
+)
