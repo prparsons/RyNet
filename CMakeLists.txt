@@ -4,6 +4,8 @@ cmake_minimum_required(VERSION 2.8)
 # declare my-recognition project
 project(overallApp)
 
+add_subdirectory(threadLib)
+
 # import jetson-inference and jetson-utils packages.
 # note that if you didn't do "sudo make install"
 # while building jetson-inference, this will error.
