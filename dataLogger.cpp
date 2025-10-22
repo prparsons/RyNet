@@ -52,8 +52,7 @@ void DataLoggerWriter::LogImage(CameraFrame& frm, std::string strIdSource)
 
     frm.matrix.copyTo(pNewLogEntry->matrix);
 
-    if (!images->AddData(pNewLogEntry, 0)) {//todo timeout???
-        //todo Figure out what to do here
+    if (!images->AddData(pNewLogEntry, 0)) {//todo timeouts?
         delete pNewLogEntry;
     }
 }
@@ -81,7 +80,6 @@ void DataLoggerWriter::LogImageIr(CameraFrame& frm)
     frm.matrix.copyTo(pNewLogEntry->matrix);
 
     if (!ir->AddData(pNewLogEntry, 0)) {
-        //todo
         delete pNewLogEntry;
     }
 }
@@ -106,8 +104,7 @@ void DataLoggerWriter::LogString(const char* scData)
     *pNewLogEntry = scText;
     delete[] scText;
 
-    if (!strings->AddData(pNewLogEntry, 0)) { //todo?
-        //todo
+    if (!strings->AddData(pNewLogEntry, 0)) {
         delete pNewLogEntry;
     }
 }

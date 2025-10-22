@@ -486,7 +486,6 @@ void Navigator::runNavigator(PipeReceiverRGB& pipeRGB, Signal sigStop)
     }
 
     while (!sigStop.isSignaled()) {
-        //sigRGB.waitFor(1000);//todo???timeout?
         std::shared_ptr<cv::Mat> pNewImage;
         // Get new image and process it
         if (!pipeRGB.RetrieveData(pNewImage, 1000)) {

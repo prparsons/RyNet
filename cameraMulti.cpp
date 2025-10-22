@@ -373,7 +373,9 @@ void CameraController::run_CV(const char* scGStream, PipeSenderRGB& pipe, Signal
             continue;
         }
         // Do something with frame
-        pipe.AddData(pFrame, 0);
+        if (!pipe.AddData(pFrame, 0)) { // No point in waiting to send, cameras are fast enough
+            delete pFrame;
+        }
     }
     // According to opencv: the camera will be deinitialized automatically in VideoCapture destructor
     delete pCap;
@@ -409,7 +411,10 @@ void CameraController::run_simulation(PipeSenderRGB& pipe, Signal* pSigStop)
         uFrameFail = 0; // Reset this now that we got a frame
         iFramesRead++;
         
-        pipe.AddData(pFrame, 0);//todo not deleting if fail
+        if (!pipe.AddData(pFrame, 100)) {
+            // If the add failed, then delete the frame
+            delete pFrame;
+        }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(iSimulationFrameDelay));
     }

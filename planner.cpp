@@ -425,9 +425,6 @@ void FlightController::runDepth(PipeReceiverDepth& pipeDepth, Signal sigStop)
     const uint16x8_t u8Underflow = vld1q_dup_u16(&uUnderflow);
 
     while (!sigStop.isSignaled()) {
-        //todo sig.waitFor(1000);
-        
-        // No timeout used here
         std::shared_ptr<cameraFrame_depth> pFrameDepth;
         if (!pipeDepth.RetrieveData(pFrameDepth, 1000)) {
             continue;
@@ -571,7 +568,6 @@ void FlightController::runIr(PipeReceiverRGB& pipeIR, Signal sigStop)
     printL("FlightController::runIr");
 
     while (!sigStop.isSignaled()) {
-        //sig.wait(1000);//todo//timeout??
         std::shared_ptr<cv::Mat> pNewImage;
         // Get new image and process it
         if (!pipeIR.RetrieveData(pNewImage, 1000)) {
