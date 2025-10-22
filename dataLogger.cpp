@@ -132,13 +132,13 @@ DataLogger::~DataLogger()
 
 void DataLogger::Start()
 {
-    pThread = new std::thread(&DataLogger::run, this, ssThread);
+    pThread = new std::thread(&DataLogger::run, this, sigStopThread);
 }
 
 void DataLogger::Stop()
 {
     if (pThread != nullptr) {
-        ssThread.stop();
+        sigStopThread.signal();
         if (pThread->joinable()) pThread->join();
     }
 }
@@ -148,7 +148,7 @@ DataLoggerWriter* DataLogger::GetLogger()
     return new DataLoggerWriter(pipeStrings.CreateSender(), pipeImage.CreateSender(), pipeIR.CreateSender());
 }
 
-void DataLogger::run(StopSignal ss)
+void DataLogger::run(Signal sigStop)
 {
     printf("DataLogger Thread\n");
 
@@ -173,7 +173,7 @@ void DataLogger::run(StopSignal ss)
     bool bWriteImgLocal = false;
     ImageLogData dataWrite;
 
-    while (!ss.shouldStop()) {
+    while (!sigStop.isSignaled()) {
         // Wait on signal
         //sigImage.wait(1000);
 

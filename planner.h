@@ -65,10 +65,10 @@ private:
     bool VerifyMessage(const char* _scMessage, uint32_t uMessageLength);
     void ConnectMavLink();
 
-    void runDepth(PipeReceiverDepth& pipeDepth, StopSignal ss); // Thread function to continuously send depth info for obstacle avoidance
-    void runPointLogger(StopSignal ss); // Thread function to continuously retrieve and store visited points when in guided mode
-    void runIr(PipeReceiverRGB& pipeIR, StopSignal ss);
-    void runRecv(StopSignal ss); // Thread that recv's UDP packet and stores them in a map according to salt
+    void runDepth(PipeReceiverDepth& pipeDepth, Signal ss); // Thread function to continuously send depth info for obstacle avoidance
+    void runPointLogger(Signal ss); // Thread function to continuously retrieve and store visited points when in guided mode
+    void runIr(PipeReceiverRGB& pipeIR, Signal ss);
+    void runRecv(Signal ss); // Thread that recv's UDP packet and stores them in a map according to salt
     char* recvUdp(); // Contains the udp code itself for runRecv()
 
     DataLoggerWriter* pLogger;
@@ -80,10 +80,10 @@ private:
     
     PipeReceiverDepth* pPipeDepth;
     PipeReceiverRGB* pPipeIR;
-    StopSignal ssDepth;
-    StopSignal ssPtLog;
-    StopSignal ssIr;
-    StopSignal ssRecv;
+    Signal sigDepthStop;
+    Signal sigPtLogStop;
+    Signal sigIrStop;
+    Signal sigRecvStop;
     ThreadMutex mtXML;
     ThreadMutex mtRecv;
     ThreadMutex mtPoints;

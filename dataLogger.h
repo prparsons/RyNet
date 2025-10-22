@@ -2,7 +2,7 @@
 
 #include <thread>
 #include <vector>
-#include "threadLib.hpp"
+#include "threadLib/threadLib.hpp"
 #include "data_types.h"
 
 void printL(const char* sc);
@@ -62,12 +62,12 @@ public:
     void LogMask(float4* pImg, int iImageId, int width, int height);
 
 private:
-    void run(StopSignal ss);
+    void run(Signal sigStop);
     void WriteImageData(cv::Mat& image, ImageLogData& imageData);
     void SaveImage(std::string strPrefix, cv::Mat& image, ImageLogData& imageData);
 
     ThreadMutex mt;
-    StopSignal ssThread;
+    Signal sigStopThread;
     std::thread* pThread;
 
     LogReceiver_Image pipeImage;
