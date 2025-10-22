@@ -52,7 +52,7 @@ void DataLoggerWriter::LogImage(CameraFrame& frm, std::string strIdSource)
 
     frm.matrix.copyTo(pNewLogEntry->matrix);
 
-    if (!images->AddData(pNewLogEntry)) {
+    if (!images->AddData(pNewLogEntry, 0)) {//todo timeout???
         //todo Figure out what to do here
         delete pNewLogEntry;
     }
@@ -80,7 +80,7 @@ void DataLoggerWriter::LogImageIr(CameraFrame& frm)
 
     frm.matrix.copyTo(pNewLogEntry->matrix);
 
-    if (!ir->AddData(pNewLogEntry)) {
+    if (!ir->AddData(pNewLogEntry, 0)) {
         //todo
         delete pNewLogEntry;
     }
@@ -106,7 +106,7 @@ void DataLoggerWriter::LogString(const char* scData)
     *pNewLogEntry = scText;
     delete[] scText;
 
-    if (!strings->AddData(pNewLogEntry)) {
+    if (!strings->AddData(pNewLogEntry, 0)) { //todo?
         //todo
         delete pNewLogEntry;
     }
@@ -180,12 +180,12 @@ void DataLogger::run(Signal sigStop)
         // Text
         //no timeout
         std::shared_ptr<std::string> pNewString;
-        if (pipeStrings.HasNewData()) {
+        if (pipeStrings.DataReady()) {
             fileLog.open(scFileNameText, ios::out | ios::app);
             if (!fileLog) {
                 printf("Failed to open log files\n");
             } else {
-                while (pipeStrings.RetrieveData(pNewString)) {
+                while (pipeStrings.RetrieveData(pNewString, 500)) {
                     fileLog << *pNewString << endl;
                 }
                 fileLog.close();
@@ -195,12 +195,12 @@ void DataLogger::run(Signal sigStop)
         // Image
         //timeout or not to timeout
         std::shared_ptr<ImageLogData> pNewImage;
-        while (pipeImage.RetrieveData(pNewImage)) {
+        while (pipeImage.RetrieveData(pNewImage, 500)) {
             SaveImage("img", pNewImage->matrix, *pNewImage);
         }
 
         //IR
-        while (pipeIR.RetrieveData(pNewImage)) {
+        while (pipeIR.RetrieveData(pNewImage, 500)) {
             SaveImage("flir", pNewImage->matrix, *pNewImage);
         }
 

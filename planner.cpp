@@ -429,7 +429,7 @@ void FlightController::runDepth(PipeReceiverDepth& pipeDepth, Signal sigStop)
         
         // No timeout used here
         std::shared_ptr<cameraFrame_depth> pFrameDepth;
-        if (!pipeDepth.RetrieveData(pFrameDepth)) {
+        if (!pipeDepth.RetrieveData(pFrameDepth, 1000)) {
             continue;
         }
         cameraFrame_depth& frameDepth = *pFrameDepth;
@@ -573,9 +573,8 @@ void FlightController::runIr(PipeReceiverRGB& pipeIR, Signal sigStop)
     while (!sigStop.isSignaled()) {
         //sig.wait(1000);//todo//timeout??
         std::shared_ptr<cv::Mat> pNewImage;
-        pipeIR.RetrieveData(pNewImage);
         // Get new image and process it
-        if (!pipeIR.RetrieveData(pNewImage)) {
+        if (!pipeIR.RetrieveData(pNewImage, 1000)) {
             continue;
         }
         CameraFrame frmIr;

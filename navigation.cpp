@@ -14,7 +14,7 @@ ObjectDetection::ObjectDetection(DataLoggerWriter* _pLogger)
 , pLogger(_pLogger)
 , pNetwork(nullptr)
 , pThread(nullptr)
-, sigNewImage(mt)
+, sigNewImage()//todo wihout using another mutex, deadlocks?
 {
     pNetwork = detectNet::Create(networkDetection);
 	//detectNet* net = detectNet::Create(detectNet::SSD_MOBILENET_V2, 0.5f, 1, TYPE_FASTEST, DEVICE_DLA_0);DEVICE_DLA_1 DEVICE_GPU
@@ -149,7 +149,7 @@ TerrainSegmentation::TerrainSegmentation(DataLoggerWriter* _pLogger)
 , pLogger(_pLogger)
 , pMask(nullptr)
 , pThread(nullptr)
-, sigNewImage(mt)
+, sigNewImage()//todo deadlock?
 , uMaskWidth(0)
 , uMaskHeight(0)
 , uValidNumPixels(18)
@@ -488,9 +488,8 @@ void Navigator::runNavigator(PipeReceiverRGB& pipeRGB, Signal sigStop)
     while (!sigStop.isSignaled()) {
         //sigRGB.waitFor(1000);//todo???timeout?
         std::shared_ptr<cv::Mat> pNewImage;
-        pipeRGB.RetrieveData(pNewImage);
         // Get new image and process it
-        if (!pipeRGB.RetrieveData(pNewImage)) {
+        if (!pipeRGB.RetrieveData(pNewImage, 1000)) {
             printL("runNavigator frame was not valid");
             continue;
         }

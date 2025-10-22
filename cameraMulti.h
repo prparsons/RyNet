@@ -30,10 +30,10 @@ private:
     rs2::decimation_filter* pDownsample;
 };
 
-using PipeSenderDepth = ThreadPipeSender<cameraFrame_depth, ThreadPipeShared<cameraFrame_depth>>;
-using PipeReceiverDepth = ThreadPipeReceiver<cameraFrame_depth, ThreadPipeShared<cameraFrame_depth>>;
-using PipeSenderRGB = ThreadPipeSender<cv::Mat, ThreadPipeShared<cv::Mat>>;
-using PipeReceiverRGB = ThreadPipeReceiver<cv::Mat, ThreadPipeShared<cv::Mat>>;
+using PipeSenderDepth = ThreadPipeSender<cameraFrame_depth>;
+using PipeReceiverDepth = ThreadPipeReceiver<cameraFrame_depth>;
+using PipeSenderRGB = ThreadPipeSender<cv::Mat>;
+using PipeReceiverRGB = ThreadPipeReceiver<cv::Mat>;
 
 class I_InterruptStop {
 public:

@@ -27,10 +27,10 @@ public:
 // // std::tuple<std::shared_ptr<float4>, int, int, int>? on the float4?
 // using LogSenderMask = ThreadPipeSender<CameraFrame, ThreadPipeShared<CameraFrame>>;
 
-using LogSender_String = ThreadPipeSender<std::string, ThreadPipeShared<std::string>>;
-using LogReceiver_String = ThreadPipeReceiver<std::string, ThreadPipeShared<std::string>>;
-using LogSender_Image = ThreadPipeSender<ImageLogData, ThreadPipeShared<ImageLogData>>;
-using LogReceiver_Image = ThreadPipeReceiver<ImageLogData, ThreadPipeShared<ImageLogData>>;
+using LogSender_String = ThreadPipeSender<std::string>;
+using LogReceiver_String = ThreadPipeReceiver<std::string>;
+using LogSender_Image = ThreadPipeSender<ImageLogData>;
+using LogReceiver_Image = ThreadPipeReceiver<ImageLogData>;
 
 class DataLoggerWriter
 {
