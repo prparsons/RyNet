@@ -51,15 +51,15 @@ void FlightController::DestroyFlightController()
 
     if (pInstance->pThreadDepth != nullptr) {
         printL("FlightController::DestroyFlightController Stopping depths");
-        pInstance->ssDepth.stop();
+        pInstance->sigDepthStop.signal();
     }
     if (pInstance->pThreadPoint != nullptr) {
         printL("FlightController::DestroyFlightController Stopping point logger");
-        pInstance->ssPtLog.stop();
+        pInstance->sigPtLogStop.signal();
     }
     if (pInstance->pThreadIr != nullptr) {
         printL("FlightController::DestroyFlightController Stopping thermal camera");
-        pInstance->ssIr.stop();
+        pInstance->sigIrStop.signal();
     }
     printL("FlightController::DestroyFlightController Deleting flight controller");
     delete pInstance;
@@ -75,15 +75,15 @@ void FlightController::Start(bool bStartDepth, bool bStartPointLogger, bool bSta
 void FlightController::Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr)
 {
     printL("FlightController::Start");
-    pThreadRecv = new std::thread(&FlightController::runRecv, this, ssRecv);
+    pThreadRecv = new std::thread(&FlightController::runRecv, this, sigRecvStop);
     if (bStartDepth) {
-        pThreadDepth = new std::thread(&FlightController::runDepth, this, sigCameraDepth, ssDepth);
+        pThreadDepth = new std::thread(&FlightController::runDepth, this, sigCameraDepth, sigDepthStop);
     }
     if (bStartPointLogger) {
-        pThreadPoint = new std::thread(&FlightController::runPointLogger, this, ssPtLog);
+        pThreadPoint = new std::thread(&FlightController::runPointLogger, this, sigPtLogStop);
     }
     if (bStartIr) {
-        pThreadIr = new std::thread(&FlightController::runIr, this, sigIr, ssIr);
+        pThreadIr = new std::thread(&FlightController::runIr, this, sigIr, sigIrStop);
     }
 }
 
@@ -145,22 +145,22 @@ void FlightController::SetExtraDistance(int _iExtraGuidedDistance)
 FlightController::~FlightController()
 {
     printL("FlightController::~FlightController");
-    ssRecv.stop();
+    sigRecvStop.signal();
     if (pThreadRecv->joinable()) pThreadRecv->join();
     delete pThreadRecv;
 
     if (pThreadDepth != nullptr) {
-        ssDepth.stop();
+        sigDepthStop.signal();
         if (pThreadDepth->joinable()) pThreadDepth->join();
         delete pThreadDepth;
     }
     if (pThreadPoint != nullptr) {
-        ssPtLog.stop();
+        sigPtLogStop.signal();
         if (pThreadPoint->joinable()) pThreadPoint->join();
         delete pThreadPoint;
     }
     if (pThreadIr != nullptr) {
-        ssIr.stop();
+        sigIrStop.signal();
         if (pThreadIr->joinable()) pThreadIr->join();
         delete pThreadIr;
     }
@@ -404,7 +404,7 @@ void FlightController::SaveRoute()
     SendXML(sc);
 }
 
-void FlightController::runDepth(Signal sig, StopSignal ss)
+void FlightController::runDepth(Signal sig, Signal sigStop)
 {
     printL("FlightController::runDepth");
 
@@ -413,8 +413,8 @@ void FlightController::runDepth(Signal sig, StopSignal ss)
     const uint16_t uUnderflow = 1;
     const uint16x8_t u8Underflow = vld1q_dup_u16(&uUnderflow);
 
-    while (!ss.shouldStop()) {
-        sig.wait(1000);
+    while (!sigStop.isSignaled()) {
+        sig.waitFor(1000);
         
         cameraFrame_depth* pFrameDepth = camera.GetFrameDepth();
         if (pFrameDepth == nullptr) {
@@ -511,7 +511,7 @@ void FlightController::runDepth(Signal sig, StopSignal ss)
     }
 }
 
-void FlightController::runPointLogger(StopSignal ss)
+void FlightController::runPointLogger(Signal sigStop)
 {
     printL("FlightController::runPointLogger");
     bool bGuided = false;
@@ -521,7 +521,7 @@ void FlightController::runPointLogger(StopSignal ss)
     float fLon = 0;
     GetPosition(fLat, fLon);
 
-    while (!ss.shouldStop()) {
+    while (!sigStop.isSignaled()) {
         if (bGuided) { // In GUIDED
             // Get the current position, add it to the list of visited points
             if (GetPosition(fLat, fLon)) {
@@ -555,26 +555,26 @@ void FlightController::runPointLogger(StopSignal ss)
     }
 }
 
-void FlightController::runIr(Signal sig, StopSignal ss)
+void FlightController::runIr(Signal sig, Signal sigStop)
 {
     printL("FlightController::runIr");
     CameraFrame frmIr;
-    while (!ss.shouldStop()) {
-        sig.wait(1000);
+    while (!sigStop.isSignaled()) {
+        sig.waitFor(1000);
         camera.GetFrameIR(frmIr);
         if (frmIr.matrix.empty()) continue;
         logger.LogImageIr(frmIr);
     }
 }
 
-void FlightController::runRecv(StopSignal ss)
+void FlightController::runRecv(Signal sigStop)
 {
     printL("FlightController::runRecv");
 
     char* buffer = nullptr;
     uint32_t* pSalt = nullptr;
 
-    while (!ss.shouldStop()) {
+    while (!sigStop.isSignaled()) {
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
         // Get a valid frame (size right, unverified)

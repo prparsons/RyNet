@@ -4,6 +4,8 @@ cmake_minimum_required(VERSION 2.8)
 # declare my-recognition project
 project(overallApp)
 
+add_subdirectory(threadLib)
+
 # import jetson-inference and jetson-utils packages.
 # note that if you didn't do "sudo make install"
 # while building jetson-inference, this will error.
@@ -39,4 +41,10 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 cuda_add_executable(overallApp overallApp.cpp dataLogger.cpp cameraMulti.cpp planner.cpp navigation.cpp route.cpp )
 
 # link my-recognition to jetson-inference library
-target_link_libraries(overallApp jetson-inference realsense2 OpenSSL::SSL ${OpenCV_LIBS})
+target_link_libraries(overallApp 
+    jetson-inference 
+    realsense2 
+    OpenSSL::SSL 
+    ${OpenCV_LIBS}
+    threadLib
+)

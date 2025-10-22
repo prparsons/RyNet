@@ -23,7 +23,7 @@ public:
 
 private:
     bool ProcessImage(CameraFrame& frm);
-    void run(Signal sig, StopSignal ss);
+    void run(Signal sig, Signal sigStop);
 
     int iNumSlices;
     DataLogger& logger;
@@ -31,7 +31,7 @@ private:
     std::thread* pThread;
     ThreadMutex mt;
     Signal sigNewImage;
-    StopSignal ssMain;
+    Signal sigStopMain;
     CameraFrame frmRecent;
 };
 
@@ -63,7 +63,7 @@ public:
 private:
     bool ProcessImage(CameraFrame& frm);
     bool ScanMask(uint8_t* pMask, int iImageId, uint32_t uWidth, uint32_t uHeight);
-    void run(Signal sig, StopSignal ss);
+    void run(Signal sig, Signal sigStop);
 
     bool bHabitatVisible;
     uint8_t uTargetClass;
@@ -81,7 +81,7 @@ private:
 
     ThreadMutex mt;
     Signal sigNewImage;
-    StopSignal ssMain;
+    Signal sigStopMain;
     CameraFrame frmRecent;
 };
 
@@ -103,8 +103,8 @@ public:
 private:
     Route* RestoreRoute(Route* pRoute);
 
-    void runBattery(StopSignal ss, StopSignal ssMainThread);
-    void runNavigator(Signal sig, StopSignal ss);
+    void runBattery(Signal sigStop, Signal sigStopMainThread);
+    void runNavigator(Signal sig, Signal sigStop);
 
     // ONLY access from runBattery. runNavigator will access it AFTER it has joined runBattery
     bool bSendRTL;
@@ -118,7 +118,7 @@ private:
     CameraController& camera;
     Route* pRouteOrig;
 
-    StopSignal ssMain;
+    Signal sigStopMain;
     Signal sigMainRGB;
     std::thread* pThread;
     ObjectDetection detector;
