@@ -2,7 +2,6 @@
 
 #include <thread>
 #include <vector>
-#include "locksignal.h"
 #include "threadLib/threadLib.hpp"
 #include "data_types.h"
 
@@ -37,7 +36,7 @@ public:
     void LogString(const char* scData);
 
 private:
-    void run(Signal sigImage, StopSignal ss);
+    void run(Signal sigImage, Signal sigStop);
     void WriteImageData(cv::Mat& image, ImageLogData& imageData);
     void SaveImage(std::string strPrefix, cv::Mat& image, ImageLogData& imageData);
 
@@ -47,7 +46,7 @@ private:
 
     ThreadMutex mt;
     Signal sigNewData;
-    StopSignal ssThread;
+    Signal sigStopThread;
     std::thread* pThread;
 
     cv::Mat image;

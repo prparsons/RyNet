@@ -6,7 +6,6 @@
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
 #include <thread>
 
-#include "locksignal.h"
 #include "threadLib/threadLib.hpp"
 #include "data_types.h"
 

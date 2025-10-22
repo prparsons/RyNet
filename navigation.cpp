@@ -24,7 +24,7 @@ ObjectDetection::~ObjectDetection()
 {
     if (pNetwork != nullptr) delete pNetwork;
     if (pThread != nullptr) {
-        ssMain.stop();
+        sigStopMain.signal();
         if (pThread->joinable()) pThread->join();
         delete pThread;
     }
@@ -89,12 +89,12 @@ bool ObjectDetection::ProcessImage(CameraFrame& frm)
     return bRet;
 }
 
-void ObjectDetection::run(Signal sig, StopSignal ss)
+void ObjectDetection::run(Signal sig, Signal sigStop)
 {
     printL("ObjectDetection::run");
     CameraFrame frmProcess;
     int iFramesProcessed = 0;
-    while (!ss.shouldStop()) {
+    while (!sigStop.isSignaled()) {
         sig.waitFor(1000);
         mt.lock();
         frmProcess = frmRecent; // This doesn't need to be a deep copy
@@ -111,12 +111,12 @@ void ObjectDetection::run(Signal sig, StopSignal ss)
 
 void ObjectDetection::Start()
 {
-    pThread = new std::thread(&ObjectDetection::run, this, sigNewImage, ssMain);
+    pThread = new std::thread(&ObjectDetection::run, this, sigNewImage, sigStopMain);
 }
 
 void ObjectDetection::SendStopSignal()
 {
-    ssMain.stop();
+    sigStopMain.signal();
 }
 
 void ObjectDetection::SetNumberImageSlices(int _iNumSlices)
@@ -161,7 +161,7 @@ TerrainSegmentation::~TerrainSegmentation()
 {
     if (pMask != nullptr) delete[] pMask;// cudaFree(pMask);
     if (pThread != nullptr) {
-        ssMain.stop();
+        sigStopMain.signal();
         if (pThread->joinable()) pThread->join();
         delete pThread;
     }
@@ -193,16 +193,16 @@ void TerrainSegmentation::SetNewImage(CameraFrame& frm)
 
 void TerrainSegmentation::Start()
 {
-    pThread = new std::thread(&TerrainSegmentation::run, this, sigNewImage, ssMain);
+    pThread = new std::thread(&TerrainSegmentation::run, this, sigNewImage, sigStopMain);
 }
 
-void TerrainSegmentation::run(Signal sig, StopSignal ss)
+void TerrainSegmentation::run(Signal sig, Signal sigStop)
 {
     printL("TerrainSegmentation::run");
     CameraFrame frmProcess;
     int iFramesProcessed = 0;
 
-    while (!ss.shouldStop()) {
+    while (!sigStop.isSignaled()) {
         sig.waitFor(1000);
         mt.lock();
         frmProcess = frmRecent; // This doesn't need to be a deep copy?
@@ -224,7 +224,7 @@ void TerrainSegmentation::run(Signal sig, StopSignal ss)
 
 void TerrainSegmentation::SendStopSignal()
 {
-    ssMain.stop();
+    sigStopMain.signal();
 }
 
 void TerrainSegmentation::SetTargetClass(uint8_t _uTargetClass)
@@ -403,7 +403,7 @@ Navigator::Navigator(FlightController& _control, DataLogger& _logger, CameraCont
 Navigator::~Navigator()
 {
     if (pThread != nullptr) {
-        ssMain.stop();
+        sigStopMain.signal();
         if (pThread->joinable()) pThread->join();
         delete pThread;
     }
@@ -414,7 +414,7 @@ Navigator::~Navigator()
     
 void Navigator::Start()
 {
-    pThread = new std::thread(&Navigator::runNavigator, this, sigMainRGB, ssMain);
+    pThread = new std::thread(&Navigator::runNavigator, this, sigMainRGB, sigStopMain);
 }
 
 void Navigator::Join()
@@ -427,7 +427,7 @@ void Navigator::Join()
 void Navigator::SignalStop()
 {
     if (pThread != nullptr) {
-        ssMain.stop();
+        sigStopMain.signal();
     }
 }
 
@@ -452,7 +452,7 @@ void Navigator::SetRouteClean(int iClean)
     iRouteCleanType = iClean;
 }
 
-void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
+void Navigator::runNavigator(Signal sigRGB, Signal sigStop)
 {
     printL("Navigator::runNavigator");
     pthread_setname_np(pthread_self(), "Navigator::runNavigator");
@@ -461,9 +461,9 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
     float fMargin = 5;
     float fCurrentDirection = 0;
 
-    StopSignal ssBattery;
+    Signal sigStopBattery;
     std::thread* pThrBattery = nullptr;
-    if (bStartBatteryMonitor) pThrBattery = new std::thread(&Navigator::runBattery, this, ssBattery, ssMain);
+    if (bStartBatteryMonitor) pThrBattery = new std::thread(&Navigator::runBattery, this, sigStopBattery, sigStopMain);
     
     detector.Start();
     segmenter.Start();
@@ -478,7 +478,7 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
         logger.LogString("Failed to get route.");
     }
 
-    while (!ss.shouldStop()) {
+    while (!sigStop.isSignaled()) {
         sigRGB.waitFor(1000);
         // Get new image and process it
         CameraFrame frameNew;
@@ -564,7 +564,7 @@ void Navigator::runNavigator(Signal sigRGB, StopSignal ss)
     segmenter.SendStopSignal();
     
     if (bStartBatteryMonitor) {
-        ssBattery.stop();
+        sigStopBattery.signal();
         if (pThrBattery->joinable()) pThrBattery->join();
         delete pThrBattery;
         if (bSendRTL) control.SetRTL();
@@ -606,14 +606,14 @@ Route* Navigator::RestoreRoute(Route* pRoute)
     return pRoute;
 }
 
-void Navigator::runBattery(StopSignal ss, StopSignal ssMainThread)
+void Navigator::runBattery(Signal sigStop, Signal sigStopMainThread)
 {
     printL("Navigator::runBattery");
 
     // Loop over uCheckBattery, on each overflow we'll check the battery. This way we don't have to check very often,
     //  but don't wait too long while tryin to stop this thread.
     uint8_t uCheckBattery = 0;
-    while (!ss.shouldStop()) {
+    while (!sigStop.isSignaled()) {
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         if (uCheckBattery++ != 0) continue;
 
@@ -623,7 +623,7 @@ void Navigator::runBattery(StopSignal ss, StopSignal ssMainThread)
         // For now, simple method...if battery is < 50% then we will stop the nav threads and RTL.
         if (iBattery < 50) {
             bSendRTL = true;
-            ssMainThread.stop();
+            sigStopMainThread.signal();
             break;
         }
     }
