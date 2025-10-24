@@ -512,26 +512,27 @@ void FlightController::runDepth(Signal sig, Signal sigStop)
     }
 }
 
-void writeProlog(std::string& strGpx)
+std::string GetProlog()
 {
-    strGpx += "<gpx version=\"1.1\" creator=\"todo\">\n"\
-                    "<metadata>\n"\
-                        "<name>My Route</name>\n"\
-                        "<time>2024-01-22T10:00:00Z</time>\n"\
-                    "</metadata>\n";
+    std::string str = "<gpx version=\"1.1\" creator=\"todo\">\n"\
+                            "<metadata>\n"\
+                                "<name>My Route</name>\n"\
+                                "<time>2024-01-22T10:00:00Z</time>\n"\
+                            "</metadata>\n";
+    return str;
 }
 
-void writeStartTrackSeg(std::string& strGpx, std::string strType)
+std::string GetStartTrackSeg(std::string strSegmentType)
 {
-    strGpx += "<trkseg>\n"\
-                    "<extensions>\n"
-                        "<mode>" + strType + "</mode\n"\
-                    "</extensions>\n";
+    return "<trkseg>\n"\
+                "<extensions>\n"
+                    "<mode>" + strSegmentType + "</mode>\n"\
+                "</extensions>\n";
 }
 
-void writeTrackPoint(std::string& strGpx, float fLat, float fLon, float fElev)
+std::string GetTrackPoint(float fLat, float fLon, float fElev)
 {
-    strGpx += "<trkpt lat=\"";
+    std::string strGpx = "<trkpt lat=\"";
     strGpx += fLat;
     strGpx += "\" lon=\"";
     strGpx += fLon;
@@ -542,9 +543,9 @@ void writeTrackPoint(std::string& strGpx, float fLat, float fLon, float fElev)
     strGpx += "</time></trkpt>\n";
 }
 
-void writeEndTrackSeg(std::string& strGpx)
+std::string GetEndTrackSeg()
 {
-    strGpx += "</trkseg>\n";
+    return "</trkseg>\n";
 }
 
 void writeWaypoint(std::string& strGpx, std::string strDesc, float fLat, float fLon)
@@ -565,10 +566,33 @@ void FlightController::runPointLogger(Signal sigStop)
     float fLat = 0;
     float fLon = 0;
     GetPosition(fLat, fLon);
-    std::string strRunGpx;
     std::string strTrackGpx;
     std::string strDetectionGpx;//todo data filled via pipe
-    writeProlog(strRunGpx);
+    std::string strSegmentationGpx;//todo data filled via pipe
+
+    char scFileNameText[128];
+    time_t timeNow = time(nullptr);
+    tm* pTimeStruct = localtime(&timeNow);
+    snprintf(scFileNameText, 
+            127, 
+            "run_%d_%d_%d_%d_%d.gpx", 
+            pTimeStruct->tm_year + 1900, 
+            pTimeStruct->tm_mon + 1,
+            pTimeStruct->tm_mday,
+            pTimeStruct->tm_hour,
+            pTimeStruct->tm_min);
+
+    printf(" Starting GPX file: %s\n", scFileNameText);
+    {
+        std::fstream fileGpx;
+        fileGpx.open(scFileNameText, std::ios::out | std::ios::app);
+        if (fileGpx) {
+            fileGpx << GetProlog() << GetStartTrackSeg("AUTO") ;
+            fileGpx.close();
+        } else {
+            printL(" failed to save GPX");//todo throw exception?, bail the whole thing? crash the drone?
+        }
+    }
 
     while (!sigStop.isSignaled()) {
         if (bGuided) { // In GUIDED
@@ -576,7 +600,7 @@ void FlightController::runPointLogger(Signal sigStop)
             // Get the current position, add it to the list of visited points
             if (GetPosition(fLat, fLon)) {
                 bValidPos = true;
-                writeTrackPoint(strTrackGpx, fLat, fLon, 0);//todo elevation
+                strTrackGpx += GetTrackPoint(fLat, fLon, 0);//todo elevation
                 mtPoints.lock();
                 startLocation.InsertPoint(fLat, fLon);
                 mtPoints.unlock();
@@ -587,49 +611,43 @@ void FlightController::runPointLogger(Signal sigStop)
             }
             if (!bGuided) {
                 // Just switched to guided from auto, so clear visited points
-                writeEndTrackSeg(strTrackGpx);
-                writeStartTrackSeg(strTrackGpx, "AUTO");
-                if (bValidPos) {
-                    strTrackGpx, fLat, fLon, 0);
-                }
+                strTrackGpx += GetEndTrackSeg();
+                strTrackGpx += GetStartTrackSeg("AUTO");
                 mtPoints.lock();
                 startLocation.ResetPosition(fLat, fLon);
                 mtPoints.unlock();
             }
         } else { // in AUTO            
             // See if we're in guided or auto (switched?)
+            bool bValidPos = GetPosition(fLat, fLon);
             if (GetMode(scMode, 32)) {
-                bool bValidPos = GetPosition(fLat, fLon);
                 bGuided = strcmp(scMode, "GUIDED") == 0;
                 if (bGuided) {
-                    writeEndTrackSeg(strTrackGpx);
-                    writeStartTrackSeg(strTrackGpx, "GUIDED");
+                    strTrackGpx += GetEndTrackSeg();
+                    strTrackGpx += GetStartTrackSeg("GUIDED");
                     if (bValidPos) {
-                        writeTrackPoint(strTrackGpx, fLat, fLon, 0);
                     }
                     mtPoints.lock();
                     startLocation.ResetPosition(fLat, fLon);
                     mtPoints.unlock();
-                } else {
-                    if (bValidPos) {
-                        writeTrackPoint(strTrackGpx, fLat, fLon, 0);
-                    }
                 }
             }
+            strTrackGpx += GetTrackPoint(fLat, fLon, 0);//todo elevation
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
-
-    writeEndTrackSeg(strTrackGpx);
     printL(" Saving GPX file");
-    std::fstream fileGpx;
-    fileGpx.open("run.gpx", std::ios::out | std::ios::app);//todo file name
-    if (fileGpx) {
-        fileGpx << strRunGpx << strTrackGpx << strDetectionGpx << "</gpx>";
-        fileGpx.close();
-    } else {
-        printL(" failed to save GPX");
+    {
+        std::fstream fileGpx;
+        fileGpx.open(scFileNameText, std::ios::out | std::ios::app);
+        if (fileGpx) {
+            fileGpx << strTrackGpx << GetEndTrackSeg() << strDetectionGpx << "</gpx>";
+            fileGpx.close();
+        } else {
+            printL(" failed to save GPX");//todo throw exception?, bail the whole thing? crash the drone?
+        }
     }
+
 }
 
 void FlightController::runIr(Signal sig, Signal sigStop)
