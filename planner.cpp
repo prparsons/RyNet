@@ -2,6 +2,7 @@
 
 #include <string.h>
 #include <chrono>
+#include <fstream>
 #include <openssl/evp.h>
 #include <openssl/err.h>
 
@@ -511,6 +512,50 @@ void FlightController::runDepth(Signal sig, Signal sigStop)
     }
 }
 
+void writeProlog(std::string& strGpx)
+{
+    strGpx += "<gpx version=\"1.1\" creator=\"todo\">\n"\
+                    "<metadata>\n"\
+                        "<name>My Route</name>\n"\
+                        "<time>2024-01-22T10:00:00Z</time>\n"\
+                    "</metadata>\n";
+}
+
+void writeStartTrackSeg(std::string& strGpx, std::string strType)
+{
+    strGpx += "<trkseg>\n"\
+                    "<extensions>\n"
+                        "<mode>" + strType + "</mode\n"\
+                    "</extensions>\n";
+}
+
+void writeTrackPoint(std::string& strGpx, float fLat, float fLon, float fElev)
+{
+    strGpx += "<trkpt lat=\"";
+    strGpx += fLat;
+    strGpx += "\" lon=\"";
+    strGpx += fLon;
+    strGpx += "\"><ele>";
+    strGpx += fElev;
+    strGpx += "</ele><time>";
+    //2025-07-12T08:16:02Z
+    strGpx += "</time></trkpt>\n";
+}
+
+void writeEndTrackSeg(std::string& strGpx)
+{
+    strGpx += "</trkseg>\n";
+}
+
+void writeWaypoint(std::string& strGpx, std::string strDesc, float fLat, float fLon)
+{
+    strGpx += "<wpt lat=\"";
+    strGpx += fLat;
+    strGpx += "\" lon=\"";
+    strGpx += fLon;
+    strGpx += "\"><desc>" + strDesc + "</desc></wpt>\n";
+}
+
 void FlightController::runPointLogger(Signal sigStop)
 {
     printL("FlightController::runPointLogger");
@@ -520,11 +565,18 @@ void FlightController::runPointLogger(Signal sigStop)
     float fLat = 0;
     float fLon = 0;
     GetPosition(fLat, fLon);
+    std::string strRunGpx;
+    std::string strTrackGpx;
+    std::string strDetectionGpx;//todo data filled via pipe
+    writeProlog(strRunGpx);
 
     while (!sigStop.isSignaled()) {
         if (bGuided) { // In GUIDED
+            bool bValidPos = false;
             // Get the current position, add it to the list of visited points
             if (GetPosition(fLat, fLon)) {
+                bValidPos = true;
+                writeTrackPoint(strTrackGpx, fLat, fLon, 0);//todo elevation
                 mtPoints.lock();
                 startLocation.InsertPoint(fLat, fLon);
                 mtPoints.unlock();
@@ -535,23 +587,48 @@ void FlightController::runPointLogger(Signal sigStop)
             }
             if (!bGuided) {
                 // Just switched to guided from auto, so clear visited points
-                GetPosition(fLat, fLon); // Doesn't matter if it fails...we still need to reset position
+                writeEndTrackSeg(strTrackGpx);
+                writeStartTrackSeg(strTrackGpx, "AUTO");
+                if (bValidPos) {
+                    strTrackGpx, fLat, fLon, 0);
+                }
                 mtPoints.lock();
                 startLocation.ResetPosition(fLat, fLon);
                 mtPoints.unlock();
             }
         } else { // in AUTO            
-            // See if we're in guided or auto
+            // See if we're in guided or auto (switched?)
             if (GetMode(scMode, 32)) {
+                bool bValidPos = GetPosition(fLat, fLon);
                 bGuided = strcmp(scMode, "GUIDED") == 0;
                 if (bGuided) {
+                    writeEndTrackSeg(strTrackGpx);
+                    writeStartTrackSeg(strTrackGpx, "GUIDED");
+                    if (bValidPos) {
+                        writeTrackPoint(strTrackGpx, fLat, fLon, 0);
+                    }
                     mtPoints.lock();
                     startLocation.ResetPosition(fLat, fLon);
                     mtPoints.unlock();
+                } else {
+                    if (bValidPos) {
+                        writeTrackPoint(strTrackGpx, fLat, fLon, 0);
+                    }
                 }
             }
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    }
+
+    writeEndTrackSeg(strTrackGpx);
+    printL(" Saving GPX file");
+    std::fstream fileGpx;
+    fileGpx.open("run.gpx", std::ios::out | std::ios::app);//todo file name
+    if (fileGpx) {
+        fileGpx << strRunGpx << strTrackGpx << strDetectionGpx << "</gpx>";
+        fileGpx.close();
+    } else {
+        printL(" failed to save GPX");
     }
 }
 
