@@ -16,12 +16,11 @@
 
 */
 
-
 class FlightController {
 public:
     ~FlightController();
 
-    static FlightController* GetFlightController(DataLoggerWriter* pLogger, PipeReceiverDepth* pPipeDepth, PipeReceiverRGB* pPipeIR);
+    static FlightController* GetFlightController(DataLoggerWriter* pLogger, PipeReceiverDepth* pPipeDepth, PipeReceiver_Image* pPipeIR);
     static void DestroyFlightController();
 
     void WaitForTakeoff(int iAltitude, const bool& bAbort);
@@ -40,6 +39,7 @@ public:
     int GetBattery();
     Route* GetRoute(); // Returns the current route. Caller owns object
     CoordNode* GetVisitedPoints(); // From point logger thread
+    PipeSender_ImageData* GetPipeDetection();
     static bool GetNextWaypoint(int16_t& iNextPoint);
 
     // Can we travel in the indicated direction for the indicated time.
@@ -56,7 +56,7 @@ public:
     void SetUdpKey(const char* scUdpKey);
 
 private:
-    FlightController(DataLoggerWriter* pLogger, PipeReceiverDepth* pPipeDepth, PipeReceiverRGB* pPipeIR);
+    FlightController(DataLoggerWriter* pLogger, PipeReceiverDepth* pPipeDepth, PipeReceiver_Image* pPipeIR);
 
     void SaveRoute();
     void SendXML(const char* sc);
@@ -66,8 +66,8 @@ private:
     void ConnectMavLink();
 
     void runDepth(PipeReceiverDepth& pipeDepth, Signal ss); // Thread function to continuously send depth info for obstacle avoidance
-    void runPointLogger(Signal ss); // Thread function to continuously retrieve and store visited points when in guided mode
-    void runIr(PipeReceiverRGB& pipeIR, Signal ss);
+    void runPointLogger(Signal sigStop); // Thread function to continuously retrieve and store visited points when in guided mode
+    void runIr(PipeReceiver_Image& pipeIR, Signal ss);
     void runRecv(Signal ss); // Thread that recv's UDP packet and stores them in a map according to salt
     char* recvUdp(); // Contains the udp code itself for runRecv()
 
@@ -79,7 +79,8 @@ private:
     std::thread* pThreadRecv;
     
     PipeReceiverDepth* pPipeDepth;
-    PipeReceiverRGB* pPipeIR;
+    PipeReceiver_Image* pPipeIR;
+    PipeReceiver_ImageData pipeDetect;
     Signal sigDepthStop;
     Signal sigPtLogStop;
     Signal sigIrStop;

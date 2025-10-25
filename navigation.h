@@ -11,10 +11,10 @@ class segNet;
 
 class ObjectDetection {
 public:
-    ObjectDetection(DataLoggerWriter* pLogger);
+    ObjectDetection(DataLoggerWriter* pDataLogger, PipeSender_ImageData* pLocationLogger);
     ~ObjectDetection();
 
-    void SetNewImage(CameraFrame& frm);
+    void SetNewImage(const CameraFrame& frm);
     void Start();
     void SendStopSignal();
     
@@ -26,13 +26,14 @@ private:
     void run(Signal sig, Signal sigStop);
 
     int iNumSlices;
-    DataLoggerWriter* pLogger;
+    DataLoggerWriter* pDataLogger;
+    PipeSender_ImageData* pLocationLogger;
     detectNet* pNetwork;
     std::thread* pThread;
     ThreadMutex mt;
     Signal sigNewImage;
     Signal sigStopMain;
-    CameraFrame frmRecent;
+    CameraFrame* pFrmRecent;
 };
 
 class TerrainSegmentation {
@@ -43,7 +44,7 @@ public:
     bool IsHabitatVisible();
     float GetHabitatDirection();
     
-    void SetNewImage(CameraFrame& frm);
+    void SetNewImage(const CameraFrame& frm);
     void Start();
     void SendStopSignal();
 
@@ -82,12 +83,12 @@ private:
     ThreadMutex mt;
     Signal sigNewImage;
     Signal sigStopMain;
-    CameraFrame frmRecent;
+    CameraFrame* pFrmRecent;
 };
 
 class Navigator:public I_InterruptStop {
 public:
-    Navigator(FlightController& control, DataLoggerWriter* pLogger, PipeReceiverRGB* pPipeRGB, bool bStartBatteryMonitor);
+    Navigator(FlightController& control, DataLoggerWriter* pLogger, PipeReceiver_Image* pPipeRGB, bool bStartBatteryMonitor);
     ~Navigator();
     
     void Start();
@@ -104,7 +105,7 @@ private:
     Route* RestoreRoute(Route* pRoute);
 
     void runBattery(Signal sigStop, Signal sigStopMainThread);
-    void runNavigator(PipeReceiverRGB& pipeRGB, Signal sigStop);
+    void runNavigator(PipeReceiver_Image& pipeRGB, Signal sigStop);
 
     // ONLY access from runBattery. runNavigator will access it AFTER it has joined runBattery
     bool bSendRTL;
@@ -118,7 +119,7 @@ private:
 
     Signal sigStopMain;
     DataLoggerWriter* pLogger;
-    PipeReceiverRGB* pPipeRGB;
+    PipeReceiver_Image* pPipeRGB;
     std::thread* pThread;
     ObjectDetection detector;
     TerrainSegmentation segmenter;

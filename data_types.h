@@ -15,6 +15,61 @@
 #define f180_PI 57.29578f
 #define RADIUS_EARTH 6371
 
+class ImageLogData {
+public:
+    ImageLogData();
+    ImageLogData(const ImageLogData& other);
+    int GetId() const { return id; }
+    float GetLat() const { return fLat; }
+    float GetLon() const { return fLon; }
+    float GetHeading() const { return fHeading; }
+    float GetAltitude() const { return fAltitude; }
+    float GetPitch() const { return fPitch; }
+    time_t GetTime() const { return timeLast; }
+    std::string GetString() const { return strData; }
+
+protected:
+    time_t timeLast;
+    std::string strData;
+    int id;
+    float fLat;
+    float fLon;
+    float fHeading;
+    float fAltitude;
+    float fPitch;
+    //d435i has an accelerometer. So we can figure out camera pitch from that,
+    //  though if the drone is accelerating it would skew that measurement. We
+    //  can get accel data from drone, as well as actual orientation. Should
+    //  be able to use that to correct any error in our pitch calculation
+};
+
+class CameraFrame: public ImageLogData {
+public:
+    CameraFrame();
+    //todo turn this into create with the required/const things (location, altitude, time, etc)CameraFrame& operator=(cv::Mat& source); // Deep copy //todo in a couple wrong spots
+    void DeepCopy(const CameraFrame& other);
+    static CameraFrame* CreateFrame(float fLat, float fLon, float fAlt, time_t time, cv::Mat& source); // Deep copy
+
+    void SetString(std::string strData);
+    std::string GetString() const;
+    const cv::Mat& GetMatrixConst();
+    cv::Mat& GetMatrix();
+
+private:
+    bool bIsDeepCopy;
+    mutable ThreadMutex mutex;
+    cv::Mat matrix;
+    cv::Mat matrixEmpty; // For returning via GetMatrix if (!bIsDeepCopy)
+
+    CameraFrame(CameraFrame& other);
+    CameraFrame& operator=(CameraFrame& other); // Not a deep copy
+};
+
+using PipeReceiver_Image = ThreadPipeReceiver<CameraFrame>;
+using PipeSender_Image = ThreadPipeSender<CameraFrame>;
+using PipeReceiver_ImageData = ThreadPipeReceiver<ImageLogData>;
+using PipeSender_ImageData = ThreadPipeSender<ImageLogData>;
+
 inline float PointDistanceM(float fLat1, float fLon1, float fLat2, float fLon2)
 {
     float fLatDiff = (fLat2 - fLat1) * PI_180f;
@@ -41,20 +96,3 @@ inline void PointFromBearing(float fLatCurrent, float fLonCurrent, float fDistan
     fLat *= f180_PI;
     fLon *= f180_PI;
 }
-
-class CameraFrame {
-public:
-    CameraFrame();
-    CameraFrame(CameraFrame& other);
-    CameraFrame& operator=(cv::Mat& source); // Deep copy
-    CameraFrame& operator=(CameraFrame& other); // Not a deep copy
-    void DeepCopy(CameraFrame& other);
-
-    int GetId() const { return id; }
-
-    cv::Mat matrix;
-
-private:
-
-    int id;
-};

@@ -4,6 +4,7 @@
 #include <opencv2/videoio.hpp>
 #include <opencv2/highgui.hpp>
 #include "dataLogger.h"
+#include "planner.h"
 
     
 // wbmode=2 //exposuretimerange=\"30000000 30000000\" aelock=true
@@ -18,37 +19,84 @@ const char* scGStream_RGB_F = "nvarguscamerasrc sensor-id=0 wbmode=%d gainrange=
 const char* scGStream_IR_file = "v4l2src device=/dev/video4 ! 'video/x-raw' ! nvvidconv ! 'video/x-raw(memory:NVMM)' ! omxh264enc ! 'video/x-h264,stream-format=byte-stream' ! h264parse ! qtmux ! filesinklocation=testFlir.mp4";
 const char* scGStream_IR = "v4l2src device=/dev/video4 ! video/x-raw ! videoconvert ! video/x-raw,format=BGR ! appsink";
 
-int iUniqueId = 0;
-
 using namespace cv;
 
-CameraFrame::CameraFrame()
-: id(-1)
+ImageLogData::ImageLogData()
+: timeLast(0)
+, id(-1)
+, fLat(0)
+, fLon(0)
+, fHeading(0)
+, fAltitude(0)
+, fPitch(0)
 {
-
 }
 
-CameraFrame::CameraFrame(CameraFrame& other)
+ImageLogData::ImageLogData(const ImageLogData& other)
 {
-    *this = other;
-}
-
-CameraFrame& CameraFrame::operator=(Mat& source)
-{
-    id = iUniqueId++;
-    source.copyTo(matrix);
-}
-
-CameraFrame& CameraFrame::operator=(CameraFrame& other)
-{
+    timeLast = other.timeLast;
     id = other.id;
-    matrix = other.matrix;
+    fLat = other.fLat;
+    fLon = other.fLon;
+    fHeading = other.fHeading;
+    fAltitude = other.fAltitude;
+    fPitch = other.fPitch;
 }
 
-void CameraFrame::DeepCopy(CameraFrame& source)
+CameraFrame::CameraFrame()
+: ImageLogData()
+, bIsDeepCopy(false)
 {
+}
+
+void CameraFrame::DeepCopy(const CameraFrame& source) 
+{
+    timeLast = source.timeLast;
     id = source.id;
+    fLat = source.fLat;
+    fLon = source.fLat;
+    fHeading = source.fHeading;
+    fAltitude = source.fAltitude;
+    fPitch = source.fPitch;
     source.matrix.copyTo(matrix);
+    bIsDeepCopy = true;
+}
+CameraFrame* CameraFrame::CreateFrame(float fLat, float fLon, float fAlt, time_t time, cv::Mat& source)
+{
+    static int iUniqueId = 0;
+    CameraFrame* pBrandNewFrame = new CameraFrame();
+    pBrandNewFrame->id = iUniqueId++;
+    pBrandNewFrame->fLat = fLat;
+    pBrandNewFrame->fLon = fLon;
+    pBrandNewFrame->fAltitude = fAlt;
+    pBrandNewFrame->timeLast = time;
+    source.copyTo(pBrandNewFrame->matrix);
+}
+
+void CameraFrame::SetString(std::string _strData)
+{
+    std::unique_lock<ThreadMutex> lock(mutex);
+    strData = _strData;
+}
+
+std::string CameraFrame::GetString() const
+{
+    std::unique_lock<ThreadMutex> lock(mutex);
+    return strData;
+}
+
+const cv::Mat& CameraFrame::GetMatrixConst()
+{
+    return matrix;
+}
+
+cv::Mat& CameraFrame::GetMatrix()
+{
+    std::unique_lock<ThreadMutex> lock(mutex);
+    if (bIsDeepCopy) {
+        return matrix;
+    }
+    return matrixEmpty;
 }
 
 cameraFrame_depth::cameraFrame_depth()
@@ -125,12 +173,12 @@ CameraController* CameraController::OpenCamera(uint32_t features, const char* sc
     return pReturn;
 }
 
-PipeReceiverRGB* CameraController::GetPipeRGB()
+PipeReceiver_Image* CameraController::GetPipeRGB()
 {
     return pipeRGB.CreateReceiver(false);
 }
 
-PipeReceiverRGB* CameraController::GetPipeIR()
+PipeReceiver_Image* CameraController::GetPipeIR()
 {
     return pipeIR.CreateReceiver(true);
 }
@@ -335,7 +383,7 @@ void CameraController::run_RS()
     }
 }
 
-void CameraController::run_CV(const char* scGStream, PipeSenderRGB& pipe, Signal* pSigStop)
+void CameraController::run_CV(const char* scGStream, PipeSender_Image& pipe, Signal* pSigStop)
 {
     printL("CameraController::run_CV");
     if (pSigStop == nullptr) {
@@ -372,16 +420,25 @@ void CameraController::run_CV(const char* scGStream, PipeSenderRGB& pipe, Signal
             delete pFrame;
             continue;
         }
-        // Do something with frame
-        if (!pipe.AddData(pFrame, 0)) { // No point in waiting to send, cameras are fast enough
-            delete pFrame;
+        // Get data for frame creation
+        float fLat = 0;
+        float fLon = 0;
+        FlightController::GetPosition(fLat, fLon);
+        float fAlt = 0;
+        FlightController::GetAltitude(fAlt);
+        time_t timeNow = time(nullptr);
+            
+        CameraFrame* pCameraFrame = CameraFrame::CreateFrame(fLat, fLon, fAlt, timeNow, *pFrame);
+        if (!pipe.AddData(pCameraFrame, 0)) { // No point in waiting to send, cameras are fast enough
+            delete pCameraFrame;
         }
+        delete pFrame;
     }
     // According to opencv: the camera will be deinitialized automatically in VideoCapture destructor
     delete pCap;
 }
 
-void CameraController::run_simulation(PipeSenderRGB& pipe, Signal* pSigStop)
+void CameraController::run_simulation(PipeSender_Image& pipe, Signal* pSigStop)
 {
     cv::VideoCapture cap(scSimulationFile);
     if (!cap.isOpened()) {
@@ -410,8 +467,17 @@ void CameraController::run_simulation(PipeSenderRGB& pipe, Signal* pSigStop)
         }
         uFrameFail = 0; // Reset this now that we got a frame
         iFramesRead++;
-        
-        if (!pipe.AddData(pFrame, 100)) {
+
+        // Get data for frame creation
+        float fLat = 0;
+        float fLon = 0;
+        FlightController::GetPosition(fLat, fLon);
+        float fAlt = 0;
+        FlightController::GetAltitude(fAlt);
+        time_t timeNow = time(nullptr);
+            
+        CameraFrame* pCameraFrame = CameraFrame::CreateFrame(fLat, fLon, fAlt, timeNow, *pFrame);  
+        if (!pipe.AddData(pCameraFrame, 100)) {
             // If the add failed, then delete the frame
             delete pFrame;
         }

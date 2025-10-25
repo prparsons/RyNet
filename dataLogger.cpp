@@ -29,58 +29,24 @@ DataLoggerWriter::DataLoggerWriter(DataLoggerWriter& other)
 {
 }
 
-void DataLoggerWriter::LogImage(CameraFrame& frm, std::string strIdSource)
+void DataLoggerWriter::LogImage(const CameraFrame& frm, std::string strData)
 {
-    ImageLogData* pNewLogEntry = new ImageLogData();
-    ImageLogData& data = *pNewLogEntry;
-    data.strData = strIdSource;
-    time_t timeNow = time(nullptr);
-    time_t timeDifference = timeNow - data.timeLast;
-    data.timeLast = timeNow;
-    if (timeDifference < SEC_BETWEEN_IMAGES) return;
-    data.id = frm.GetId();
-    if (!FlightController::GetPosition(data.fLat, data.fLon)) {
-        data.fLat = 0;
-        data.fLon = 0;
-    }
-    if (!FlightController::GetHeading(data.fHeading)) {
-        data.fHeading = 999; // Obvious incorrect value
-    }
-    if (!FlightController::GetAltitude(data.fAltitude)) {
-        data.fAltitude = -999;
-    }
+    CameraFrame* pNew = new CameraFrame();
+    pNew->DeepCopy(frm);
+    pNew->SetString(pNew->GetString() + strData);
 
-    frm.matrix.copyTo(pNewLogEntry->matrix);
-
-    if (!images->AddData(pNewLogEntry, 0)) {//todo timeouts?
-        delete pNewLogEntry;
+    if (!images->AddData(pNew, 0)) {//todo timeouts?
+        delete pNew;
     }
 }
 
-void DataLoggerWriter::LogImageIr(CameraFrame& frm)
+void DataLoggerWriter::LogImageIr(const CameraFrame& frm)
 {
-    ImageLogData* pNewLogEntry = new ImageLogData();
-    ImageLogData& data = *pNewLogEntry;
-    time_t timeNow = time(nullptr);
-    time_t timeDifference = timeNow - data.timeLast;
-    data.timeLast = timeNow;
-    if (timeDifference < SEC_BETWEEN_IMAGES) return;
-    data.id = frm.GetId();
-    if (!FlightController::GetPosition(data.fLat, data.fLon)) {
-        data.fLat = 0;
-        data.fLon = 0;
-    }
-    if (!FlightController::GetHeading(data.fHeading)) {
-        data.fHeading = 999; // Obvious incorrect value
-    }
-    if (!FlightController::GetAltitude(data.fAltitude)) {
-        data.fAltitude = -999;
-    }
+    CameraFrame* pNew = new CameraFrame();
+    pNew->DeepCopy(frm);
 
-    frm.matrix.copyTo(pNewLogEntry->matrix);
-
-    if (!ir->AddData(pNewLogEntry, 0)) {
-        delete pNewLogEntry;
+    if (!ir->AddData(pNew, 0)) {//todo timeouts?
+        delete pNew;
     }
 }
 
@@ -191,14 +157,14 @@ void DataLogger::run(Signal sigStop)
 
         // Image
         //timeout or not to timeout
-        std::shared_ptr<ImageLogData> pNewImage;
+        std::shared_ptr<CameraFrame> pNewImage;
         while (pipeImage.RetrieveData(pNewImage, 500)) {
-            SaveImage("img", pNewImage->matrix, *pNewImage);
+            SaveImage("img", *pNewImage);
         }
 
         //IR
         while (pipeIR.RetrieveData(pNewImage, 500)) {
-            SaveImage("flir", pNewImage->matrix, *pNewImage);
+            SaveImage("flir", *pNewImage);
         }
 
         // Check if there's a mask we should write
@@ -218,7 +184,7 @@ void DataLogger::run(Signal sigStop)
             snprintf(scFileName, 
                     127, 
                     "masks/mask[%d]_%d_%d_%d_%d_%d_%d.jpg", 
-                    dataWrite.id,
+                    0,//todo (is protected) dataWrite.id,
                     pTimeStruct->tm_year + 1900, 
                     pTimeStruct->tm_mon + 1,
                     pTimeStruct->tm_mday,
@@ -234,22 +200,23 @@ void DataLogger::LogMask(float4* pImg, int iImageId, int width, int height)
 {
     cv::Mat tempMat(height, width, CV_32FC4, (void*)pImg);
     mt.lock();
-    dataMask.id = iImageId;
+    //dataMask.id = iImageId;
     mask = tempMat.clone();
     bWriteMask = true;
     mt.unlock();
     // sigNewData.signal();
 }
 
-void DataLogger::WriteImageData(cv::Mat& image, ImageLogData& imageData)
+void DataLogger::WriteImageData(CameraFrame& frame)
 {
+    cv::Mat& image = frame.GetMatrix();
     cv::Mat imageLarger = cv::Mat::zeros(cv::Size(image.cols, image.rows + 55), CV_8UC3);
     memcpy(imageLarger.data, image.data, image.cols * image.rows * 3);
     // Now write stuff at the bottom, 2 rows, 5 pixel padding
     double dFontSize = cv::getFontScaleFromHeight(cv::FONT_HERSHEY_SIMPLEX, 20, 1);
     char sc[512];
     snprintf(sc, 511, "Image:%d Lat:%.7f Lon:%.7f Alt:%.1fm Head:%.2f",
-                imageData.id, imageData.fLat, imageData.fLon, imageData.fAltitude, imageData.fHeading);
+                frame.GetId(), frame.GetLat(), frame.GetLon(), frame.GetAltitude(), frame.GetHeading());
     cv::putText(imageLarger, 
                 sc,
                 cv::Point(5, image.rows + 25),
@@ -259,9 +226,12 @@ void DataLogger::WriteImageData(cv::Mat& image, ImageLogData& imageData)
     image = imageLarger;
 }
 
-void DataLogger::SaveImage(std::string strPrefix, cv::Mat& image, ImageLogData& imageData)
+void DataLogger::SaveImage(std::string strPrefix, CameraFrame& image)
 {
-    WriteImageData(image, imageData);
+    CameraFrame imageCopy;
+    imageCopy.DeepCopy(image); // So we get access to cv::Mat&
+
+    WriteImageData(imageCopy);
     time_t timeNow = time(nullptr);
     struct tm* pTimeStruct = localtime(&timeNow);
     char scFileName[128];
@@ -275,5 +245,5 @@ void DataLogger::SaveImage(std::string strPrefix, cv::Mat& image, ImageLogData& 
             pTimeStruct->tm_hour,
             pTimeStruct->tm_min,
             pTimeStruct->tm_sec);
-    cv::imwrite(scFileName, image);
+    cv::imwrite(scFileName, imageCopy.GetMatrix());
 }

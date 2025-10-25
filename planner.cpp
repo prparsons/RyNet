@@ -15,7 +15,7 @@ bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** s
 
 FlightController* pInstance = nullptr;
 
-FlightController::FlightController(DataLoggerWriter* _pLogger, PipeReceiverDepth* _pPipeDepth, PipeReceiverRGB* _pPipeIR)
+FlightController::FlightController(DataLoggerWriter* _pLogger, PipeReceiverDepth* _pPipeDepth, PipeReceiver_Image* _pPipeIR)
 : pLogger(_pLogger)
 , startLocation(0,0)
 , pThreadDepth(nullptr)
@@ -23,6 +23,7 @@ FlightController::FlightController(DataLoggerWriter* _pLogger, PipeReceiverDepth
 , pThreadIr(nullptr)
 , pPipeDepth(_pPipeDepth)
 , pPipeIR(_pPipeIR)
+, pipeDetect(16, true)
 , socketDesc(-1)
 , uSalt(1)
 , iUdpTimeoutUs(100000)
@@ -37,7 +38,7 @@ FlightController::FlightController(DataLoggerWriter* _pLogger, PipeReceiverDepth
     memset(&addressMavLink, 0, sizeof(addressMavLink));
 }
 
-FlightController* FlightController::GetFlightController(DataLoggerWriter* pLogger, PipeReceiverDepth* pPipeDepth, PipeReceiverRGB* pPipeIR)
+FlightController* FlightController::GetFlightController(DataLoggerWriter* pLogger, PipeReceiverDepth* pPipeDepth, PipeReceiver_Image* pPipeIR)
 {
     if (pInstance == nullptr) {
         pInstance = new FlightController(pLogger, pPipeDepth, pPipeIR);
@@ -305,6 +306,11 @@ CoordNode* FlightController::GetVisitedPoints()
     return pStolen;
 }
 
+PipeSender_ImageData* FlightController::GetPipeDetection()
+{
+    return pipeDetect.CreateSender();
+}
+
 bool FlightController::GetNextWaypoint(int16_t& iNextPoint)
 {
     if (pInstance == nullptr) return false;
@@ -556,13 +562,14 @@ std::string GetEndTrackSeg()
     return "</trkseg>\n";
 }
 
-void writeWaypoint(std::string& strGpx, std::string strDesc, float fLat, float fLon)
+std::string GetWaypoint(std::string strDesc, float fLat, float fLon)
 {
-    strGpx += "<wpt lat=\"";
+    std::string strGpx = "<wpt lat=\"";
     strGpx += fLat;
     strGpx += "\" lon=\"";
     strGpx += fLon;
     strGpx += "\"><desc>" + strDesc + "</desc></wpt>\n";
+    return strGpx;
 }
 
 void FlightController::runPointLogger(Signal sigStop)
@@ -576,7 +583,6 @@ void FlightController::runPointLogger(Signal sigStop)
     GetPosition(fLat, fLon);
     std::string strTrackGpx;
     std::string strDetectionGpx;//todo data filled via pipe
-    std::string strSegmentationGpx;//todo data filled via pipe
 
     char scFileNameText[128];
     time_t timeNow = time(nullptr);
@@ -642,6 +648,13 @@ void FlightController::runPointLogger(Signal sigStop)
             }
             strTrackGpx += GetTrackPoint(fLat, fLon, 0);//todo elevation
         }
+
+        if (pipeDetect.DataReady()) {
+            std::shared_ptr<ImageLogData> pWaypoint;
+            while (pipeDetect.RetrieveData(pWaypoint, 0)) {
+                strDetectionGpx += GetWaypoint(pWaypoint->GetString(), pWaypoint->GetLat(), pWaypoint->GetLon());
+            }
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
     printL(" Saving GPX file");
@@ -658,20 +671,18 @@ void FlightController::runPointLogger(Signal sigStop)
 
 }
 
-void FlightController::runIr(PipeReceiverRGB& pipeIR, Signal sigStop)
+void FlightController::runIr(PipeReceiver_Image& pipeIR, Signal sigStop)
 {
     printL("FlightController::runIr");
 
     while (!sigStop.isSignaled()) {
-        std::shared_ptr<cv::Mat> pNewImage;
+        std::shared_ptr<CameraFrame> pNewImage;
         // Get new image and process it
         if (!pipeIR.RetrieveData(pNewImage, 1000)) {
             continue;
         }
-        CameraFrame frmIr;
-        frmIr = *pNewImage;
-        if (frmIr.matrix.empty()) continue;
-        pLogger->LogImageIr(frmIr);
+        if (!pNewImage) continue;
+        pLogger->LogImageIr(*pNewImage);
     }
 }
 

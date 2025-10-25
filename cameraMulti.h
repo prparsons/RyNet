@@ -32,8 +32,6 @@ private:
 
 using PipeSenderDepth = ThreadPipeSender<cameraFrame_depth>;
 using PipeReceiverDepth = ThreadPipeReceiver<cameraFrame_depth>;
-using PipeSenderRGB = ThreadPipeSender<cv::Mat>;
-using PipeReceiverRGB = ThreadPipeReceiver<cv::Mat>;
 
 class I_InterruptStop {
 public:
@@ -61,8 +59,8 @@ public:
     static CameraController* OpenCamera(uint32_t features, const char* scSimulationFile = nullptr);
 
     // Must delete returned pointers
-    PipeReceiverRGB* GetPipeRGB();
-    PipeReceiverRGB* GetPipeIR();
+    PipeReceiver_Image* GetPipeRGB();
+    PipeReceiver_Image* GetPipeIR();
     PipeReceiverDepth* GetPipeDepth();
 
     void Start();
@@ -74,8 +72,8 @@ public:
 protected:
     CameraController(uint32_t features, const char* scSimulationFile);
     void run_RS();
-    void run_CV(const char* scGStream, PipeSenderRGB& pipe, Signal* pSigStop);
-    void run_simulation(PipeSenderRGB& pipe, Signal* pSigStop);
+    void run_CV(const char* scGStream, PipeSender_Image& pipe, Signal* pSigStop);
+    void run_simulation(PipeSender_Image& pipe, Signal* pSigStop);
 
 private:
     cameraFrame_depth* pFrameCurrentDepth;
@@ -93,6 +91,6 @@ private:
     Signal arSigStop[NUM_CAMERA_THREADS];
 
     PipeSenderDepth pipeDepth;
-    PipeSenderRGB pipeRGB;
-    PipeSenderRGB pipeIR;
+    PipeSender_Image pipeRGB;
+    PipeSender_Image pipeIR;
 };
