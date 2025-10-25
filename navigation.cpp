@@ -15,7 +15,6 @@ ObjectDetection::ObjectDetection(DataLoggerWriter* _pDataLogger, PipeSender_Imag
 , pLocationLogger(_pLocationLogger)
 , pNetwork(nullptr)
 , pThread(nullptr)
-, sigNewImage()
 , pFrmRecent(nullptr)
 {
     pNetwork = detectNet::Create(networkDetection);
@@ -109,12 +108,17 @@ void ObjectDetection::run(Signal sig, Signal sigStop)
     int iFramesProcessed = 0;
     while (!sigStop.isSignaled()) {
         sig.waitFor(1000);
+        sig.reset();
         mt.lock();
         pFrmProcess = pFrmRecent;
         pFrmRecent = nullptr;
         mt.unlock();
         if (pFrmProcess == nullptr) continue;
-        if (pFrmProcess->GetMatrix().empty()) continue; // Not sure it would be, but easy enough to check
+        if (pFrmProcess->GetMatrix().empty()) { // Not sure it would be, but easy enough to check
+            delete pFrmProcess;
+            pFrmProcess = nullptr;
+            continue;
+        }
         iFramesProcessed++;
 
         if (ProcessImage(*pFrmProcess)) {
@@ -165,7 +169,6 @@ TerrainSegmentation::TerrainSegmentation(DataLoggerWriter* _pLogger)
 , pLogger(_pLogger)
 , pMask(nullptr)
 , pThread(nullptr)
-, sigNewImage()//todo deadlock?
 , uMaskWidth(0)
 , uMaskHeight(0)
 , uValidNumPixels(18)
@@ -222,17 +225,22 @@ void TerrainSegmentation::Start()
 void TerrainSegmentation::run(Signal sig, Signal sigStop)
 {
     printL("TerrainSegmentation::run");
-    CameraFrame* pFrmProcess = nullptr;
     int iFramesProcessed = 0;
+    CameraFrame* pFrmProcess = nullptr;
 
     while (!sigStop.isSignaled()) {
         sig.waitFor(1000);
+        sig.reset();
         mt.lock();
         pFrmProcess = pFrmRecent;
         pFrmRecent = nullptr;
         mt.unlock();
         if (pFrmProcess == nullptr) continue;
-        if (pFrmProcess->GetMatrix().empty()) continue;
+        if (pFrmProcess->GetMatrix().empty()) {
+            delete pFrmProcess;
+            pFrmProcess = nullptr;
+            continue;
+        }
         
         iFramesProcessed++;
         if (ProcessImage(*pFrmProcess)) {
@@ -397,8 +405,7 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iImageId, uint32_t uWidth
     float4* imgMask;
     if (!CUDA_FAILED(cudaHostAlloc(&imgMask, maskWidth*maskHeight*16, cudaHostAllocMapped))) {
         pNetwork->Mask(imgMask, maskWidth, maskHeight, segNet::FILTER_POINT);
-        pLogger->LogMask(imgMask, iImageId, maskWidth, maskHeight);
-        cudaFreeHost(imgMask);
+        pLogger->LogMask(imgMask, iImageId, maskWidth, maskHeight); // frees imgMask
     }
     // Set direction and that we found something
     mt.lock();

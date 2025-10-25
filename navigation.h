@@ -114,7 +114,7 @@ private:
     time_t tLastChange;
     time_t tMinTimeBetweenChanges;
 
-    FlightController& control;//todo can replace with pipe? yes
+    FlightController& control;
     Route* pRouteOrig;
 
     Signal sigStopMain;

@@ -15,10 +15,22 @@
 #define f180_PI 57.29578f
 #define RADIUS_EARTH 6371
 
+class ImageMask {
+public:
+    ImageMask():pImg(nullptr){}
+    ~ImageMask(){if(pImg)cudaFreeHost(pImg);}
+    float4* pImg;
+    int iImageId;
+    int width;
+    int height;
+};
+
 class ImageLogData {
 public:
     ImageLogData();
     ImageLogData(const ImageLogData& other);
+    virtual ~ImageLogData(){}
+
     int GetId() const { return id; }
     float GetLat() const { return fLat; }
     float GetLon() const { return fLon; }
@@ -46,7 +58,7 @@ protected:
 class CameraFrame: public ImageLogData {
 public:
     CameraFrame();
-    //todo turn this into create with the required/const things (location, altitude, time, etc)CameraFrame& operator=(cv::Mat& source); // Deep copy //todo in a couple wrong spots
+    
     void DeepCopy(const CameraFrame& other);
     static CameraFrame* CreateFrame(float fLat, float fLon, float fAlt, time_t time, cv::Mat& source); // Deep copy
 
@@ -69,6 +81,8 @@ using PipeReceiver_Image = ThreadPipeReceiver<CameraFrame>;
 using PipeSender_Image = ThreadPipeSender<CameraFrame>;
 using PipeReceiver_ImageData = ThreadPipeReceiver<ImageLogData>;
 using PipeSender_ImageData = ThreadPipeSender<ImageLogData>;
+using PipeReceiver_Mask = ThreadPipeReceiver<ImageMask>;
+using PipeSender_Mask = ThreadPipeSender<ImageMask>;
 
 inline float PointDistanceM(float fLat1, float fLon1, float fLat2, float fLon2)
 {

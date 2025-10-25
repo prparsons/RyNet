@@ -404,9 +404,9 @@ void CameraController::run_CV(const char* scGStream, PipeSender_Image& pipe, Sig
     }
 
     while (!pSigStop->isSignaled()) { // We need a separate stop signal for each thread
-        Mat* pFrame = new Mat();
-        pCap->read(*pFrame);
-        if (pFrame->empty()) {
+        Mat frame;
+        pCap->read(frame);
+        if (frame.empty()) {
             printL("CameraController::run_CV empty frame");
             // The only mentioned reasons for failure are camera has been disconnected, or there are
             //  no more frames in the video file (not applicable here). So, we'll try reconnecting
@@ -417,7 +417,6 @@ void CameraController::run_CV(const char* scGStream, PipeSender_Image& pipe, Sig
                 printL("CameraController::run_CV, reconnect attempt failed");
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             }
-            delete pFrame;
             continue;
         }
         // Get data for frame creation
@@ -428,11 +427,10 @@ void CameraController::run_CV(const char* scGStream, PipeSender_Image& pipe, Sig
         FlightController::GetAltitude(fAlt);
         time_t timeNow = time(nullptr);
             
-        CameraFrame* pCameraFrame = CameraFrame::CreateFrame(fLat, fLon, fAlt, timeNow, *pFrame);
+        CameraFrame* pCameraFrame = CameraFrame::CreateFrame(fLat, fLon, fAlt, timeNow, frame);
         if (!pipe.AddData(pCameraFrame, 0)) { // No point in waiting to send, cameras are fast enough
             delete pCameraFrame;
         }
-        delete pFrame;
     }
     // According to opencv: the camera will be deinitialized automatically in VideoCapture destructor
     delete pCap;
@@ -455,14 +453,13 @@ void CameraController::run_simulation(PipeSender_Image& pipe, Signal* pSigStop)
     //  failure, and keep trying until it overflows
     uint8_t uFrameFail = 0;
     while (!pSigStop->isSignaled()) {
-        cv::Mat* pFrame;
-        if (!cap.read(*pFrame)) {
+        cv::Mat frame;
+        if (!cap.read(frame)) {
             if (++uFrameFail == 0) {
                 // It's overflowed, so 255 failures, so time to give up
                 printL("CameraController::run_simulation no more frames");
                 break;
             }
-            delete pFrame;
             continue;
         }
         uFrameFail = 0; // Reset this now that we got a frame
@@ -476,10 +473,10 @@ void CameraController::run_simulation(PipeSender_Image& pipe, Signal* pSigStop)
         FlightController::GetAltitude(fAlt);
         time_t timeNow = time(nullptr);
             
-        CameraFrame* pCameraFrame = CameraFrame::CreateFrame(fLat, fLon, fAlt, timeNow, *pFrame);  
+        CameraFrame* pCameraFrame = CameraFrame::CreateFrame(fLat, fLon, fAlt, timeNow, frame);  
         if (!pipe.AddData(pCameraFrame, 100)) {
             // If the add failed, then delete the frame
-            delete pFrame;
+            delete pCameraFrame;
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(iSimulationFrameDelay));

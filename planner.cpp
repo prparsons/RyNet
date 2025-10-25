@@ -580,9 +580,11 @@ void FlightController::runPointLogger(Signal sigStop)
 
     float fLat = 0;
     float fLon = 0;
+    float fAlt = 0;
     GetPosition(fLat, fLon);
+    GetAltitude(fAlt);
     std::string strTrackGpx;
-    std::string strDetectionGpx;//todo data filled via pipe
+    std::string strDetectionGpx;
 
     char scFileNameText[128];
     time_t timeNow = time(nullptr);
@@ -614,7 +616,8 @@ void FlightController::runPointLogger(Signal sigStop)
             // Get the current position, add it to the list of visited points
             if (GetPosition(fLat, fLon)) {
                 bValidPos = true;
-                strTrackGpx += GetTrackPoint(fLat, fLon, 0);//todo elevation
+                GetAltitude(fAlt);
+                strTrackGpx += GetTrackPoint(fLat, fLon, fAlt);
                 mtPoints.lock();
                 startLocation.InsertPoint(fLat, fLon);
                 mtPoints.unlock();
@@ -634,6 +637,7 @@ void FlightController::runPointLogger(Signal sigStop)
         } else { // in AUTO            
             // See if we're in guided or auto (switched?)
             bool bValidPos = GetPosition(fLat, fLon);
+            GetAltitude(fAlt);
             if (GetMode(scMode, 32)) {
                 bGuided = strcmp(scMode, "GUIDED") == 0;
                 if (bGuided) {
@@ -646,7 +650,7 @@ void FlightController::runPointLogger(Signal sigStop)
                     mtPoints.unlock();
                 }
             }
-            strTrackGpx += GetTrackPoint(fLat, fLon, 0);//todo elevation
+            strTrackGpx += GetTrackPoint(fLat, fLon, fAlt);
         }
 
         if (pipeDetect.DataReady()) {
