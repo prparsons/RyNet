@@ -88,7 +88,7 @@ private:
 
 class Navigator:public I_InterruptStop {
 public:
-    Navigator(FlightController& control, DataLoggerWriter* pLogger, PipeReceiver_Image* pPipeRGB, bool bStartBatteryMonitor);
+    Navigator(FlightController& control, DataLoggerWriter* pLogger, PipeReceiver_Image* pPipeRGB, PipeSender_ImageData* pLocationLogger, bool bStartBatteryMonitor);
     ~Navigator();
     
     void Start();

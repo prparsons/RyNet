@@ -415,7 +415,7 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iImageId, uint32_t uWidth
     return true;
 }
 
-Navigator::Navigator(FlightController& _control, DataLoggerWriter* _pLogger, PipeReceiver_Image* _pPipeRGB, bool _bStartBatteryMonitor)
+Navigator::Navigator(FlightController& _control, DataLoggerWriter* _pLogger, PipeReceiver_Image* _pPipeRGB, PipeSender_ImageData* pLocationLogger, bool _bStartBatteryMonitor)
 : bSendRTL(false)
 , bStartBatteryMonitor(_bStartBatteryMonitor)
 , iRouteCleanType(0)
@@ -426,7 +426,7 @@ Navigator::Navigator(FlightController& _control, DataLoggerWriter* _pLogger, Pip
 , pRouteOrig(nullptr)
 , pPipeRGB(_pPipeRGB)
 , pThread(nullptr)
-, detector(new DataLoggerWriter(*pLogger), nullptr)
+, detector(new DataLoggerWriter(*pLogger), pLocationLogger)
 , segmenter(new DataLoggerWriter(*pLogger))
 {
 

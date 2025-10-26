@@ -125,7 +125,7 @@ int main(int argc, char** argv)
         if (args.iGuideExtraDistance != -1) pController->SetExtraDistance(args.iGuideExtraDistance);
 
         printL(">>>Creating Navigator");
-        Navigator nav(*pController, logger.GetLogger(), pCamera->GetPipeRGB(), args.bBatteryMonitor);
+        Navigator nav(*pController, logger.GetLogger(), pCamera->GetPipeRGB(), pController->GetPipeDetection(), args.bBatteryMonitor);
         if (args.bRunDepth) pSignal_interrupt = pCamera;
         else pSignal_interrupt = &nav;
         // If we specified a target class, need to set that now

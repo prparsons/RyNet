@@ -71,6 +71,12 @@ private:
     void runRecv(Signal ss); // Thread that recv's UDP packet and stores them in a map according to salt
     char* recvUdp(); // Contains the udp code itself for runRecv()
 
+    std::string GpxProlog();
+    std::string GpxStartTrackSeg(std::string strSegmentType);
+    std::string GpxTrackPoint(float fLat, float fLon, float fElev);
+    std::string GpxEndTrackSeg();
+    std::string GpxWaypoint(std::string strDesc, float fLat, float fLon);
+
     DataLoggerWriter* pLogger;
     CoordNode startLocation;
     std::thread* pThreadDepth;
