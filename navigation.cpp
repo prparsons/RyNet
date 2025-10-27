@@ -161,12 +161,13 @@ bool ObjectDetection::SetNetwork(const char* scNetwork)
 
 // ** TerrainSegmentation
 
-TerrainSegmentation::TerrainSegmentation(DataLoggerWriter* _pLogger)
+TerrainSegmentation::TerrainSegmentation(DataLoggerWriter* _pLogger, PipeSender_SegmentData* _pSegmentLogger)
 : bHabitatVisible(false)
 , uTargetClass(HABITAT)
 , iNumSlices(3)
 , fImageFOV(50) // I calculated this number based on the imx477 sensor size with a 6mm lens
 , pLogger(_pLogger)
+, pSegmentLogger(_pSegmentLogger)
 , pMask(nullptr)
 , pThread(nullptr)
 , uMaskWidth(0)
@@ -190,6 +191,7 @@ TerrainSegmentation::~TerrainSegmentation()
     if (pFrmRecent) delete pFrmRecent;
     if (pLogger) delete pLogger;
     if (pNetwork) delete pNetwork;
+    if (pSegmentLogger) delete pSegmentLogger;
 }
 
 bool TerrainSegmentation::IsHabitatVisible()
@@ -246,9 +248,16 @@ void TerrainSegmentation::run(Signal sig, Signal sigStop)
         if (ProcessImage(*pFrmProcess)) {
             char sc[128];
             sprintf(sc, "Good Habitat Found %2.2f [Image:%d]", fBestDirection, pFrmProcess->GetId());
+            // Log string about habitat
             pLogger->LogString(sc);
             pFrmProcess->SetString(sc);
+            // Log the image itself
             pLogger->LogImage(*pFrmProcess, "segment");
+            // Save the detection to the kml file
+            std::pair<ImageLogData, std::string>* pNewKmlPair = new std::pair<ImageLogData, std::string>;
+            pNewKmlPair->first = *pFrmProcess;
+            pNewKmlPair->second = pFrmProcess->GetFilename();
+            if (!pSegmentLogger->AddData(pNewKmlPair, 50)) delete pNewKmlPair;
         }
         delete pFrmProcess;
         pFrmProcess = nullptr;
@@ -415,7 +424,7 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iImageId, uint32_t uWidth
     return true;
 }
 
-Navigator::Navigator(FlightController& _control, DataLoggerWriter* _pLogger, PipeReceiver_Image* _pPipeRGB, PipeSender_ImageData* pLocationLogger, bool _bStartBatteryMonitor)
+Navigator::Navigator(FlightController& _control, DataLoggerWriter* _pLogger, PipeReceiver_Image* _pPipeRGB, PipeSender_ImageData* pDetectionLogger, PipeSender_SegmentData* pSegmentLogger, bool _bStartBatteryMonitor)
 : bSendRTL(false)
 , bStartBatteryMonitor(_bStartBatteryMonitor)
 , iRouteCleanType(0)
@@ -426,8 +435,8 @@ Navigator::Navigator(FlightController& _control, DataLoggerWriter* _pLogger, Pip
 , pRouteOrig(nullptr)
 , pPipeRGB(_pPipeRGB)
 , pThread(nullptr)
-, detector(new DataLoggerWriter(*pLogger), pLocationLogger)
-, segmenter(new DataLoggerWriter(*pLogger))
+, detector(new DataLoggerWriter(*pLogger), pDetectionLogger)
+, segmenter(new DataLoggerWriter(*pLogger), pSegmentLogger)
 {
 
 }

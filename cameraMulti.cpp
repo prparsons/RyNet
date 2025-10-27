@@ -47,6 +47,7 @@ CameraFrame::CameraFrame()
 : ImageLogData()
 , bIsDeepCopy(false)
 {
+    scFileName[0] = 0;
 }
 
 void CameraFrame::DeepCopy(const CameraFrame& source) 
@@ -97,6 +98,24 @@ cv::Mat& CameraFrame::GetMatrix()
         return matrix;
     }
     return matrixEmpty;
+}
+
+const char* CameraFrame::GetFilename() const
+{
+    std::unique_lock<ThreadMutex> lock(mutex);
+    if (scFileName[0] == 0) {
+        struct tm* pTimeStruct = localtime(&timeLast);
+        snprintf(scFileName, 
+                127, 
+                "images/%d_%d_%d_%d_%d_%d.jpg",
+                pTimeStruct->tm_year + 1900, 
+                pTimeStruct->tm_mon + 1,
+                pTimeStruct->tm_mday,
+                pTimeStruct->tm_hour,
+                pTimeStruct->tm_min,
+                pTimeStruct->tm_sec);
+    }
+    return scFileName;
 }
 
 cameraFrame_depth::cameraFrame_depth()

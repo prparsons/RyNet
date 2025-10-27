@@ -38,7 +38,7 @@ private:
 
 class TerrainSegmentation {
 public:
-    TerrainSegmentation(DataLoggerWriter* pLogger);
+    TerrainSegmentation(DataLoggerWriter* pLogger, PipeSender_SegmentData* pSegmentLogger);
     ~TerrainSegmentation();
 
     bool IsHabitatVisible();
@@ -77,6 +77,7 @@ private:
     uint32_t uValidNumPixels;
 
     DataLoggerWriter* pLogger;
+    PipeSender_SegmentData* pSegmentLogger;
     segNet* pNetwork;
     std::thread* pThread;
 
@@ -88,7 +89,7 @@ private:
 
 class Navigator:public I_InterruptStop {
 public:
-    Navigator(FlightController& control, DataLoggerWriter* pLogger, PipeReceiver_Image* pPipeRGB, PipeSender_ImageData* pLocationLogger, bool bStartBatteryMonitor);
+    Navigator(FlightController& control, DataLoggerWriter* pLogger, PipeReceiver_Image* pPipeRGB, PipeSender_ImageData* pDetectionLogger, PipeSender_SegmentData* pSegmentLogger, bool bStartBatteryMonitor);
     ~Navigator();
     
     void Start();

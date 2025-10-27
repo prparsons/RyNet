@@ -66,10 +66,12 @@ public:
     std::string GetString() const;
     const cv::Mat& GetMatrixConst();
     cv::Mat& GetMatrix();
+    const char* GetFilename() const;
 
 private:
     bool bIsDeepCopy;
     mutable ThreadMutex mutex;
+    mutable char scFileName[128];
     cv::Mat matrix;
     cv::Mat matrixEmpty; // For returning via GetMatrix if (!bIsDeepCopy)
 
@@ -83,6 +85,8 @@ using PipeReceiver_ImageData = ThreadPipeReceiver<ImageLogData>;
 using PipeSender_ImageData = ThreadPipeSender<ImageLogData>;
 using PipeReceiver_Mask = ThreadPipeReceiver<ImageMask>;
 using PipeSender_Mask = ThreadPipeSender<ImageMask>;
+using PipeReceiver_SegmentData = ThreadPipeReceiver<std::pair<ImageLogData, std::string>>;
+using PipeSender_SegmentData = ThreadPipeSender<std::pair<ImageLogData, std::string>>;
 
 inline float PointDistanceM(float fLat1, float fLon1, float fLat2, float fLon2)
 {

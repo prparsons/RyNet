@@ -214,24 +214,11 @@ void DataLogger::WriteImageData(CameraFrame& frame)
     image = imageLarger;
 }
 
-void DataLogger::SaveImage(std::string strPrefix, CameraFrame& image)
+void DataLogger::SaveImage(std::string, CameraFrame& image)
 {
     CameraFrame imageCopy;
     imageCopy.DeepCopy(image); // So we get access to cv::Mat&
 
     WriteImageData(imageCopy);
-    time_t timeNow = time(nullptr);
-    struct tm* pTimeStruct = localtime(&timeNow);
-    char scFileName[128];
-    snprintf(scFileName, 
-            127, 
-            "images/%s_%d_%d_%d_%d_%d_%d.jpg",
-            strPrefix.c_str(),
-            pTimeStruct->tm_year + 1900, 
-            pTimeStruct->tm_mon + 1,
-            pTimeStruct->tm_mday,
-            pTimeStruct->tm_hour,
-            pTimeStruct->tm_min,
-            pTimeStruct->tm_sec);
-    cv::imwrite(scFileName, imageCopy.GetMatrix());
+    cv::imwrite(image.GetFilename(), imageCopy.GetMatrix());
 }

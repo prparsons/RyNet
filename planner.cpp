@@ -24,6 +24,7 @@ FlightController::FlightController(DataLoggerWriter* _pLogger, PipeReceiverDepth
 , pPipeDepth(_pPipeDepth)
 , pPipeIR(_pPipeIR)
 , pipeDetect(16, true)
+, pipeSegment(16, true)
 , socketDesc(-1)
 , uSalt(1)
 , iUdpTimeoutUs(100000)
@@ -311,6 +312,11 @@ PipeSender_ImageData* FlightController::GetPipeDetection()
     return pipeDetect.CreateSender();
 }
 
+PipeSender_SegmentData* FlightController::GetPipeSegmentation()
+{
+    return pipeSegment.CreateSender();
+}
+
 bool FlightController::GetNextWaypoint(int16_t& iNextPoint)
 {
     if (pInstance == nullptr) return false;
@@ -537,13 +543,18 @@ void FlightController::runPointLogger(Signal sigStop)
     float fAlt = 0;
     GetPosition(fLat, fLon);
     GetAltitude(fAlt);
+    // Strings used for storing all the parts of the gpx/kml files
     std::string strTrackGpx;
     std::string strDetectionGpx;
-
-    char scFileNameText[128];
+    std::string strPathDocKml;
+    std::string strPathPtsKml;
+    std::string strDetectionKml; // Waypoints of detections
+    std::string strSegmentationKml; // Overlays of habitat
+    // File names
+    char scFileNameGpx[128];
     time_t timeNow = time(nullptr);
     tm* pTimeStruct = localtime(&timeNow);
-    snprintf(scFileNameText, 
+    snprintf(scFileNameGpx, 
             127, 
             "run_%d_%d_%d_%d_%d.gpx", 
             pTimeStruct->tm_year + 1900, 
@@ -551,11 +562,10 @@ void FlightController::runPointLogger(Signal sigStop)
             pTimeStruct->tm_mday,
             pTimeStruct->tm_hour,
             pTimeStruct->tm_min);
-
-    printf(" Starting GPX file: %s\n", scFileNameText);
+    printf(" Starting GPX file: %s\n", scFileNameGpx);
     {
         std::fstream fileGpx;
-        fileGpx.open(scFileNameText, std::ios::out | std::ios::app);
+        fileGpx.open(scFileNameGpx, std::ios::out | std::ios::app);
         if (fileGpx) {
             fileGpx << GpxProlog() << GpxStartTrackSeg("AUTO");
             fileGpx.close();
@@ -563,15 +573,45 @@ void FlightController::runPointLogger(Signal sigStop)
             printL(" failed to save GPX");//todo throw exception?, bail the whole thing? crash the drone?
         }
     }
+    char scFileNameKml[128];
+    snprintf(scFileNameKml, 
+        127, 
+        "run_%d_%d_%d_%d_%d.kml", 
+        pTimeStruct->tm_year + 1900, 
+        pTimeStruct->tm_mon + 1,
+        pTimeStruct->tm_mday,
+        pTimeStruct->tm_hour,
+        pTimeStruct->tm_min);
+    printf(" Starting KML file: %s\n", scFileNameKml);
+    {
+        std::fstream fileKml;
+        fileKml.open(scFileNameKml, std::ios::out | std::ios::app);
+        if (fileKml) {
+            fileKml << KmlProlog();
+            fileKml.close();
+        } else {
+            printL(" failed to save KML");//todo throw exception?, bail the whole thing? crash the drone?
+        }
+    }
+    strPathDocKml = KmlStartPath("Start of drone flight - AUTO", KmlPathStyle::AUTO);
 
+    // Main loop
     while (!sigStop.isSignaled()) {
+        // First part we look to see which mode we're in (guided or auto) and save those points
+        // both for gpx/kml files and for the path optimization to be able to delete points
+        // from the route that were already visited in guided mode.
         if (bGuided) { // In GUIDED
             bool bValidPos = false;
             // Get the current position, add it to the list of visited points
             if (GetPosition(fLat, fLon)) {
                 bValidPos = true;
                 GetAltitude(fAlt);
+
                 strTrackGpx += GpxTrackPoint(fLat, fLon, fAlt);
+                std::pair<std::string, std::string> kmlStrings = KmlPathPoint(fLat, fLon, fAlt);
+                strPathDocKml += kmlStrings.first;
+                strPathPtsKml += kmlStrings.second;
+
                 mtPoints.lock();
                 startLocation.InsertPoint(fLat, fLon);
                 mtPoints.unlock();
@@ -581,9 +621,13 @@ void FlightController::runPointLogger(Signal sigStop)
                 bGuided = strcmp(scMode, "GUIDED") == 0;
             }
             if (!bGuided) {
-                // Just switched to guided from auto, so clear visited points
+                // Just switched to AUTO from GUIDED, so clear visited points
                 strTrackGpx += GpxEndTrackSeg();
                 strTrackGpx += GpxStartTrackSeg("AUTO");
+                strPathDocKml += KmlEndPath(strPathPtsKml);
+                strPathDocKml += KmlStartPath("Drone Path - AUTO", KmlPathStyle::AUTO);
+                strPathPtsKml = "";
+
                 mtPoints.lock();
                 startLocation.ResetPosition(fLat, fLon);
                 mtPoints.unlock();
@@ -595,30 +639,49 @@ void FlightController::runPointLogger(Signal sigStop)
             if (GetMode(scMode, 32)) {
                 bGuided = strcmp(scMode, "GUIDED") == 0;
                 if (bGuided) {
+                    // Just switched to GUIDED from AUTO
                     strTrackGpx += GpxEndTrackSeg();
                     strTrackGpx += GpxStartTrackSeg("GUIDED");
-                    if (bValidPos) {
-                    }
+                    strPathDocKml += KmlEndPath(strPathPtsKml);
+                    strPathDocKml += KmlStartPath("Drone Path - GUIDED", KmlPathStyle::GUIDED);
+                    strPathPtsKml = "";
+
                     mtPoints.lock();
-                    startLocation.ResetPosition(fLat, fLon);
+                    startLocation.ResetPosition(fLat, fLon);//todo did we do this if bad point before?
                     mtPoints.unlock();
                 }
             }
-            strTrackGpx += GpxTrackPoint(fLat, fLon, fAlt);
+            if (bValidPos) {
+                strTrackGpx += GpxTrackPoint(fLat, fLon, fAlt);
+                std::pair<std::string, std::string> kmlStrings = KmlPathPoint(fLat, fLon, fAlt);
+                strPathDocKml += kmlStrings.first;
+                strPathPtsKml += kmlStrings.second;
+            }
         }
 
+        // Now look to see if the detection or segmentation threads have added anything to the respective pipes for the
+        // gpx and kml files.
         if (pipeDetect.DataReady()) {
             std::shared_ptr<ImageLogData> pWaypoint;
             while (pipeDetect.RetrieveData(pWaypoint, 0)) {
                 strDetectionGpx += GpxWaypoint(pWaypoint->GetString(), pWaypoint->GetLat(), pWaypoint->GetLon());
+                strDetectionKml += KmlWaypoint("Detection", pWaypoint->GetString(), pWaypoint->GetLat(), pWaypoint->GetLon(), false);
+            }
+        }
+        if (pipeSegment.DataReady()) {
+            std::shared_ptr<std::pair<ImageLogData, std::string>> pWaypoint;
+            while (pipeSegment.RetrieveData(pWaypoint, 0)) {
+                strSegmentationKml += KmlHabitatOverlay(pWaypoint->first, pWaypoint->second);
             }
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
+
+    // Thread is done, now save off the gpx and kml files
     printL(" Saving GPX file");
     {
         std::fstream fileGpx;
-        fileGpx.open(scFileNameText, std::ios::out | std::ios::app);
+        fileGpx.open(scFileNameGpx, std::ios::out | std::ios::app);
         if (fileGpx) {
             fileGpx << strTrackGpx << GpxEndTrackSeg() << strDetectionGpx << "</gpx>";
             fileGpx.close();
@@ -626,7 +689,19 @@ void FlightController::runPointLogger(Signal sigStop)
             printL(" failed to save GPX");//todo throw exception?, bail the whole thing? crash the drone?
         }
     }
-
+    printL(" Saving KML file");
+    {
+        std::fstream fileKml;
+        fileKml.open(scFileNameKml, std::ios::out | std::ios::app);
+        if (fileKml) {
+            fileKml << strPathDocKml << KmlEndPath(strPathPtsKml) << strDetectionKml << strSegmentationKml;
+            //todo in a document << strDetectionKml;//segmentation
+            fileKml << "</Folder></kml>";
+            fileKml.close();
+        } else {
+            printL(" failed to save KML");//todo throw exception?, bail the whole thing? crash the drone?
+        }
+    }
 }
 
 void FlightController::runIr(PipeReceiver_Image& pipeIR, Signal sigStop)
@@ -1139,11 +1214,12 @@ std::string FlightController::GpxProlog()
     std::stringstream ss;
     ss << std::put_time(timeStruct, "%F") << "T" << std::put_time(timeStruct, "%T") << "Z";
 
-    std::string str = "<gpx version=\"1.1\" creator=\"RyNet\">\n"\
+    std::string str = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"\
+                       "<gpx version=\"1.1\" creator=\"RyNet\">\n"\
                             "<metadata>\n"\
                                 "<name>Flown Route</name>\n"\
                                 "<time>";
-    str += ss.str();;
+    str += ss.str();
     str +=                      "</time>\n"\
                             "</metadata>\n";
     return str;
@@ -1189,4 +1265,130 @@ std::string FlightController::GpxWaypoint(std::string strDesc, float fLat, float
     strGpx += fLon;
     strGpx += "\"><desc>" + strDesc + "</desc></wpt>\n";
     return strGpx;
+}
+
+std::string FlightController::KmlProlog()
+{
+    return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"\
+            "<kml xmlns=\"http://www.opengis.net/kml/2.2\">\n"\
+                "<Folder>\n"\
+                    "<name>RyNet_FlownRoute.kml</name>\n"\
+                    "<description>\n"\
+                        "Contains path flown, waypoints of positive detections, and overlay of habitat.\n"\
+                    "</description>\n";
+}
+
+std::string FlightController::KmlStartPath(std::string strDesc, KmlPathStyle styleSegment)
+{
+    //todo unique name
+    std::string strPath;
+    strPath += "<Document>\n"\
+                    "<name>Drone Path</name>\n"\
+                    "<description>";
+    strPath += strDesc + "</description>\n";
+    strPath +=      "<Style id=\"yellowLineGreenPoly\">\n"\
+                        "<LineStyle>\n"\
+                            "<color>7f00ffff</color>\n"\
+                            "<width>4</width>\n"\
+                        "</LineStyle>\n"\
+                        "<PolyStyle>\n"\
+                            "<color>7f00ff00</color>\n"\
+                        "</PolyStyle>\n"\
+                    "</Style>\n";
+    strPath += "<Placemark>\n"\
+                    "<name>Path</name>\n"\
+                    "<description>List of points drone traveled</description>\n";
+    strPath +=      "<styleUrl>#yellowLineGreenPoly</styleUrl>\n"\
+                    "<LineString>\n"\
+                        "<extrude>1</extrude>\n"\
+                        "<tessellate>1</tessellate>\n"\
+                        "<altitudeMode>absolute</altitudeMode>\n"\
+                        "<coordinates>";
+    return strPath;
+}
+
+std::pair<std::string, std::string> FlightController::KmlPathPoint(float fLat, float fLon, float fElev)
+{
+    std::string strCoord;
+    strCoord += fLon;
+    strCoord += ",";
+    strCoord += fLat;
+    strCoord += ",";
+    strCoord += fElev;
+
+    std::string strWpt = KmlWaypoint("Drone Path point", "", fLat, fLon, true);
+
+    return std::make_pair(strCoord, strWpt);
+}
+
+std::string FlightController::KmlEndPath(std::string strPathPoints)
+{
+    std::string strPathDoc;
+    strPathDoc += "</coordinates>\n"\
+                "</LineString>\n"\
+            "</Placemark>\n";
+    strPathDoc += strPathPoints + "</Document>";
+    return strPathDoc;
+}
+
+//todo<GroundOverlay>
+
+std::string FlightController::KmlWaypoint(std::string strName, std::string strDesc, float fLat, float fLon, bool bTime)
+{
+    std::string strWpt;
+    strWpt += "<Placemark>\n"\
+                "<name>";
+    strWpt += strName + "</name>\n";
+    strWpt +=   "<description>";
+    strWpt += strDesc + "</description>\n";
+    //todo<altitudeMode>
+    if (bTime) {
+        time_t timeNow = time(nullptr);
+        std::tm* timeStruct = gmtime(&timeNow);
+        std::stringstream ss;
+        ss << std::put_time(timeStruct, "%F") << "T" << std::put_time(timeStruct, "%T") << "Z";
+        strWpt += "<TimeStamp><when>";
+        strWpt += ss.str();
+        strWpt += "</when></TimeStamp>\n";
+    }
+    strWpt +=   "<Point>\n"\
+                    "<coordinates>";
+    strWpt += fLon;
+    strWpt += ",";
+    strWpt += fLat;
+    //todo,altitude</coordinates>
+    strWpt +=       "</coordinates>\n"\
+                "</Point>\n"\
+            "</Placemark>\n";
+
+    return strWpt;
+}
+
+std::string FlightController::KmlHabitatOverlay(const ImageLogData& data, std::string strFilename)
+{
+    std::string strHab;
+    strHab += "<GroundOverlay>\n"\
+                "<name>";
+    strHab += "Habitat Detection</name>\n<description>";
+    //todo masks should have a way to be associated with the image
+    strHab += "Overlay of the image that triggered the habitat detection.</description>\n<Icon><href>images/";
+    strHab += strFilename;
+    strHab +=   "</href></Icon>\n"\
+                "<LatLonBox>\n"\
+                    "<north>";
+    strHab += (data.GetLat() + 0.0005);
+    strHab += "</north>\n<south>";
+    strHab += (data.GetLat() - 0.0005);
+    strHab += "</south>\n<east>";
+    strHab += (data.GetLon() - 0.0005);
+    strHab += "</east>\n<west>";
+    strHab += (data.GetLon() + 0.0005);
+    strHab +=       "</west>\n"\
+                    "<rotation>";
+    strHab += data.GetHeading();
+    strHab +=       "</rotation>\n"\
+                "</LatLonBox>\n"\
+            "</GroundOverlay>";
+
+    return strHab;
 }

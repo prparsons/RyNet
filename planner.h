@@ -16,6 +16,11 @@
 
 */
 
+enum class KmlPathStyle {
+    GUIDED,
+    AUTO
+};//todo there's other places looking for guided/auto
+
 class FlightController {
 public:
     ~FlightController();
@@ -40,6 +45,7 @@ public:
     Route* GetRoute(); // Returns the current route. Caller owns object
     CoordNode* GetVisitedPoints(); // From point logger thread
     PipeSender_ImageData* GetPipeDetection();
+    PipeSender_SegmentData* GetPipeSegmentation();
     static bool GetNextWaypoint(int16_t& iNextPoint);
 
     // Can we travel in the indicated direction for the indicated time.
@@ -77,6 +83,13 @@ private:
     std::string GpxEndTrackSeg();
     std::string GpxWaypoint(std::string strDesc, float fLat, float fLon);
 
+    std::string KmlProlog();
+    std::string KmlStartPath(std::string strDesc, KmlPathStyle styleSegment);
+    std::pair<std::string, std::string> KmlPathPoint(float fLat, float fLon, float fElev);
+    std::string KmlEndPath(std::string strPathPoints);
+    std::string KmlWaypoint(std::string strName, std::string strDesc, float fLat, float fLon, bool bTime);
+    std::string KmlHabitatOverlay(const ImageLogData& data, std::string strFilename);
+
     DataLoggerWriter* pLogger;
     CoordNode startLocation;
     std::thread* pThreadDepth;
@@ -87,6 +100,7 @@ private:
     PipeReceiverDepth* pPipeDepth;
     PipeReceiver_Image* pPipeIR;
     PipeReceiver_ImageData pipeDetect;
+    PipeReceiver_SegmentData pipeSegment;
     Signal sigDepthStop;
     Signal sigPtLogStop;
     Signal sigIrStop;
