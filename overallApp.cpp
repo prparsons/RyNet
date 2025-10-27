@@ -119,7 +119,11 @@ int main(int argc, char** argv)
         else pCamera = CameraController::OpenCamera(uCameraFeatures);
 
         printL(">>>Getting Flight Controller");
-        FlightController* pController = FlightController::GetFlightController(logger.GetLogger(), pCamera->GetPipeDepth(), pCamera->GetPipeIR());
+        FlightController* pController = FlightController::GetFlightController(logger.GetLogger(), 
+                                                                              pCamera->GetPipeDepth(),
+                                                                              pCamera->GetPipeIR(),
+                                                                              args.bGpx,
+                                                                              args.bKml);
         if (args.bManualServerAddress) pController->SetServerAddress(args.scServerAddress);
         if (args.bHmacUdp) pController->SetUdpKey(args.scUdpKey);
         if (args.iUdpTimeoutUs != -1) pController->SetUdpTimout(args.iUdpTimeoutUs);
@@ -127,7 +131,12 @@ int main(int argc, char** argv)
         if (args.iGuideExtraDistance != -1) pController->SetExtraDistance(args.iGuideExtraDistance);
 
         printL(">>>Creating Navigator");
-        Navigator nav(*pController, logger.GetLogger(), pCamera->GetPipeRGB(), pController->GetPipeDetection(), pController->GetPipeSegmentation(), args.bBatteryMonitor);
+        Navigator nav(*pController, 
+                      logger.GetLogger(),
+                      pCamera->GetPipeRGB(),
+                      pController->GetPipeDetection(),
+                      pController->GetPipeSegmentation(),
+                      args.bBatteryMonitor);
         if (args.bRunDepth) pSignal_interrupt = pCamera;
         else pSignal_interrupt = &nav;
         // If we specified a target class, need to set that now
@@ -549,9 +558,9 @@ void printHelp()
     printL("    algorithm.");
     printL("    Target is either \"simple\" or \"2opt\".\n");
     printL(" --gpx");
-    printl("    Save GPX file of this run.\n");
+    printL("    Save GPX file of this run.\n");
     printL(" --kml");
-    printl("    Save KML file of this run.\n");
+    printL("    Save KML file of this run.\n");
 }
 
 void cleanupFailure()
