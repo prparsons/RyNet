@@ -53,6 +53,8 @@ public:
     bool bDownsampleDepth = false;
     bool bHmacUdp = false;
     bool bDepthLowRes = false;
+    bool bGpx = false;
+    bool bKml = false;
     char scVideoSimPath[512];
     char scServerAddress[32];
     char scUdpKey[33];
@@ -395,6 +397,8 @@ bool Arguments::Parse()
             else if (strcmp("--battery_monitor", argv[i]) == 0) bBatteryMonitor = true;
             else if (strcmp("--depth_lowres", argv[i]) == 0) bDepthLowRes = true;
             else if (strcmp("--run_flir", argv[i]) == 0) bRunFlir = true;
+            else if (strcmp("--gpx", argv[i]) == 0) bGpx = true;
+            else if (strcmp("--kml", argv[i]) == 0) bKml = true;
             else if (strcmp("--hmac_udp", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = UDP_KEY;
@@ -544,6 +548,10 @@ void printHelp()
     printL("    When restoring a route, either run a simple cleaning algorithm, or a 2opt");
     printL("    algorithm.");
     printL("    Target is either \"simple\" or \"2opt\".\n");
+    printL(" --gpx");
+    printl("    Save GPX file of this run.\n");
+    printL(" --kml");
+    printl("    Save KML file of this run.\n");
 }
 
 void cleanupFailure()

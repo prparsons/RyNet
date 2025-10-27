@@ -15,7 +15,7 @@ bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** s
 
 FlightController* pInstance = nullptr;
 
-FlightController::FlightController(DataLoggerWriter* _pLogger, PipeReceiverDepth* _pPipeDepth, PipeReceiver_Image* _pPipeIR)
+FlightController::FlightController(DataLoggerWriter* _pLogger, PipeReceiverDepth* _pPipeDepth, PipeReceiver_Image* _pPipeIR, bool _bGpx, bool _bKml)
 : pLogger(_pLogger)
 , startLocation(0,0)
 , pThreadDepth(nullptr)
@@ -26,6 +26,8 @@ FlightController::FlightController(DataLoggerWriter* _pLogger, PipeReceiverDepth
 , pipeDetect(16, true)
 , pipeSegment(16, true)
 , socketDesc(-1)
+, bGpx(_bGpx)
+, bKml(_bKml)
 , uSalt(1)
 , iUdpTimeoutUs(100000)
 , iMaxDist(-1)
@@ -39,10 +41,10 @@ FlightController::FlightController(DataLoggerWriter* _pLogger, PipeReceiverDepth
     memset(&addressMavLink, 0, sizeof(addressMavLink));
 }
 
-FlightController* FlightController::GetFlightController(DataLoggerWriter* pLogger, PipeReceiverDepth* pPipeDepth, PipeReceiver_Image* pPipeIR)
+FlightController* FlightController::GetFlightController(DataLoggerWriter* pLogger, PipeReceiverDepth* pPipeDepth, PipeReceiver_Image* pPipeIR, bool bGpx, bool bKml)
 {
     if (pInstance == nullptr) {
-        pInstance = new FlightController(pLogger, pPipeDepth, pPipeIR);
+        pInstance = new FlightController(pLogger, pPipeDepth, pPipeIR, bGpx, bKml);
         return pInstance;
     }
     return nullptr;
@@ -562,8 +564,9 @@ void FlightController::runPointLogger(Signal sigStop)
             pTimeStruct->tm_mday,
             pTimeStruct->tm_hour,
             pTimeStruct->tm_min);
-    printf(" Starting GPX file: %s\n", scFileNameGpx);
-    {
+    if (bGpx) {
+        printf(" Starting GPX file: %s\n", scFileNameGpx);
+
         std::fstream fileGpx;
         fileGpx.open(scFileNameGpx, std::ios::out | std::ios::app);
         if (fileGpx) {
@@ -582,8 +585,9 @@ void FlightController::runPointLogger(Signal sigStop)
         pTimeStruct->tm_mday,
         pTimeStruct->tm_hour,
         pTimeStruct->tm_min);
-    printf(" Starting KML file: %s\n", scFileNameKml);
-    {
+    if (bKml) {
+        printf(" Starting KML file: %s\n", scFileNameKml);
+
         std::fstream fileKml;
         fileKml.open(scFileNameKml, std::ios::out | std::ios::app);
         if (fileKml) {
@@ -592,8 +596,10 @@ void FlightController::runPointLogger(Signal sigStop)
         } else {
             printL(" failed to save KML");//todo throw exception?, bail the whole thing? crash the drone?
         }
+        
+        strPathDocKml = KmlStartPath("Start of drone flight - AUTO", KmlPathStyle::AUTO);
     }
-    strPathDocKml = KmlStartPath("Start of drone flight - AUTO", KmlPathStyle::AUTO);
+    
 
     // Main loop
     while (!sigStop.isSignaled()) {
@@ -678,8 +684,8 @@ void FlightController::runPointLogger(Signal sigStop)
     }
 
     // Thread is done, now save off the gpx and kml files
-    printL(" Saving GPX file");
-    {
+    if (bGpx) {
+        printL(" Saving GPX file");
         std::fstream fileGpx;
         fileGpx.open(scFileNameGpx, std::ios::out | std::ios::app);
         if (fileGpx) {
@@ -689,8 +695,8 @@ void FlightController::runPointLogger(Signal sigStop)
             printL(" failed to save GPX");//todo throw exception?, bail the whole thing? crash the drone?
         }
     }
-    printL(" Saving KML file");
-    {
+    if (bKml) {
+        printL(" Saving KML file");
         std::fstream fileKml;
         fileKml.open(scFileNameKml, std::ios::out | std::ios::app);
         if (fileKml) {

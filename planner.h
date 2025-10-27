@@ -25,7 +25,7 @@ class FlightController {
 public:
     ~FlightController();
 
-    static FlightController* GetFlightController(DataLoggerWriter* pLogger, PipeReceiverDepth* pPipeDepth, PipeReceiver_Image* pPipeIR);
+    static FlightController* GetFlightController(DataLoggerWriter* pLogger, PipeReceiverDepth* pPipeDepth, PipeReceiver_Image* pPipeIR, bool bGpx, bool bKml);
     static void DestroyFlightController();
 
     void WaitForTakeoff(int iAltitude, const bool& bAbort);
@@ -62,7 +62,7 @@ public:
     void SetUdpKey(const char* scUdpKey);
 
 private:
-    FlightController(DataLoggerWriter* pLogger, PipeReceiverDepth* pPipeDepth, PipeReceiver_Image* pPipeIR);
+    FlightController(DataLoggerWriter* pLogger, PipeReceiverDepth* pPipeDepth, PipeReceiver_Image* pPipeIR, bool bGpx, bool bKml);
 
     void SaveRoute();
     void SendXML(const char* sc);
@@ -109,6 +109,8 @@ private:
     ThreadMutex mtRecv;
     ThreadMutex mtPoints;
 
+    bool bGpx;
+    bool bKml;
     struct sockaddr_in addressMavLink;
     int socketDesc;
     int iUdpTimeoutUs;
