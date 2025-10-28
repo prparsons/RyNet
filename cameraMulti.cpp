@@ -196,14 +196,14 @@ void CameraController::Start()
     if (features & CameraController_RGBSimulation) {
         printf("CameraController::Start starting simulation using file: %s\n", scSimulationFile);
         if (pthrCamera[1] == nullptr) {
-            pthrCamera[1] = new std::thread(&CameraController::run_simulation, this, &FrameCurrentRGB, &sigRGB, &ss[1]);
+            pthrCamera[1] = new std::thread(&CameraController::run_simulation, this, &FrameCurrentRGB, &sigRGB, &arSigStop[1]);
         } else {
             printL("CameraController::Start pthrCamera[1] already started");
         }
     } else if (features & CameraController_RGB) { // Can't run actual RGB camera if the simulation is enabled
         printL("CameraController::Start starting RGB");
         if (pthrCamera[1] == nullptr) {
-            pthrCamera[1] = new std::thread(&CameraController::run_CV, this, scGStream_RGB, &FrameCurrentRGB, &sigRGB, &ss[1]);
+            pthrCamera[1] = new std::thread(&CameraController::run_CV, this, scGStream_RGB, &FrameCurrentRGB, &sigRGB, &arSigStop[1]);
         } else {
             printL("CameraController::Start cv1 already started");
         }
@@ -211,7 +211,7 @@ void CameraController::Start()
 
     if (features & CameraController_IR) {
         if (pthrCamera[2] == nullptr) {
-            pthrCamera[2] = new std::thread(&CameraController::run_CV, this, scGStream_IR, &FrameCurrentIR, &sigIR, &ss[2]);
+            pthrCamera[2] = new std::thread(&CameraController::run_CV, this, scGStream_IR, &FrameCurrentIR, &sigIR, &arSigStop[2]);
         } else {
             printL("CameraController::Start cv2 already started");
         }
@@ -224,7 +224,7 @@ void CameraController::Stop()
     for (int i = 0; i < NUM_CAMERA_THREADS; i++) {
         if (pthrCamera[i] != nullptr) {
             printf("CameraController::Stop Stopping thread %d\n", i);
-            ss[i].stop();
+            arSigStop[i].signal();
             pthrCamera[i]->join();
             delete pthrCamera[i];
             pthrCamera[i] = nullptr;
@@ -234,7 +234,7 @@ void CameraController::Stop()
 
 void CameraController::SignalStop()
 {
-    ss[0].stop();
+    arSigStop[0].signal();
 }
 
 void CameraController::JoinDepth()
@@ -316,7 +316,7 @@ void CameraController::run_RS()
             }
 
             sigDepth.signal();
-        } while (!ss[0].shouldStop());
+        } while (!arSigStop[0].isSignaled());
         pCameraRS->pipe.stop();
     } catch (rs2::error e) {
         printL("run_RS failed");
@@ -325,7 +325,7 @@ void CameraController::run_RS()
     }
 }
 
-void CameraController::run_CV(const char* scGStream, Mat* pFrameCurrent, Signal* pSig, StopSignal* pss)
+void CameraController::run_CV(const char* scGStream, Mat* pFrameCurrent, Signal* pSig, Signal* pSigStop)
 {
     printL("CameraController::run_CV");
     if (pFrameCurrent == nullptr) {
@@ -336,8 +336,8 @@ void CameraController::run_CV(const char* scGStream, Mat* pFrameCurrent, Signal*
         printL("CameraController::run_CV Signal nullptr");
         return;
     }
-    if (pss == nullptr) {
-        printL("CameraController::run_CV StopSignal nullptr");
+    if (pSigStop == nullptr) {
+        printL("CameraController::run_CV Stop Signal nullptr");
         return;
     }
     if (scGStream == nullptr) {
@@ -353,7 +353,7 @@ void CameraController::run_CV(const char* scGStream, Mat* pFrameCurrent, Signal*
         return;
     }
 
-    while (!pss->shouldStop()) { // We need a separate stop signal for each thread
+    while (!pSigStop->isSignaled()) { // We need a separate stop signal for each thread
         Mat frame;
         pCap->read(frame);
         if (frame.empty()) {
@@ -380,7 +380,7 @@ void CameraController::run_CV(const char* scGStream, Mat* pFrameCurrent, Signal*
     delete pCap;
 }
 
-void CameraController::run_simulation(cv::Mat* pFrameCurrent, Signal* pSig, StopSignal* pss)
+void CameraController::run_simulation(cv::Mat* pFrameCurrent, Signal* pSig, Signal* pSigStop)
 {
     cv::VideoCapture cap(scSimulationFile);
     if (!cap.isOpened()) {
@@ -396,15 +396,15 @@ void CameraController::run_simulation(cv::Mat* pFrameCurrent, Signal* pSig, Stop
         printL("CameraController::run_simulation Signal nullptr");
         return;
     }
-    if (pss == nullptr) {
-        printL("CameraController::run_simulation StopSignal nullptr");
+    if (pSigStop == nullptr) {
+        printL("CameraController::run_simulation Stop Signal nullptr");
         return;
     }
     int iFramesRead = 0;
     // Looks like we can get frame failures before the file ends, so we'll increment uFrameFail in the instance of a
     //  failure, and keep trying until it overflows
     uint8_t uFrameFail = 0;
-    while (!pss->shouldStop()) {
+    while (!pSigStop->isSignaled()) {
         cv::Mat frame;
         if (!cap.read(frame)) {
             if (++uFrameFail == 0) {

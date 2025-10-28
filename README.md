@@ -3,6 +3,8 @@ Drone search project. Navigate by segmentation network (looking for proper terra
 
 General "how it works": you program a route, and start the drone following that route in auto. The app will then switch it to guided when the segmentation network detects the desired category, and keep going so long as desired category is in frame. Once there's nothing else new in frame, it will remove any points it "visited" while in guided mode from the route, then re-arrange remaining waypoints for the shortest path possible before switching back to auto. Currently is working (camera in portrain mode), testing with dronekit's simulator as well as live flights without commanding drone (python script --livetest).
 
+The python DroneKit library was the most complete library I found, so there's a python script that communicates directly with the drone. It listens via UDP for the c++ program that does the actual work. Since the drone will have wifi, implemented a simple hmac based authentication scheme for the UDP packets (also provides verification of message correctness/completeness).
+
 Building/testing
 It "should" be able to be built in windows via WSL. This is what I can remember from looking at the little nvidia jetson nano.
 <ul>
@@ -49,3 +51,6 @@ https://github.com/VainF/DeepLabV3Plus-Pytorch
 That's the project I was planning to use for training the terrain scanning network (image segmentation). Drone is running a Jetson Xavier NX, 8gb ram for whole system. So inference models need to fit in it. As for training, I have a 16gb card...memory is the limiting factor.
 
 I haven't really come up with what to use for detection...jetson inference has some decent models, and it might be worth just continuing to use that out of simplicity?
+
+release build:
+$ cmake -DCMAKE_BUILD_TYPE=Release ..

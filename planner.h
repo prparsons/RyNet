@@ -5,6 +5,7 @@
 #include "cameraMulti.h"
 #include "data_types.h"
 #include "dataLogger.h"
+#include "route.h"
 
 /*
     Plan for connecting to drone:
@@ -14,6 +15,7 @@
     downloading the route to this program...can let the script handle the saving/loading of waypoints.
 
 */
+
 
 class FlightController {
 public:
@@ -26,7 +28,6 @@ public:
     void SetUdpTimout(int iTimeoutUs);
     void SetMissionSpeed(int iMissionSpeedMS);
     void SetExtraDistance(int iExtraGuidedDistance);
-    void SetRouteClean(int iClean); // 1 = simple, 2 = 2opt
 
     void Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr, int iMaxDist);
     void Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr);
@@ -37,6 +38,9 @@ public:
     static bool GetAltitude(float& fAltitude);
     bool GetMode(char* scMode, int iStrLen);
     int GetBattery();
+    Route* GetRoute(); // Returns the current route. Caller owns object
+    CoordNode* GetVisitedPoints(); // From point logger thread
+    static bool GetNextWaypoint(int16_t& iNextPoint);
 
     // Can we travel in the indicated direction for the indicated time.
     //  0 == No. Positive number is distance direction is valid for.
@@ -46,7 +50,7 @@ public:
     void SetDestination(float fHeadingOffsetDeg, float fDistance); // Store route, adjust heading, after distance will automatically restore route
     void SetRTL();
     void SetAltitude(float fAltitudeMeters);
-    void RestoreRoute();
+    void SetRoute(const Route& NewRoute, bool bSetAuto); // Replaces current route with this one, will takeover ownership.
 
     void SetServerAddress(const char* scServerAddress);
     void SetUdpKey(const char* scUdpKey);
@@ -56,25 +60,34 @@ private:
 
     void SaveRoute();
     void SendXML(const char* sc);
-    char* SendRecXML(const char* sc);
+    uint32_t SendRecXML(const char* sc); // Used to send message if you want to be able to get a response
+    char* GetUdp(uint32_t uSalt, int iTimeoutMs); // Used to get any response
+    bool VerifyMessage(const char* _scMessage, uint32_t uMessageLength);
     void ConnectMavLink();
 
-    void runDepth(Signal sig, StopSignal ss); // Thread function to continuously send depth info for obstacle avoidance
-    void runPointLogger(StopSignal ss); // Thread function to continuously retrieve and store visited points when in guided mode
-    void runIr(Signal sig, StopSignal ss);
+    void runDepth(Signal sig, Signal ss); // Thread function to continuously send depth info for obstacle avoidance
+    void runPointLogger(Signal ss); // Thread function to continuously retrieve and store visited points when in guided mode
+    void runIr(Signal sig, Signal ss);
+    void runRecv(Signal ss); // Thread that recv's UDP packet and stores them in a map according to salt
+    char* recvUdp(); // Contains the udp code itself for runRecv()
 
     DataLogger& logger;
     CameraController& camera;
+    CoordNode startLocation;
     std::thread* pThreadDepth;
     std::thread* pThreadPoint;
     std::thread* pThreadIr;
+    std::thread* pThreadRecv;
     
     Signal sigCameraDepth;
     Signal sigIr;
-    StopSignal ssDepth;
-    StopSignal ssPtLog;
-    StopSignal ssIr;
+    Signal sigDepthStop;
+    Signal sigPtLogStop;
+    Signal sigIrStop;
+    Signal sigRecvStop;
     ThreadMutex mtXML;
+    ThreadMutex mtRecv;
+    ThreadMutex mtPoints;
 
     struct sockaddr_in addressMavLink;
     int socketDesc;
@@ -83,11 +96,11 @@ private:
     char scMavLinkAddress[32];
     const int iMavlinkPort = 3636;
     char scKey[33];
-    int iSalt;
+    uint32_t uSalt;
     float fHomeLat;
     float fHomeLon;
     int iMissionSpeedMS;
     int iExtraGuidedDistance;
-    int iRouteCleanType;
+    std::map<uint32_t, char*> mapRecv;
 };
 

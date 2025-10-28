@@ -5,6 +5,9 @@
 #include <openssl/evp.h>
 #include <openssl/err.h>
 
+// Messages: uint32_t(size of mesage)32_bytes(hmac digest)uint32_t(salt)
+#define RECV_OFFSET (4 + 32 + 4)
+
 
 EVP_PKEY* hmacCreateKey(const char* _scKey);
 bool hmacMessage(std::string strMessage, std::string strKey, int iSalt, char** scHmac, char** scSaltAndMessageOut);
@@ -14,19 +17,19 @@ FlightController* pInstance = nullptr;
 FlightController::FlightController(DataLogger& _logger, CameraController& _camera)
 : logger(_logger)
 , camera(_camera)
+, startLocation(0,0)
 , pThreadDepth(nullptr)
 , pThreadPoint(nullptr)
 , pThreadIr(nullptr)
 , sigCameraDepth(_camera.GetSignalDepth())
 , socketDesc(-1)
-, iSalt(0)
+, uSalt(1)
 , iUdpTimeoutUs(100000)
 , iMaxDist(-1)
 , fHomeLat(0)
 , fHomeLon(0)
 , iMissionSpeedMS(8)
 , iExtraGuidedDistance(10)
-, iRouteCleanType(0)
 {
     scKey[0] = 0;
     strcpy(scMavLinkAddress, "127.0.0.1");
@@ -48,15 +51,15 @@ void FlightController::DestroyFlightController()
 
     if (pInstance->pThreadDepth != nullptr) {
         printL("FlightController::DestroyFlightController Stopping depths");
-        pInstance->ssDepth.stop();
+        pInstance->sigDepthStop.signal();
     }
     if (pInstance->pThreadPoint != nullptr) {
         printL("FlightController::DestroyFlightController Stopping point logger");
-        pInstance->ssPtLog.stop();
+        pInstance->sigPtLogStop.signal();
     }
     if (pInstance->pThreadIr != nullptr) {
         printL("FlightController::DestroyFlightController Stopping thermal camera");
-        pInstance->ssIr.stop();
+        pInstance->sigIrStop.signal();
     }
     printL("FlightController::DestroyFlightController Deleting flight controller");
     delete pInstance;
@@ -72,14 +75,15 @@ void FlightController::Start(bool bStartDepth, bool bStartPointLogger, bool bSta
 void FlightController::Start(bool bStartDepth, bool bStartPointLogger, bool bStartIr)
 {
     printL("FlightController::Start");
+    pThreadRecv = new std::thread(&FlightController::runRecv, this, sigRecvStop);
     if (bStartDepth) {
-        pThreadDepth = new std::thread(&FlightController::runDepth, this, sigCameraDepth, ssDepth);
+        pThreadDepth = new std::thread(&FlightController::runDepth, this, sigCameraDepth, sigDepthStop);
     }
     if (bStartPointLogger) {
-        pThreadPoint = new std::thread(&FlightController::runPointLogger, this, ssPtLog);
+        pThreadPoint = new std::thread(&FlightController::runPointLogger, this, sigPtLogStop);
     }
     if (bStartIr) {
-        pThreadIr = new std::thread(&FlightController::runIr, this, sigIr, ssIr);
+        pThreadIr = new std::thread(&FlightController::runIr, this, sigIr, sigIrStop);
     }
 }
 
@@ -138,28 +142,33 @@ void FlightController::SetExtraDistance(int _iExtraGuidedDistance)
     iExtraGuidedDistance = _iExtraGuidedDistance;
 }
 
-void FlightController::SetRouteClean(int iClean)
-{
-    iRouteCleanType = iClean;
-}
-
 FlightController::~FlightController()
 {
     printL("FlightController::~FlightController");
+    sigRecvStop.signal();
+    if (pThreadRecv->joinable()) pThreadRecv->join();
+    delete pThreadRecv;
+
     if (pThreadDepth != nullptr) {
-        ssDepth.stop();
+        sigDepthStop.signal();
         if (pThreadDepth->joinable()) pThreadDepth->join();
         delete pThreadDepth;
     }
     if (pThreadPoint != nullptr) {
-        ssPtLog.stop();
+        sigPtLogStop.signal();
         if (pThreadPoint->joinable()) pThreadPoint->join();
         delete pThreadPoint;
     }
     if (pThreadIr != nullptr) {
-        ssIr.stop();
+        sigIrStop.signal();
         if (pThreadIr->joinable()) pThreadIr->join();
         delete pThreadIr;
+    }
+
+    // Clear out any unwanted, unclaimed or orphaned messages.
+    for (std::map<uint32_t, char*>::iterator iter(mapRecv.begin()); iter != mapRecv.end(); iter++)
+    {
+        delete[] iter->second;
     }
 
     //socket
@@ -168,16 +177,22 @@ FlightController::~FlightController()
 bool FlightController::GetPosition(float& fLat, float& fLon)
 {
     if (pInstance == nullptr) return false;
-    char* sc = pInstance->SendRecXML("<pos_retrieve />");
-    if (sc == nullptr) return false;
-    int i;
-    // string is in format "LAT\nLON"
-    for (i = 0; i < strlen(sc); i++) {
-        if (sc[i] == '\n') break;
+    uint32_t uSalt = pInstance->SendRecXML("<pos_retrieve />");
+    char* sc = pInstance->GetUdp(uSalt, 100);
+    if (sc == nullptr) {
+        printL(" GetPosition fail");
+        return false;
     }
-    sc[i] = 0;
-    fLat = float(atof(sc));
-    fLon = float(atof(sc + i + 1));
+
+    // Advance 4 bytes for size, 32 for hmac
+    char* scNum = sc + RECV_OFFSET;
+    int i;
+    for (i = 0; i < strlen(scNum); i++) {
+        if (scNum[i] == '\n') break;
+    }
+    scNum[i] = 0;
+    fLat = float(atof(scNum));
+    fLon = float(atof(scNum + i + 1));
     delete[] sc;
     return true;
 }
@@ -185,18 +200,27 @@ bool FlightController::GetPosition(float& fLat, float& fLon)
 bool FlightController::GetHeading(float& fHeading)
 {
     if (pInstance == nullptr) return false;
-    char* sc = pInstance->SendRecXML("<heading_retrieve />");
-    if (sc == nullptr) return false;
-    fHeading = atof(sc);
+    uint32_t uSalt = pInstance->SendRecXML("<heading_retrieve />");
+    char* sc = pInstance->GetUdp(uSalt, 100);
+    if (sc == nullptr) {
+        printL(" GetHeading fail");
+        return false;
+    }
+    fHeading = atof(sc + RECV_OFFSET);
     delete[] sc;
     return true;
 }
 
 bool FlightController::GetSpeed(float& fSpeedMS)
 {
-    char* sc = SendRecXML("<speed_retrieve />");
-    if (sc == nullptr) return false;
-    fSpeedMS = atof(sc);
+    if (pInstance == nullptr) return false;
+    uint32_t uSalt = pInstance->SendRecXML("<speed_retrieve />");
+    char* sc = pInstance->GetUdp(uSalt, 100);
+    if (sc == nullptr) {
+        printL(" GetSpeed fail");
+        return false;
+    }
+    fSpeedMS = atof(sc + RECV_OFFSET);
     delete[] sc;
     return true;
 }
@@ -204,29 +228,82 @@ bool FlightController::GetSpeed(float& fSpeedMS)
 bool FlightController::GetAltitude(float& fAltitude)
 {
     if (pInstance == nullptr) return false;
-    char* sc = pInstance->SendRecXML("<altitude_retrieve />");
-    if (sc == nullptr) return false;
-    fAltitude = atof(sc);
+    uint32_t uSalt = pInstance->SendRecXML("<altitude_retrieve />");
+    char* sc = pInstance->GetUdp(uSalt, 100);
+    if (sc == nullptr) {
+        printL(" GetAltitude fail");
+        return false;
+    }
+    fAltitude = atof(sc + RECV_OFFSET);
     delete[] sc;
     return true;
 }
 
 bool FlightController::GetMode(char* scMode, int iStrLen)
 {
-    char* sc = SendRecXML("<mode_retrieve />");
-    if (sc == nullptr) return false;
-    strncpy(scMode, sc, iStrLen);
-    delete sc;
+    if (pInstance == nullptr) return false;
+    uint32_t uSalt = pInstance->SendRecXML("<mode_retrieve />");
+    char* sc = pInstance->GetUdp(uSalt, 100);
+    if (sc == nullptr) {
+        printL(" GetMode fail");
+        return false;
+    }
+    strncpy(scMode, sc + RECV_OFFSET, iStrLen);
+    delete[] sc;
     return true;
 }
 
 int FlightController::GetBattery()
 {
-    char* sc = SendRecXML("<battery_retrieve />");
-    if (sc == nullptr) return -1;
-    int iBattery = atoi(sc);
-    delete sc;
+    if (pInstance == nullptr) return false;
+    uint32_t uSalt = pInstance->SendRecXML("<battery_retrieve />");
+    char* sc = pInstance->GetUdp(uSalt, 100);
+    if (sc == nullptr) {
+        printL(" GetBattery fail");
+        return false;
+    }
+    int iBattery = atoi(sc + RECV_OFFSET);
+    delete[] sc;
     return iBattery;
+}
+
+Route* FlightController::GetRoute()
+{
+    if (pInstance == nullptr) return nullptr;
+    uint32_t uSalt = pInstance->SendRecXML("<route_retrieve />");
+    char* sc = pInstance->GetUdp(uSalt, 5000);
+    if (sc == nullptr) {
+        printL("GetRoute failed");
+        return nullptr;
+    }
+    char* scRoute = sc + RECV_OFFSET;
+    
+    uint32_t& uLen = *((uint32_t*)sc);
+    Route* pRoute = Route::CreateRoute(scRoute, uLen - RECV_OFFSET);
+
+    delete[] sc;
+    return pRoute;
+}
+
+CoordNode* FlightController::GetVisitedPoints()
+{
+    mtPoints.lock();
+    CoordNode* pStolen = new CoordNode(startLocation, 0, 0);
+    mtPoints.unlock();
+    return pStolen;
+}
+
+bool FlightController::GetNextWaypoint(int16_t& iNextPoint)
+{
+    if (pInstance == nullptr) return false;
+    uint32_t uSalt = pInstance->SendRecXML("<waypoint_current_retrieve />");
+    char* sc = pInstance->GetUdp(uSalt, 100);
+    if (sc == nullptr) {
+        printL(" GetNextWaypoint fail");
+        return false;
+    }
+    iNextPoint = int16_t(atoi(sc + RECV_OFFSET));
+    return true;
 }
 
 int FlightController::CheckDirectionValid(float fDirection, time_t travelTime)
@@ -251,7 +328,6 @@ int FlightController::CheckDirectionValid(float fDirection, time_t travelTime)
         printL("Failed to get position");
         return -1;
     }
-
 
     float fQueryLat = 0;
     float fQueryLon = 0;
@@ -297,15 +373,18 @@ void FlightController::SetAltitude(float fAltitudeMeters)
     SendXML(sc);
 }
 
-void FlightController::RestoreRoute()
+void FlightController::SetRoute(const Route& NewRoute, bool bSetAuto)
 {
-    const char* scRouteString = "<route_restore setauto='true'/>";
-    if (iRouteCleanType == 1) {
-        scRouteString = "<route_restore setauto='true' clean='simple'/>";
-    } else if (iRouteCleanType == 2) {
-        scRouteString = "<route_restore setauto='true' clean='2opt'/>";
+    std::string strRoute = "<route_set ";
+    if (bSetAuto) {
+        strRoute += "setauto='true'>";
+    } else {
+        strRoute += ">";
     }
-    SendXML(scRouteString);
+    strRoute += NewRoute.toString();
+    strRoute += "</route_set>";
+
+    SendXML(strRoute.c_str());
 }
 
 void FlightController::SetServerAddress(const char* scServerAddress)
@@ -325,7 +404,7 @@ void FlightController::SaveRoute()
     SendXML(sc);
 }
 
-void FlightController::runDepth(Signal sig, StopSignal ss)
+void FlightController::runDepth(Signal sig, Signal sigStop)
 {
     printL("FlightController::runDepth");
 
@@ -334,8 +413,8 @@ void FlightController::runDepth(Signal sig, StopSignal ss)
     const uint16_t uUnderflow = 1;
     const uint16x8_t u8Underflow = vld1q_dup_u16(&uUnderflow);
 
-    while (!ss.shouldStop()) {
-        sig.wait(1000);
+    while (!sigStop.isSignaled()) {
+        sig.waitFor(1000);
         
         cameraFrame_depth* pFrameDepth = camera.GetFrameDepth();
         if (pFrameDepth == nullptr) {
@@ -432,19 +511,23 @@ void FlightController::runDepth(Signal sig, StopSignal ss)
     }
 }
 
-void FlightController::runPointLogger(StopSignal ss)
+void FlightController::runPointLogger(Signal sigStop)
 {
     printL("FlightController::runPointLogger");
     bool bGuided = false;
-    std::vector<coord> vecVisitedPoints;
-    coord currentPosition;
     char scMode[32];
 
-    while (!ss.shouldStop()) {
+    float fLat = 0;
+    float fLon = 0;
+    GetPosition(fLat, fLon);
+
+    while (!sigStop.isSignaled()) {
         if (bGuided) { // In GUIDED
             // Get the current position, add it to the list of visited points
-            if (GetPosition(currentPosition.fLatitude, currentPosition.fLongitude)) {
-                vecVisitedPoints.push_back(currentPosition);
+            if (GetPosition(fLat, fLon)) {
+                mtPoints.lock();
+                startLocation.InsertPoint(fLat, fLon);
+                mtPoints.unlock();
             }
             // See if we're in guided or auto
             if (GetMode(scMode, 32)) {
@@ -452,28 +535,118 @@ void FlightController::runPointLogger(StopSignal ss)
             }
             if (!bGuided) {
                 // Just switched to guided from auto, so clear visited points
-                vecVisitedPoints.clear();
+                GetPosition(fLat, fLon); // Doesn't matter if it fails...we still need to reset position
+                mtPoints.lock();
+                startLocation.ResetPosition(fLat, fLon);
+                mtPoints.unlock();
             }
         } else { // in AUTO            
             // See if we're in guided or auto
             if (GetMode(scMode, 32)) {
                 bGuided = strcmp(scMode, "GUIDED") == 0;
+                if (bGuided) {
+                    mtPoints.lock();
+                    startLocation.ResetPosition(fLat, fLon);
+                    mtPoints.unlock();
+                }
             }
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
 }
 
-void FlightController::runIr(Signal sig, StopSignal ss)
+void FlightController::runIr(Signal sig, Signal sigStop)
 {
     printL("FlightController::runIr");
     CameraFrame frmIr;
-    while (!ss.shouldStop()) {
-        sig.wait(1000);
+    while (!sigStop.isSignaled()) {
+        sig.waitFor(1000);
         camera.GetFrameIR(frmIr);
         if (frmIr.matrix.empty()) continue;
         logger.LogImageIr(frmIr);
     }
+}
+
+void FlightController::runRecv(Signal sigStop)
+{
+    printL("FlightController::runRecv");
+
+    char* buffer = nullptr;
+    uint32_t* pSalt = nullptr;
+
+    while (!sigStop.isSignaled()) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+        // Get a valid frame (size right, unverified)
+        // Frame layout: { uint32_t size, char[32] digest, uint32_t salt, char[] message}
+        buffer = recvUdp();
+        if (buffer) {
+            // Verify that the message is valid (start of digest, size - the size/digest/salt)
+            if (!VerifyMessage(buffer + 4, *((uint32_t*)buffer) - 4 - 32 - 4)) {
+                printL("Verify Fail");
+                delete[] buffer;
+                continue;
+            }
+            // Set up salt variable at right point in message
+            pSalt = (uint32_t*)(buffer + 4 + 32);
+            // Then add it to the receive map
+            mtRecv.lock();
+            mapRecv[*pSalt] = buffer;
+            mtRecv.unlock();
+            // Whatever gets it will clean it up
+            buffer = nullptr;
+        }
+    }
+}
+
+char* FlightController::recvUdp()
+{
+    mtXML.lock();
+    char* scResponse = new char[16384];
+    char* scBufferStart = scResponse;
+    uint32_t* size = (uint32_t*)scResponse; // Mesage length is beginning of message
+    *size = 0;
+    int iLength = 0;
+    int iCount = 0;
+    bool bSuccess = true;
+    size_t recvSize = 16383;
+
+    if (socketDesc < 0) { // Not initialized yet, let send do it
+        mtXML.unlock();
+        return nullptr;
+    }
+    do {
+        iLength = recv(socketDesc, scBufferStart, recvSize, 0);
+
+        // If we didn't get 4 byte, we don't have a valid message length, so fail
+        if (iLength < 4 + 32 + 4) {
+            bSuccess = false;
+        } else {
+            bSuccess = true;
+        }
+        // Don't cause problems with a too big "size" for the buffer
+        if (*size > recvSize) {
+            bSuccess = false;
+            break;
+        }
+        scBufferStart += iLength;
+    } while (iLength < *size && iCount++ < 1); // end of the loop that's trying to get "an entire message"
+
+    if (!bSuccess) {
+        delete[] scResponse;
+        mtXML.unlock();
+        return nullptr;
+    }
+    // Haven't been seeing this yet, so leaving it in here
+    if (iLength != *size) {
+        printf("Size mismatch: %d  %d\n", iLength, int(*size));
+    }
+    
+    // Set null character at end of the string
+    scResponse[*size] = 0;
+    mtXML.unlock();
+
+    return scResponse;
 }
 
 void FlightController::SendXML(const char* _scMessage)
@@ -493,8 +666,12 @@ void FlightController::SendXML(const char* _scMessage)
     char* scHmacMessage = nullptr;
     const char* scMessage = _scMessage;
     int iStrLen = strlen(scMessage);
+    mtXML.lock();
+    uint32_t usedSalt = uSalt++;
+    mtXML.unlock();
+
     if (scKey[0] != 0) {
-        if (!hmacMessage(scMessage, scKey, iSalt++, &scHmac, &scSaltedMessage)) {
+        if (!hmacMessage(scMessage, scKey, usedSalt, &scHmac, &scSaltedMessage)) {
             printL("Failed to HMAC message");
             return;
         }
@@ -518,7 +695,106 @@ void FlightController::SendXML(const char* _scMessage)
     #endif
 }
 
-char* FlightController::SendRecXML(const char* _scMessage)
+bool FlightController::VerifyMessage(const char* _scMessage, uint32_t uMessageLength)
+{
+    const char* scHmacOrig = _scMessage;
+    const char* scMessage = _scMessage + 32 + 4; // _scMessage is at start of digest...skip that and the salt for just the message
+    const char* scMessageAndSalt = _scMessage + 32;
+    bool bReturn = true;
+
+    // Create the message digest context
+    EVP_MD_CTX* pSslCtx = nullptr;
+    pSslCtx = EVP_MD_CTX_create();
+    if (pSslCtx == nullptr) {
+        printf("EVP_MD_CTX_create failed, error 0x%lx\n", ERR_get_error());
+        return false;
+    }
+    // Get the message digest for sha256
+    const EVP_MD* pMd = EVP_get_digestbyname("SHA256");
+    if(pMd == nullptr) {
+        printf("EVP_get_digestbyname failed, error 0x%lx\n", ERR_get_error());
+        bReturn = false;
+    }
+    // Create the hmac/sha256 digest
+    if (bReturn && (EVP_DigestInit_ex(pSslCtx, pMd, NULL) != 1)) {
+        printf("EVP_DigestInit_ex failed, error 0x%lx\n", ERR_get_error());
+        bReturn = false;
+    }
+
+    // Get the key for the hmac
+    EVP_PKEY* pKey = nullptr;
+    if (bReturn) {
+        pKey = hmacCreateKey(scKey);
+        if (pKey == nullptr) bReturn = false;
+    }
+    
+    // Attach the key to the digest
+    if (bReturn && (EVP_DigestSignInit(pSslCtx, NULL, pMd, NULL, pKey) != 1)) {
+        printf("EVP_DigestSignInit failed, error 0x%lx\n", ERR_get_error());
+        bReturn = false;
+    }
+    
+    // Add the message to the digest
+    if (bReturn && (EVP_DigestSignUpdate(pSslCtx, scMessageAndSalt, uMessageLength + 4) != 1) ) {
+        printf("EVP_DigestSignUpdate failed, error 0x%lx\n", ERR_get_error());
+        bReturn = false;
+    }
+
+    // Get the size of the digest, allocate enough room for the output
+    size_t req = 0;
+    if (bReturn && (EVP_DigestSignFinal(pSslCtx, NULL, &req) != 1)) {
+        printf("EVP_DigestSignFinal failed (1), error 0x%lx\n", ERR_get_error());
+        bReturn = false;
+    }
+    char* scHmac = nullptr;
+    if (bReturn && (req == 0)) {
+        printf("EVP_DigestSignFinal failed (2), error 0x%lx\n", ERR_get_error());
+        bReturn = false;
+    } else {
+        scHmac = (char*)OPENSSL_malloc(req);
+    }
+    if (!scHmac) {
+        printf("OPENSSL_malloc(%d) failed, error 0x%lx\n", int(req), ERR_get_error());
+        bReturn = false;
+    }
+
+    // Get the digest and verify size is correct
+    size_t slen = 0;
+    if (bReturn && (EVP_DigestSignFinal(pSslCtx, (unsigned char*)(scHmac), &slen) != 1)) {
+        printf("EVP_DigestSignFinal failed (3), error 0x%lx\n", ERR_get_error());
+        bReturn = false;
+    }
+    if (bReturn && (req != slen)) {
+        printf("EVP_DigestSignFinal failed, mismatched signature sizes %ld, %ld", req, slen);
+        bReturn = false;
+    }
+
+    if (pSslCtx) EVP_MD_CTX_destroy(pSslCtx); // Renamed EVP_MD_CTX_free in openssl 1.1.0
+    EVP_PKEY_free(pKey);
+    // Now do a quick check to make sure the digest matches (can make this faster by comparing bigger things)
+    if (bReturn) {
+        for (int i = 0; i < slen; i++) {
+            if (scHmac[i] != scHmacOrig[i]) {
+                bReturn = false;
+                printf(" Digest mismatch[Ours]: ");
+                for (int i = 0; i < slen; i++) {
+                    printf("%02x", scHmac[i]);
+                }
+                printf("\n Digest mismatch[Theirs]: ");
+                for (int i = 0; i < slen; i++) {
+                    printf("%02x", scHmacOrig[i]);
+                }
+                printf("\n");
+                break;
+            }
+        }
+    }
+
+    if (scHmac != nullptr) OPENSSL_free(scHmac);
+    return bReturn;
+}
+
+uint32_t FlightController::SendRecXML(const char* _scMessage)
 {
     #ifdef FLIGHT_CONTROLLER_TCP
     //Send some data
@@ -543,10 +819,16 @@ char* FlightController::SendRecXML(const char* _scMessage)
     char* scHmacMessage = nullptr;
     const char* scMessage = _scMessage;
     int iStrLen = strlen(scMessage);
+    // Grab the salt and save it (threads, we'll be using it to verify too)
+    mtXML.lock();
+    uint32_t usedSalt = uSalt++;
+    mtXML.unlock();
+
+    // Create the message to send
     if (scKey[0] != 0) {
-        if (!hmacMessage(scMessage, scKey, iSalt++, &scHmac, &scSaltedMessage)) {
+        if (!hmacMessage(scMessage, scKey, usedSalt, &scHmac, &scSaltedMessage)) {
             printL("Failed to HMAC message");
-            return nullptr;
+            return 0;
         }
         scHmacMessage = new char[32 + 4 + iStrLen];
         memcpy(scHmacMessage, scHmac, 32);
@@ -558,33 +840,40 @@ char* FlightController::SendRecXML(const char* _scMessage)
     mtXML.lock();
     if (socketDesc < 0) ConnectMavLink();
     sendto(socketDesc, scMessage, iStrLen, MSG_CONFIRM, (const struct sockaddr*)&addressMavLink, sizeof(addressMavLink));
-    char* scResponse = new char[512];
-    int iLength = recv(socketDesc, scResponse, 511, 0);
-    if (iLength < 0) {
-        // It failed, give it __msec then try one more time
-        std::this_thread::sleep_for(std::chrono::milliseconds(iUdpTimeoutUs / 1000));
-        iLength = recv(socketDesc, scResponse, 511, 0);
-        if (iLength < 0) {
-            // Still failed...give up
-            delete[] scResponse;
-            mtXML.unlock();
-            if (scKey[0] != 0) {
-                OPENSSL_free(scHmac);
-                delete[] scSaltedMessage;
-                delete[] scHmacMessage;
-            }
-            return nullptr;
-        }
-    }
-    scResponse[iLength] = 0;
     mtXML.unlock();
-    if (scKey[0] != 0) {
-        OPENSSL_free(scHmac);
-        delete[] scSaltedMessage;
-        delete[] scHmacMessage;
-    }
-    return scResponse;
     #endif
+    return usedSalt;
+}
+
+char* FlightController::GetUdp(uint32_t uSalt, int iTimeoutMs)
+{
+    bool bFound = false;    
+    char* buffer = nullptr;
+    do {
+        mtRecv.lock();
+        // .at() will throw exception if it doesn't exist, so try and get it
+        try{
+            buffer = mapRecv.at(uSalt);
+        } catch (std::out_of_range e)
+        {
+            // Only thing to really do here
+            buffer = nullptr;
+        }
+        if (buffer != nullptr) {
+            // If we got a buffer, clear it from the list and exit the loop
+            mapRecv.erase(uSalt);
+            mtRecv.unlock();
+            bFound = true;
+        } else {
+            // Didn't find anything, so unlock mutex and check timeout. If time left, then wait.
+            mtRecv.unlock();
+            if (iTimeoutMs <= 0) return nullptr;
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            iTimeoutMs -= 10;
+        }
+    } while (!bFound);
+    // Return whatever was found(nullptr for timeout)
+    return buffer;
 }
 
 void FlightController::ConnectMavLink()

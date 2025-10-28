@@ -1,0 +1,3 @@
+[submodule "threadLib"]
+	path = threadLib
+	url = https://${GITHUB_TOKEN}@github.com/prparsons/threadLib.git

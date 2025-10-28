@@ -6,7 +6,7 @@
 #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
 #include <thread>
 
-#include "locksignal.h"
+#include "threadLib/threadLib.hpp"
 #include "data_types.h"
 
 class CameraController;
@@ -70,8 +70,8 @@ public:
 protected:
     CameraController(uint32_t features, const char* scSimulationFile);
     void run_RS();
-    void run_CV(const char* scGStream, cv::Mat* pFrameCurrent, Signal* pSig, StopSignal* pss);
-    void run_simulation(cv::Mat* pFrameCurrent, Signal* pSig, StopSignal* pss);
+    void run_CV(const char* scGStream, cv::Mat* pFrameCurrent, Signal* pSig, Signal* pSigStop);
+    void run_simulation(cv::Mat* pFrameCurrent, Signal* pSig, Signal* pSigStop);
 
 private:
     cameraFrame_depth* pFrameCurrentDepth;
@@ -87,7 +87,7 @@ private:
 
     static const int NUM_CAMERA_THREADS = 3;
     std::thread* pthrCamera[NUM_CAMERA_THREADS];
-    StopSignal ss[NUM_CAMERA_THREADS];
+    Signal arSigStop[NUM_CAMERA_THREADS];
     Signal sigDepth;
     Signal sigRGB;
     Signal sigIR;

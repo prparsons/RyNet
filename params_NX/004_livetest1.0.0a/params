@@ -1,0 +1,11 @@
+continue
+segment_net FCN_RESNET18_DEEPSCENE_576x320
+img_slices 1
+nav_target 0
+hmac_udp SecretKey
+valid_pixels 20
+clean 2opt
+log_visited
+guide_distance 40
+guide_time 10
+depth_lowres

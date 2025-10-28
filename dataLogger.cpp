@@ -34,19 +34,19 @@ DataLogger::~DataLogger()
 
 void DataLogger::Start()
 {
-    pThread = new std::thread(&DataLogger::run, this, sigNewData, ssThread);
+    pThread = new std::thread(&DataLogger::run, this, sigNewData, sigStopThread);
 }
 
 void DataLogger::Stop()
 {
     if (pThread != nullptr) {
-        ssThread.stop();
+        sigStopThread.signal();
         if (pThread->joinable()) pThread->join();
     }
 }
 
 
-void DataLogger::run(Signal sigImage, StopSignal ss)
+void DataLogger::run(Signal sigImage, Signal sigStop)
 {
     printf("DataLogger Thread\n");
 
@@ -71,9 +71,9 @@ void DataLogger::run(Signal sigImage, StopSignal ss)
     bool bWriteImgLocal = false;
     ImageLogData dataWrite;
 
-    while (!ss.shouldStop()) {
+    while (!sigStop.isSignaled()) {
         // Wait on signal
-        sigImage.wait(1000);
+        sigImage.waitFor(1000);
 
         // check text list, if not empty write
         mt.lock();
