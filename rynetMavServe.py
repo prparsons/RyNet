@@ -116,8 +116,6 @@ parser.add_argument('--connect',
                     help="Vehicle connection target string.\nMission Planner SITL example: 'tcp:127.0.0.1:5762'\nIf not specified, dronekit SITL used")
 parser.add_argument('--port', type=int, default=3636, help="Port to listen on [default:3636]")
 parser.add_argument('--livetest', default='False', action='store_true', help='If True, will only send <obs /> messages to the drone.')
-parser.add_argument('--clean_dist_visit', type=int, default=10, help='Distance between visited points that is close enough to consider them duplicates.')
-parser.add_argument('--clean_dist_way', type=int, default=100, help='Distance from visited point that is close enough to remove a waypoint from mission list.')
 parser.add_argument('--udp_hmac', type=str, default='', help='If specified, all udp commands will be verified. String key should be provided.')
 args = parser.parse_args()
 #Testing without command line, use below
