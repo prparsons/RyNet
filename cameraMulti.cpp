@@ -72,6 +72,8 @@ CameraFrame* CameraFrame::CreateFrame(float fLat, float fLon, float fAlt, time_t
     pBrandNewFrame->fAltitude = fAlt;
     pBrandNewFrame->timeLast = time;
     source.copyTo(pBrandNewFrame->matrix);
+
+    return pBrandNewFrame;
 }
 
 void CameraFrame::SetString(std::string _strData)
