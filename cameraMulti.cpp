@@ -52,6 +52,8 @@ CameraFrame::CameraFrame()
 
 void CameraFrame::DeepCopy(const CameraFrame& source) 
 {
+    std::unique_lock<ThreadMutex> lock(mutex);
+    std::unique_lock<ThreadMutex> lockSource(source.mutex);
     timeLast = source.timeLast;
     id = source.id;
     fLat = source.fLat;
@@ -213,7 +215,7 @@ CameraController::CameraController(uint32_t _features, const char* _scSimulation
 : pFrameCurrentDepth(nullptr)
 , pCameraRS(nullptr)
 , features(_features)
-, iSimulationFrameDelay(33)
+, iSimulationFrameDelay(100)
 , pipeDepth(4)
 , pipeRGB(2)
 , pipeIR(4)
