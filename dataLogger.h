@@ -18,7 +18,7 @@ using LogReceiver_Image = ThreadPipeReceiver<CameraFrame>;
 class DataLoggerWriter
 {
 public:
-    DataLoggerWriter(LogSender_String* pStrings, LogSender_Image* pImages, LogSender_Image* pIr);
+    DataLoggerWriter(LogSender_String* pStrings, LogSender_Image* pImages, LogSender_Image* pIr, PipeSender_Mask* pMask);
     DataLoggerWriter(DataLoggerWriter& other); // Creates new Sender on same set of pipes
 
     void LogString(const char* scData);

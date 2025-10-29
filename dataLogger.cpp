@@ -15,10 +15,12 @@ void printL(const char* sc)
     printf("%s\n", sc);
 }
 
-DataLoggerWriter::DataLoggerWriter(LogSender_String* pStrings, LogSender_Image* pImages, LogSender_Image* pIr)
+DataLoggerWriter::DataLoggerWriter(LogSender_String* pStrings, LogSender_Image* pImages, LogSender_Image* pIr, PipeSender_Mask* pMask)
 : strings(pStrings)
 , images(pImages)
 , ir(pIr)
+, mask(pMask)
+
 {
 }
 
@@ -26,6 +28,7 @@ DataLoggerWriter::DataLoggerWriter(DataLoggerWriter& other)
 : strings(other.strings->CreateSender())
 , images(other.images->CreateSender())
 , ir(other.ir->CreateSender())
+, mask(other.mask->CreateSender())
 {
 }
 
@@ -120,7 +123,7 @@ void DataLogger::Stop()
 
 DataLoggerWriter* DataLogger::GetLogger()
 {
-    return new DataLoggerWriter(pipeStrings.CreateSender(), pipeImage.CreateSender(), pipeIR.CreateSender());
+    return new DataLoggerWriter(pipeStrings.CreateSender(), pipeImage.CreateSender(), pipeIR.CreateSender(), pipeMask.CreateSender());
 }
 
 void DataLogger::run(Signal sigStop)
