@@ -546,7 +546,7 @@ void FlightController::runPointLogger(Signal sigStop)
     GetPosition(fLat, fLon);
     GetAltitude(fAlt);
     // Strings used for storing all the parts of the gpx/kml files
-    std::list<std::string> strlTrackGpx;//std::string strTrackGpx;
+    std::list<std::string> strlTrackGpx;
     std::list<std::string> strlDetectionGpx;
     std::list<std::string> strlPathDocKml;
     std::list<std::string> strlPathPtsKml;
@@ -1257,21 +1257,16 @@ std::string FlightController::GpxStartTrackSeg(std::string strSegmentType)
 
 std::string FlightController::GpxTrackPoint(float fLat, float fLon, float fElev)
 {
-    std::string strGpx = "<trkpt lat=\"";
-    strGpx += fLat;
-    strGpx += "\" lon=\"";
-    strGpx += fLon;
-    strGpx += "\"><ele>";
-    strGpx += fElev;
-    strGpx += "</ele><time>";
+    std::stringstream ss;
+    ss << "<trkpt lat=\"" << fLat << "\" lon=\"" << fLon << "\"><ele>" << fElev << "</ele><time>";
 
     time_t timeNow = time(nullptr);
     std::tm* timeStruct = gmtime(&timeNow);
-    std::stringstream ss;
     ss << std::put_time(timeStruct, "%F") << "T" << std::put_time(timeStruct, "%T") << "Z";
 
-    strGpx += ss.str();
-    strGpx += "</time></trkpt>\n";
+    ss << "</time></trkpt>\n";
+
+    return ss.str();
 }
 
 std::string FlightController::GpxEndTrackSeg()
@@ -1281,12 +1276,9 @@ std::string FlightController::GpxEndTrackSeg()
 
 std::string FlightController::GpxWaypoint(std::string strDesc, float fLat, float fLon)
 {
-    std::string strGpx = "<wpt lat=\"";
-    strGpx += fLat;
-    strGpx += "\" lon=\"";
-    strGpx += fLon;
-    strGpx += "\"><desc>" + strDesc + "</desc></wpt>\n";
-    return strGpx;
+    std::stringstream ss;
+    ss << "<wpt lat=\"" << fLat << "\" lon=\"" << fLon << "\"><desc>" << strDesc << "</desc></wpt>\n";
+    return ss.str();
 }
 
 std::string FlightController::KmlProlog()
@@ -1331,16 +1323,12 @@ std::string FlightController::KmlStartPath(std::string strDesc, KmlPathStyle sty
 
 std::pair<std::string, std::string> FlightController::KmlPathPoint(float fLat, float fLon, float fElev)
 {
-    std::string strCoord;
-    strCoord += fLon;
-    strCoord += ",";
-    strCoord += fLat;
-    strCoord += ",";
-    strCoord += fElev;
+    std::stringstream ss;
+    ss << fLon << "," << fLat << "," << fElev;
 
     std::string strWpt = KmlWaypoint("Drone Path point", "", fLat, fLon, true);
 
-    return std::make_pair(strCoord, strWpt);
+    return std::make_pair(ss.str(), strWpt);
 }
 
 std::string FlightController::KmlEndPath(std::list<std::string> strlPathPoints)
@@ -1360,60 +1348,42 @@ std::string FlightController::KmlEndPath(std::list<std::string> strlPathPoints)
 
 std::string FlightController::KmlWaypoint(std::string strName, std::string strDesc, float fLat, float fLon, bool bTime)
 {
-    std::string strWpt;
-    strWpt += "<Placemark>\n"\
-                "<name>";
-    strWpt += strName + "</name>\n";
-    strWpt +=   "<description>";
-    strWpt += strDesc + "</description>\n";
+    std::stringstream ss;
+    ss << "<Placemark>\n"\
+                "<name>" << strName << "</name>\n";
+    ss <<       "<description>" << strDesc << "</description>\n";
     //todo<altitudeMode>
     if (bTime) {
         time_t timeNow = time(nullptr);
         std::tm* timeStruct = gmtime(&timeNow);
-        std::stringstream ss;
+        ss << "<TimeStamp><when>";
         ss << std::put_time(timeStruct, "%F") << "T" << std::put_time(timeStruct, "%T") << "Z";
-        strWpt += "<TimeStamp><when>";
-        strWpt += ss.str();
-        strWpt += "</when></TimeStamp>\n";
+        ss << "</when></TimeStamp>\n";
     }
-    strWpt +=   "<Point>\n"\
-                    "<coordinates>";
-    strWpt += fLon;
-    strWpt += ",";
-    strWpt += fLat;
-    //todo,altitude</coordinates>
-    strWpt +=       "</coordinates>\n"\
+    ss <<       "<Point>\n"\
+                    "<coordinates>" << fLon << "," << fLat << /*//todo,altitude*/ "</coordinates>\n"\
                 "</Point>\n"\
             "</Placemark>\n";
 
-    return strWpt;
+    return ss.str();
 }
 
 std::string FlightController::KmlHabitatOverlay(const ImageLogData& data, std::string strFilename)
 {
-    std::string strHab;
-    strHab += "<GroundOverlay>\n"\
-                "<name>";
-    strHab += "Habitat Detection</name>\n<description>";
     //todo masks should have a way to be associated with the image
-    strHab += "Overlay of the image that triggered the habitat detection.</description>\n<Icon><href>images/";
-    strHab += strFilename;
-    strHab +=   "</href></Icon>\n"\
-                "<LatLonBox>\n"\
-                    "<north>";
-    strHab += (data.GetLat() + 0.0005);
-    strHab += "</north>\n<south>";
-    strHab += (data.GetLat() - 0.0005);
-    strHab += "</south>\n<east>";
-    strHab += (data.GetLon() - 0.0005);
-    strHab += "</east>\n<west>";
-    strHab += (data.GetLon() + 0.0005);
-    strHab +=       "</west>\n"\
-                    "<rotation>";
-    strHab += data.GetHeading();
-    strHab +=       "</rotation>\n"\
+    std::stringstream ss;
+    ss << "<GroundOverlay>\n"\
+                "<name>" << "Habitat Detection</name>\n"\
+                "<description>Overlay of the image that triggered the habitat detection.</description>\n"\
+                "<Icon><href>images/" << strFilename << "</href></Icon>\n"\
+                "<LatLonBox>\n";
+    ss <<           "<north>" << (data.GetLat() + 0.0005) << "</north>\n"\
+                    "<south>" << (data.GetLat() - 0.0005) << "</south>\n"\
+                    "<east>" << (data.GetLon() - 0.0005) << "</east>\n"\
+                    "<west>" << (data.GetLon() + 0.0005) << "</west>\n"\
+                    "<rotation>" << data.GetHeading() << "</rotation>\n"\
                 "</LatLonBox>\n"\
             "</GroundOverlay>";
 
-    return strHab;
+    return ss.str();
 }
