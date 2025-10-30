@@ -407,7 +407,7 @@ bool Arguments::Parse()
             else if (strcmp("--depth_lowres", argv[i]) == 0) bDepthLowRes = true;
             else if (strcmp("--run_flir", argv[i]) == 0) bRunFlir = true;
             else if (strcmp("--gpx", argv[i]) == 0) bGpx = true;
-            else if (strcmp("--kml", argv[i]) == 0) bKml = true;
+            else if (strcmp("--kml", argv[i]) == 0) bKml = true;//todo doesnt work without log_visited
             else if (strcmp("--hmac_udp", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = UDP_KEY;

@@ -546,12 +546,12 @@ void FlightController::runPointLogger(Signal sigStop)
     GetPosition(fLat, fLon);
     GetAltitude(fAlt);
     // Strings used for storing all the parts of the gpx/kml files
-    std::string strTrackGpx;
-    std::string strDetectionGpx;
-    std::string strPathDocKml;
-    std::string strPathPtsKml;
-    std::string strDetectionKml; // Waypoints of detections
-    std::string strSegmentationKml; // Overlays of habitat
+    std::list<std::string> strlTrackGpx;//std::string strTrackGpx;
+    std::list<std::string> strlDetectionGpx;
+    std::list<std::string> strlPathDocKml;
+    std::list<std::string> strlPathPtsKml;
+    std::list<std::string> strlDetectionKml; // Waypoints of detections
+    std::list<std::string> strlSegmentationKml; // Overlays of habitat
     // File names
     char scFileNameGpx[128];
     time_t timeNow = time(nullptr);
@@ -597,7 +597,7 @@ void FlightController::runPointLogger(Signal sigStop)
             printL(" failed to save KML");//todo throw exception?, bail the whole thing? crash the drone?
         }
         
-        strPathDocKml = KmlStartPath("Start of drone flight - AUTO", KmlPathStyle::AUTO);
+        strlPathDocKml.push_back(KmlStartPath("Start of drone flight - AUTO", KmlPathStyle::AUTO));
     }
     
 
@@ -613,10 +613,10 @@ void FlightController::runPointLogger(Signal sigStop)
                 bValidPos = true;
                 GetAltitude(fAlt);
 
-                strTrackGpx += GpxTrackPoint(fLat, fLon, fAlt);
+                strlTrackGpx.push_back(GpxTrackPoint(fLat, fLon, fAlt));
                 std::pair<std::string, std::string> kmlStrings = KmlPathPoint(fLat, fLon, fAlt);
-                strPathDocKml += kmlStrings.first;
-                strPathPtsKml += kmlStrings.second;
+                strlPathDocKml.push_back(kmlStrings.first);
+                strlPathPtsKml.push_back(kmlStrings.second);
 
                 mtPoints.lock();
                 startLocation.InsertPoint(fLat, fLon);
@@ -628,11 +628,11 @@ void FlightController::runPointLogger(Signal sigStop)
             }
             if (!bGuided) {
                 // Just switched to AUTO from GUIDED, so clear visited points
-                strTrackGpx += GpxEndTrackSeg();
-                strTrackGpx += GpxStartTrackSeg("AUTO");
-                strPathDocKml += KmlEndPath(strPathPtsKml);
-                strPathDocKml += KmlStartPath("Drone Path - AUTO", KmlPathStyle::AUTO);
-                strPathPtsKml = "";
+                strlTrackGpx.push_back(GpxEndTrackSeg());
+                strlTrackGpx.push_back(GpxStartTrackSeg("AUTO"));
+                strlPathDocKml.push_back(KmlEndPath(strlPathPtsKml));
+                strlPathDocKml.push_back(KmlStartPath("Drone Path - AUTO", KmlPathStyle::AUTO));
+                strlPathPtsKml.clear();
 
                 mtPoints.lock();
                 startLocation.ResetPosition(fLat, fLon);
@@ -646,11 +646,11 @@ void FlightController::runPointLogger(Signal sigStop)
                 bGuided = strcmp(scMode, "GUIDED") == 0;
                 if (bGuided) {
                     // Just switched to GUIDED from AUTO
-                    strTrackGpx += GpxEndTrackSeg();
-                    strTrackGpx += GpxStartTrackSeg("GUIDED");
-                    strPathDocKml += KmlEndPath(strPathPtsKml);
-                    strPathDocKml += KmlStartPath("Drone Path - GUIDED", KmlPathStyle::GUIDED);
-                    strPathPtsKml = "";
+                    strlTrackGpx.push_back(GpxEndTrackSeg());
+                    strlTrackGpx.push_back(GpxStartTrackSeg("GUIDED"));
+                    strlPathDocKml.push_back(KmlEndPath(strlPathPtsKml));
+                    strlPathDocKml.push_back(KmlStartPath("Drone Path - GUIDED", KmlPathStyle::GUIDED));
+                    strlPathPtsKml.clear();
 
                     mtPoints.lock();
                     startLocation.ResetPosition(fLat, fLon);//todo did we do this if bad point before?
@@ -658,10 +658,10 @@ void FlightController::runPointLogger(Signal sigStop)
                 }
             }
             if (bValidPos) {
-                strTrackGpx += GpxTrackPoint(fLat, fLon, fAlt);
+                strlTrackGpx.push_back(GpxTrackPoint(fLat, fLon, fAlt));
                 std::pair<std::string, std::string> kmlStrings = KmlPathPoint(fLat, fLon, fAlt);
-                strPathDocKml += kmlStrings.first;
-                strPathPtsKml += kmlStrings.second;
+                strlPathDocKml.push_back(kmlStrings.first);
+                strlPathPtsKml.push_back(kmlStrings.second);
             }
         }
 
@@ -670,14 +670,14 @@ void FlightController::runPointLogger(Signal sigStop)
         if (pipeDetect.DataReady()) {
             std::shared_ptr<ImageLogData> pWaypoint;
             while (pipeDetect.RetrieveData(pWaypoint, 0)) {
-                strDetectionGpx += GpxWaypoint(pWaypoint->GetString(), pWaypoint->GetLat(), pWaypoint->GetLon());
-                strDetectionKml += KmlWaypoint("Detection", pWaypoint->GetString(), pWaypoint->GetLat(), pWaypoint->GetLon(), false);
+                strlDetectionGpx.push_back(GpxWaypoint(pWaypoint->GetString(), pWaypoint->GetLat(), pWaypoint->GetLon()));
+                strlDetectionKml.push_back(KmlWaypoint("Detection", pWaypoint->GetString(), pWaypoint->GetLat(), pWaypoint->GetLon(), false));
             }
         }
         if (pipeSegment.DataReady()) {
             std::shared_ptr<std::pair<ImageLogData, std::string>> pWaypoint;
             while (pipeSegment.RetrieveData(pWaypoint, 0)) {
-                strSegmentationKml += KmlHabitatOverlay(pWaypoint->first, pWaypoint->second);
+                strlSegmentationKml.push_back( KmlHabitatOverlay(pWaypoint->first, pWaypoint->second));
             }
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -689,7 +689,14 @@ void FlightController::runPointLogger(Signal sigStop)
         std::fstream fileGpx;
         fileGpx.open(scFileNameGpx, std::ios::out | std::ios::app);
         if (fileGpx) {
-            fileGpx << strTrackGpx << GpxEndTrackSeg() << strDetectionGpx << "</gpx>";
+            for (std::list<std::string>::iterator iter(strlTrackGpx.begin()); iter != strlTrackGpx.end(); iter++) {
+                fileGpx << *iter;
+            }
+            fileGpx << GpxEndTrackSeg();
+            for (std::list<std::string>::iterator iter(strlDetectionGpx.begin()); iter != strlDetectionGpx.end(); iter++) {
+                fileGpx << *iter;
+            }
+            fileGpx << "</gpx>";
             fileGpx.close();
         } else {
             printL(" failed to save GPX");//todo throw exception?, bail the whole thing? crash the drone?
@@ -700,7 +707,16 @@ void FlightController::runPointLogger(Signal sigStop)
         std::fstream fileKml;
         fileKml.open(scFileNameKml, std::ios::out | std::ios::app);
         if (fileKml) {
-            fileKml << strPathDocKml << KmlEndPath(strPathPtsKml) << strDetectionKml << strSegmentationKml;
+            for (std::list<std::string>::iterator iter(strlPathDocKml.begin()); iter != strlPathDocKml.end(); iter++) {
+                fileKml << *iter;
+            }
+            fileKml << KmlEndPath(strlPathPtsKml);
+            for (std::list<std::string>::iterator iter(strlDetectionKml.begin()); iter != strlDetectionKml.end(); iter++) {
+                fileKml << *iter;
+            }
+            for (std::list<std::string>::iterator iter(strlSegmentationKml.begin()); iter != strlSegmentationKml.end(); iter++) {
+                fileKml << *iter;
+            };
             //todo in a document << strDetectionKml;//segmentation
             fileKml << "</Folder></kml>";
             fileKml.close();
@@ -1327,13 +1343,16 @@ std::pair<std::string, std::string> FlightController::KmlPathPoint(float fLat, f
     return std::make_pair(strCoord, strWpt);
 }
 
-std::string FlightController::KmlEndPath(std::string strPathPoints)
+std::string FlightController::KmlEndPath(std::list<std::string> strlPathPoints)
 {
     std::string strPathDoc;
     strPathDoc += "</coordinates>\n"\
                 "</LineString>\n"\
             "</Placemark>\n";
-    strPathDoc += strPathPoints + "</Document>";
+    for (std::list<std::string>::iterator iter(strlPathPoints.begin()); iter != strlPathPoints.end(); iter++) {
+        strPathDoc += *iter;
+    }
+    strPathDoc += "</Document>";
     return strPathDoc;
 }
 
