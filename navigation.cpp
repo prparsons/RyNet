@@ -38,8 +38,8 @@ ObjectDetection::~ObjectDetection()
 void ObjectDetection::SetNewImage(const CameraFrame& frm)
 {
     mt.lock();
-    if (pFrmRecent == nullptr) pFrmRecent = new CameraFrame();
-    pFrmRecent->DeepCopy(frm); // Want this to be a deep copy for access to cv::Mat&
+    if (pFrmRecent != nullptr) delete pFrmRecent;
+    pFrmRecent = frm.DeepCopy(); // Want this to be a deep copy for access to cv::Mat&
     mt.unlock();
     sigNewImage.signal();
 }
@@ -213,8 +213,8 @@ float TerrainSegmentation::GetHabitatDirection()
 void TerrainSegmentation::SetNewImage(const CameraFrame& frm)
 {
     mt.lock();
-    if (pFrmRecent == nullptr) pFrmRecent = new CameraFrame();
-    pFrmRecent->DeepCopy(frm);
+    if (pFrmRecent != nullptr) delete pFrmRecent;
+    pFrmRecent = frm.DeepCopy();
     mt.unlock();
     sigNewImage.signal();
 }

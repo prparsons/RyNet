@@ -50,19 +50,21 @@ CameraFrame::CameraFrame()
     scFileName[0] = 0;
 }
 
-void CameraFrame::DeepCopy(const CameraFrame& source) 
+CameraFrame* CameraFrame::DeepCopy()  const
 {
     std::unique_lock<ThreadMutex> lock(mutex);
-    std::unique_lock<ThreadMutex> lockSource(source.mutex);
-    timeLast = source.timeLast;
-    id = source.id;
-    fLat = source.fLat;
-    fLon = source.fLat;
-    fHeading = source.fHeading;
-    fAltitude = source.fAltitude;
-    fPitch = source.fPitch;
-    source.matrix.copyTo(matrix);
-    bIsDeepCopy = true;
+    CameraFrame* pNew = new CameraFrame();
+    pNew->bIsDeepCopy = true;
+
+    pNew->timeLast = timeLast;
+    pNew->id = id;
+    pNew->fLat = fLat;
+    pNew->fLon = fLat;
+    pNew->fHeading = fHeading;
+    pNew->fAltitude = fAltitude;
+    pNew->fPitch = fPitch;
+    matrix.copyTo(pNew->matrix);
+    return pNew;
 }
 CameraFrame* CameraFrame::CreateFrame(float fLat, float fLon, float fAlt, time_t time, cv::Mat& source)
 {

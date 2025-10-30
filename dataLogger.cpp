@@ -34,8 +34,7 @@ DataLoggerWriter::DataLoggerWriter(DataLoggerWriter& other)
 
 void DataLoggerWriter::LogImage(const CameraFrame& frm, std::string strData)
 {
-    CameraFrame* pNew = new CameraFrame();
-    pNew->DeepCopy(frm);
+    CameraFrame* pNew = frm.DeepCopy();
     pNew->SetString(pNew->GetString() + strData);
 
     if (!images->AddData(pNew, 0)) {//todo timeouts?
@@ -45,8 +44,7 @@ void DataLoggerWriter::LogImage(const CameraFrame& frm, std::string strData)
 
 void DataLoggerWriter::LogImageIr(const CameraFrame& frm)
 {
-    CameraFrame* pNew = new CameraFrame();
-    pNew->DeepCopy(frm);
+    CameraFrame* pNew = frm.DeepCopy();
 
     if (!ir->AddData(pNew, 0)) {//todo timeouts?
         delete pNew;
@@ -219,9 +217,10 @@ void DataLogger::WriteImageData(CameraFrame& frame)
 
 void DataLogger::SaveImage(std::string, CameraFrame& image)
 {
-    CameraFrame imageCopy;
-    imageCopy.DeepCopy(image); // So we get access to cv::Mat&
+    CameraFrame* imageCopy = image.DeepCopy(); // So we get access to cv::Mat&
 
-    WriteImageData(imageCopy);
-    cv::imwrite(image.GetFilename(), imageCopy.GetMatrix());
+    WriteImageData(*imageCopy);
+    cv::imwrite(image.GetFilename(), imageCopy->GetMatrix());
+
+    delete imageCopy;
 }

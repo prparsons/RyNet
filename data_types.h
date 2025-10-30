@@ -59,7 +59,7 @@ class CameraFrame: public ImageLogData {
 public:
     CameraFrame();
     
-    void DeepCopy(const CameraFrame& other);
+    CameraFrame* DeepCopy() const;
     static CameraFrame* CreateFrame(float fLat, float fLon, float fAlt, time_t time, cv::Mat& source); // Deep copy
 
     void SetString(std::string strData);
