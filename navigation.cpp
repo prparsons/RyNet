@@ -226,9 +226,17 @@ void TerrainSegmentation::Start()
 
 void TerrainSegmentation::run(Signal sig, Signal sigStop)
 {
+    //todo
+    /*
+    ObjectDetection::run Frames Processed:1650
+    TerrainSegmentation::run Frames Processed: 1694
+    There shouldn't be any way for above to be greater than below; possibly pipe bug, it'll let non-required receivers re-read...
+    CameraController::run_simulation Frames Read: 232
+    */
     printL("TerrainSegmentation::run");
     int iFramesProcessed = 0;
     CameraFrame* pFrmProcess = nullptr;
+    time_t timeLastImageSave = 0;
 
     while (!sigStop.isSignaled()) {
         sig.waitFor(1000);
@@ -254,10 +262,13 @@ void TerrainSegmentation::run(Signal sig, Signal sigStop)
             // Log the image itself
             pLogger->LogImage(*pFrmProcess, "segment");
             // Save the detection to the kml file
-            std::pair<ImageLogData, std::string>* pNewKmlPair = new std::pair<ImageLogData, std::string>;
-            pNewKmlPair->first = *pFrmProcess;
-            pNewKmlPair->second = pFrmProcess->GetFilename();
-            if (!pSegmentLogger->AddData(pNewKmlPair, 50)) delete pNewKmlPair;
+            if (pFrmProcess->GetTime() > timeLastImageSave && pFrmProcess->GetTime() - timeLastImageSave > 5) { // Don't save too many image
+                timeLastImageSave = pFrmProcess->GetTime();
+                std::pair<ImageLogData, std::string>* pNewKmlPair = new std::pair<ImageLogData, std::string>;
+                pNewKmlPair->first = *pFrmProcess;
+                pNewKmlPair->second = pFrmProcess->GetFilename();
+                if (!pSegmentLogger->AddData(pNewKmlPair, 50)) delete pNewKmlPair;
+            }
         }
         delete pFrmProcess;
         pFrmProcess = nullptr;

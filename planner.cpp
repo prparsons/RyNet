@@ -599,6 +599,8 @@ void FlightController::runPointLogger(Signal sigStop)
         
         strlPathDocKml.push_back(KmlStartPath("Start of drone flight - AUTO", KmlPathStyle::AUTO));
     }
+    time_t& timeLastDetailPoint = timeNow;
+    timeLastDetailPoint = 0;
     
 
     // Main loop
@@ -616,7 +618,11 @@ void FlightController::runPointLogger(Signal sigStop)
                 strlTrackGpx.push_back(GpxTrackPoint(fLat, fLon, fAlt));
                 std::pair<std::string, std::string> kmlStrings = KmlPathPoint(fLat, fLon, fAlt);
                 strlPathDocKml.push_back(kmlStrings.first);
-                strlPathPtsKml.push_back(kmlStrings.second);
+                if (time(nullptr) - timeLastDetailPoint > 5) {
+                    // Don't save too many of these more detailed points
+                    timeLastDetailPoint = time(nullptr);
+                    strlPathPtsKml.push_back(kmlStrings.second);
+                }
 
                 mtPoints.lock();
                 startLocation.InsertPoint(fLat, fLon);
@@ -661,7 +667,11 @@ void FlightController::runPointLogger(Signal sigStop)
                 strlTrackGpx.push_back(GpxTrackPoint(fLat, fLon, fAlt));
                 std::pair<std::string, std::string> kmlStrings = KmlPathPoint(fLat, fLon, fAlt);
                 strlPathDocKml.push_back(kmlStrings.first);
-                strlPathPtsKml.push_back(kmlStrings.second);
+                if (time(nullptr) - timeLastDetailPoint > 5) {
+                    // Don't save too many of these more detailed points
+                    timeLastDetailPoint = time(nullptr);
+                    strlPathPtsKml.push_back(kmlStrings.second);
+                }
             }
         }
 
