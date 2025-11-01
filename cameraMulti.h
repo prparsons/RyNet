@@ -11,23 +11,29 @@
 
 class CameraController;
 
-class cameraFrame_depth:protected rs2::depth_frame {
+class cameraFrame_depth {
 public:
+    cameraFrame_depth();
+    cameraFrame_depth(cameraFrame_depth& other);
     cameraFrame_depth(const rs2::depth_frame& _frame);
     ~cameraFrame_depth();
 
-    float getMetersPerUnit() const { return get_units(); }
+    float getMetersPerUnit() const;
 
-    int getWidth() const { return get_width(); }
-    int getHeight() const { return get_height(); }
-    const uint16_t* getData() const { return (const uint16_t*)get_data(); }
+    int getWidth() const;
+    int getHeight() const;
+    const uint16_t* getData() const;
     void applyDecimationFilter();
 
 private:
+    rs2::depth_frame* pFrame;
     rs2::decimation_filter* pDownsample;
 };
 
-class InterruptStop {
+using PipeSenderDepth = ThreadPipeSender<cameraFrame_depth>;
+using PipeReceiverDepth = ThreadPipeReceiver<cameraFrame_depth>;
+
+class I_InterruptStop {
 public:
     virtual void SignalStop() = 0;
 };
@@ -46,37 +52,32 @@ public:
 #define CameraController_Accel 0x20
 #define CameraController_LowResDepth 0x40
 
-class CameraController:public InterruptStop {
+class CameraController:public I_InterruptStop {
 public:
     ~CameraController();
 
     static CameraController* OpenCamera(uint32_t features, const char* scSimulationFile = nullptr);
 
     // Must delete returned pointers
-    cameraFrame_depth* GetFrameDepth();
-    rs2_vector GetFrameAccel();
-    bool GetFrameRGB(CameraFrame& imgCopy);
-    bool GetFrameIR(CameraFrame& imgCopy);
-    Signal GetSignalDepth();
-    Signal GetSignalRGB();
-    Signal GetSignalIR();
+    PipeReceiver_Image* GetPipeRGB();
+    PipeReceiver_Image* GetPipeIR();
+    PipeReceiverDepth* GetPipeDepth();
 
     void Start();
     void Stop();
 
-    virtual void SignalStop();
+    void SignalStop() override;
     void JoinDepth();
 
 protected:
     CameraController(uint32_t features, const char* scSimulationFile);
     void run_RS();
-    void run_CV(const char* scGStream, cv::Mat* pFrameCurrent, Signal* pSig, Signal* pSigStop);
-    void run_simulation(cv::Mat* pFrameCurrent, Signal* pSig, Signal* pSigStop);
+    void run_CV(const char* scGStream, PipeSender_Image& pipe, Signal* pSigStop);
+    void run_simulation(PipeSender_Image& pipe, Signal* pSigStop);
 
 private:
     cameraFrame_depth* pFrameCurrentDepth;
     rs2_vector FrameCurrentAccel;
-    cv::Mat FrameCurrentRGB;
     cv::Mat FrameCurrentIR;
     ThreadMutex m;
 
@@ -88,7 +89,8 @@ private:
     static const int NUM_CAMERA_THREADS = 3;
     std::thread* pthrCamera[NUM_CAMERA_THREADS];
     Signal arSigStop[NUM_CAMERA_THREADS];
-    Signal sigDepth;
-    Signal sigRGB;
-    Signal sigIR;
+
+    PipeSenderDepth pipeDepth;
+    PipeSender_Image pipeRGB;
+    PipeSender_Image pipeIR;
 };

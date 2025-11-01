@@ -9,11 +9,13 @@ segNet::NetworkType networkSegmentation = segNet::FCN_RESNET18_VOC_512x320;
 
 // ** ObjectDetection
 
-ObjectDetection::ObjectDetection(DataLogger& _logger)
+ObjectDetection::ObjectDetection(DataLoggerWriter* _pDataLogger, PipeSender_ImageData* _pLocationLogger)
 : iNumSlices(3)
-, logger(_logger)
+, pDataLogger(_pDataLogger)
+, pLocationLogger(_pLocationLogger)
 , pNetwork(nullptr)
 , pThread(nullptr)
+, pFrmRecent(nullptr)
 {
     pNetwork = detectNet::Create(networkDetection);
 	//detectNet* net = detectNet::Create(detectNet::SSD_MOBILENET_V2, 0.5f, 1, TYPE_FASTEST, DEVICE_DLA_0);DEVICE_DLA_1 DEVICE_GPU
@@ -22,25 +24,29 @@ ObjectDetection::ObjectDetection(DataLogger& _logger)
 
 ObjectDetection::~ObjectDetection()
 {
-    if (pNetwork != nullptr) delete pNetwork;
     if (pThread != nullptr) {
         sigStopMain.signal();
         if (pThread->joinable()) pThread->join();
         delete pThread;
     }
+    if (pNetwork != nullptr) delete pNetwork;
+    if (pLocationLogger) delete pLocationLogger;
+    if (pDataLogger) delete pDataLogger;
+    if (pFrmRecent) delete pFrmRecent;
 }
 
-void ObjectDetection::SetNewImage(CameraFrame& frm)
+void ObjectDetection::SetNewImage(const CameraFrame& frm)
 {
     mt.lock();
-    frmRecent.DeepCopy(frm);
+    if (pFrmRecent != nullptr) delete pFrmRecent;
+    pFrmRecent = frm.DeepCopy(); // Want this to be a deep copy for access to cv::Mat&
     mt.unlock();
     sigNewImage.signal();
 }
 
 bool ObjectDetection::ProcessImage(CameraFrame& frm)
 {
-    cv::Mat& _imgRGB = frm.matrix;
+    cv::Mat& _imgRGB = frm.GetMatrix();
     cv::Mat imgRGB;
     cv::resize(_imgRGB, imgRGB, cv::Size(_imgRGB.cols / 2, _imgRGB.rows / 2), cv::INTER_LINEAR);
     // 1080x1920 -> 540x960  --- 3 images at 540x320
@@ -81,7 +87,13 @@ bool ObjectDetection::ProcessImage(CameraFrame& frm)
                     int(arDetections[i].Top), 
                     int(arDetections[i].Right), 
                     int(arDetections[i].Bottom));
-            logger.LogString(sc);
+            pDataLogger->LogString(sc);
+            frm.SetString(sc);
+            // Now log the waypoint to the GPX file
+            ImageLogData* pNewData = new ImageLogData(frm);
+            if (!pLocationLogger->AddData(pNewData, 500)) {
+                delete pNewData;
+            }
         }
     }
 
@@ -92,19 +104,28 @@ bool ObjectDetection::ProcessImage(CameraFrame& frm)
 void ObjectDetection::run(Signal sig, Signal sigStop)
 {
     printL("ObjectDetection::run");
-    CameraFrame frmProcess;
+    CameraFrame* pFrmProcess = nullptr;
     int iFramesProcessed = 0;
     while (!sigStop.isSignaled()) {
         sig.waitFor(1000);
+        sig.reset();
         mt.lock();
-        frmProcess = frmRecent; // This doesn't need to be a deep copy
+        pFrmProcess = pFrmRecent;
+        pFrmRecent = nullptr;
         mt.unlock();
-        if (frmProcess.matrix.empty()) continue;
+        if (pFrmProcess == nullptr) continue;
+        if (pFrmProcess->GetMatrix().empty()) { // Not sure it would be, but easy enough to check
+            delete pFrmProcess;
+            pFrmProcess = nullptr;
+            continue;
+        }
         iFramesProcessed++;
 
-        if (ProcessImage(frmProcess)) {
-            logger.LogImage(frmProcess, "detect");
+        if (ProcessImage(*pFrmProcess)) {
+            pDataLogger->LogImage(*pFrmProcess, "detect");
         }
+        delete pFrmProcess;
+        pFrmProcess = nullptr;
     }
     printf("ObjectDetection::run Frames Processed:%d\n", iFramesProcessed);
 }
@@ -140,17 +161,19 @@ bool ObjectDetection::SetNetwork(const char* scNetwork)
 
 // ** TerrainSegmentation
 
-TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
+TerrainSegmentation::TerrainSegmentation(DataLoggerWriter* _pLogger, PipeSender_SegmentData* _pSegmentLogger)
 : bHabitatVisible(false)
 , uTargetClass(HABITAT)
 , iNumSlices(3)
 , fImageFOV(50) // I calculated this number based on the imx477 sensor size with a 6mm lens
-, logger(_logger)
+, pLogger(_pLogger)
+, pSegmentLogger(_pSegmentLogger)
 , pMask(nullptr)
 , pThread(nullptr)
 , uMaskWidth(0)
 , uMaskHeight(0)
 , uValidNumPixels(18)
+, pFrmRecent(nullptr)
 {
     pNetwork = segNet::Create(networkSegmentation);//FCN_RESNET18_SUNRGB_640x512);//segNet::FCN_RESNET18_DEEPSCENE_576x320);FCN_ALEXNET_AERIAL_FPV_720p
 //  static segNet* Create( NetworkType networkType=FCN_ALEXNET_CITYSCAPES_SD, uint32_t maxBatchSize=DEFAULT_MAX_BATCH_SIZE,
@@ -159,12 +182,16 @@ TerrainSegmentation::TerrainSegmentation(DataLogger& _logger)
 
 TerrainSegmentation::~TerrainSegmentation()
 {
-    if (pMask != nullptr) delete[] pMask;// cudaFree(pMask);
     if (pThread != nullptr) {
         sigStopMain.signal();
         if (pThread->joinable()) pThread->join();
         delete pThread;
     }
+    if (pMask != nullptr) delete[] pMask;// cudaFree(pMask);
+    if (pFrmRecent) delete pFrmRecent;
+    if (pLogger) delete pLogger;
+    if (pNetwork) delete pNetwork;
+    if (pSegmentLogger) delete pSegmentLogger;
 }
 
 bool TerrainSegmentation::IsHabitatVisible()
@@ -183,10 +210,11 @@ float TerrainSegmentation::GetHabitatDirection()
     return fReturn;
 }
 
-void TerrainSegmentation::SetNewImage(CameraFrame& frm)
+void TerrainSegmentation::SetNewImage(const CameraFrame& frm)
 {
     mt.lock();
-    frmRecent.DeepCopy(frm);
+    if (pFrmRecent != nullptr) delete pFrmRecent;
+    pFrmRecent = frm.DeepCopy();
     mt.unlock();
     sigNewImage.signal();
 }
@@ -198,26 +226,52 @@ void TerrainSegmentation::Start()
 
 void TerrainSegmentation::run(Signal sig, Signal sigStop)
 {
+    //todo
+    /*
+    ObjectDetection::run Frames Processed:1650
+    TerrainSegmentation::run Frames Processed: 1694
+    There shouldn't be any way for above to be greater than below; possibly pipe bug, it'll let non-required receivers re-read...
+    CameraController::run_simulation Frames Read: 232
+    */
     printL("TerrainSegmentation::run");
-    CameraFrame frmProcess;
     int iFramesProcessed = 0;
+    CameraFrame* pFrmProcess = nullptr;
+    time_t timeLastImageSave = 0;
 
     while (!sigStop.isSignaled()) {
         sig.waitFor(1000);
+        sig.reset();
         mt.lock();
-        frmProcess = frmRecent; // This doesn't need to be a deep copy?
+        pFrmProcess = pFrmRecent;
+        pFrmRecent = nullptr;
         mt.unlock();
-        if (frmProcess.matrix.empty()) continue;
+        if (pFrmProcess == nullptr) continue;
+        if (pFrmProcess->GetMatrix().empty()) {
+            delete pFrmProcess;
+            pFrmProcess = nullptr;
+            continue;
+        }
         
         iFramesProcessed++;
-        if (ProcessImage(frmProcess)) {
-            logger.LogImage(frmProcess, "segment");
+        if (ProcessImage(*pFrmProcess)) {
             char sc[128];
-            mt.lock();
-            sprintf(sc, "Good Habitat Found %2.2f [Image:%d]", fBestDirection, frmProcess.GetId());
-            mt.unlock();
-            logger.LogString(sc);
+            sprintf(sc, "Good Habitat Found %2.2f [Image:%d]", fBestDirection, pFrmProcess->GetId());
+            // Log string about habitat
+            pLogger->LogString(sc);
+            pFrmProcess->SetString(sc);
+            // Log the image itself
+            pLogger->LogImage(*pFrmProcess, "segment");
+            // Save the detection to the kml file
+            if (pFrmProcess->GetTime() > timeLastImageSave && pFrmProcess->GetTime() - timeLastImageSave > 5) { // Don't save too many image
+                timeLastImageSave = pFrmProcess->GetTime();
+                std::pair<ImageLogData, std::string>* pNewKmlPair = new std::pair<ImageLogData, std::string>;
+                pNewKmlPair->first = *pFrmProcess;
+                pNewKmlPair->second = pFrmProcess->GetFilename();
+                if (!pSegmentLogger->AddData(pNewKmlPair, 50)) delete pNewKmlPair;
+            }
         }
+        delete pFrmProcess;
+        pFrmProcess = nullptr;
     }
     printf("TerrainSegmentation::run Frames Processed: %d\n", iFramesProcessed);
 }
@@ -290,7 +344,7 @@ bool TerrainSegmentation::SetNetwork(const char* scNetwork)
 
 bool TerrainSegmentation::ProcessImage(CameraFrame& frm)
 {
-    cv::Mat& imgRGB = frm.matrix;
+    cv::Mat& imgRGB = frm.GetMatrix();
     int imgWidth = imgRGB.cols;      // width of the image (in pixels)
     int imgHeight = imgRGB.rows;      // height of the image (in pixels)
     // 1080x1920  -- 3 images at 1080x640
@@ -330,7 +384,7 @@ bool TerrainSegmentation::ProcessImage(CameraFrame& frm)
             bRet = true;
             char sc[64];
             sprintf(sc, "ScanMask success: slice %d", s);
-            logger.LogString(sc);
+            pLogger->LogString(sc);
             break;
         }
     }
@@ -358,7 +412,7 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iImageId, uint32_t uWidth
     // Log the count, and if less than valid pixel count, we return false
     char sc[64];
     sprintf(sc, "ScanMask: count %u[%u %u]", uAngleAvgCount, uWidth, uHeight);
-    logger.LogString(sc);
+    pLogger->LogString(sc);
     if (uAngleAvgCount < uValidNumPixels) {
         mt.lock();
         bHabitatVisible = false;
@@ -371,8 +425,7 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iImageId, uint32_t uWidth
     float4* imgMask;
     if (!CUDA_FAILED(cudaHostAlloc(&imgMask, maskWidth*maskHeight*16, cudaHostAllocMapped))) {
         pNetwork->Mask(imgMask, maskWidth, maskHeight, segNet::FILTER_POINT);
-        logger.LogMask(imgMask, iImageId, maskWidth, maskHeight);
-        cudaFreeHost(imgMask);
+        pLogger->LogMask(imgMask, iImageId, maskWidth, maskHeight); // frees imgMask
     }
     // Set direction and that we found something
     mt.lock();
@@ -382,20 +435,19 @@ bool TerrainSegmentation::ScanMask(uint8_t* pMask, int iImageId, uint32_t uWidth
     return true;
 }
 
-Navigator::Navigator(FlightController& _control, DataLogger& _logger, CameraController& _camera, bool _bStartBatteryMonitor)
+Navigator::Navigator(FlightController& _control, DataLoggerWriter* _pLogger, PipeReceiver_Image* _pPipeRGB, PipeSender_ImageData* pDetectionLogger, PipeSender_SegmentData* pSegmentLogger, bool _bStartBatteryMonitor)
 : bSendRTL(false)
 , bStartBatteryMonitor(_bStartBatteryMonitor)
 , iRouteCleanType(0)
 , tLastChange(0)
 , tMinTimeBetweenChanges(5)
 , control(_control)
-, logger(_logger)
-, camera(_camera)
+, pLogger(_pLogger)
 , pRouteOrig(nullptr)
-, sigMainRGB(_camera.GetSignalRGB())
+, pPipeRGB(_pPipeRGB)
 , pThread(nullptr)
-, detector(logger)
-, segmenter(logger)
+, detector(new DataLoggerWriter(*pLogger), pDetectionLogger)
+, segmenter(new DataLoggerWriter(*pLogger), pSegmentLogger)
 {
 
 }
@@ -410,11 +462,17 @@ Navigator::~Navigator()
     if (pRouteOrig != nullptr) {
         delete pRouteOrig;
     }
+    if (pPipeRGB != nullptr) {
+        delete pPipeRGB;
+    }
+    if (pLogger != nullptr) {
+        delete pLogger;
+    }
 }
     
 void Navigator::Start()
 {
-    pThread = new std::thread(&Navigator::runNavigator, this, sigMainRGB, sigStopMain);
+    pThread = new std::thread(&Navigator::runNavigator, this, std::ref(*pPipeRGB), sigStopMain);
 }
 
 void Navigator::Join()
@@ -452,7 +510,7 @@ void Navigator::SetRouteClean(int iClean)
     iRouteCleanType = iClean;
 }
 
-void Navigator::runNavigator(Signal sigRGB, Signal sigStop)
+void Navigator::runNavigator(PipeReceiver_Image& pipeRGB, Signal sigStop)
 {
     printL("Navigator::runNavigator");
     pthread_setname_np(pthread_self(), "Navigator::runNavigator");
@@ -471,23 +529,21 @@ void Navigator::runNavigator(Signal sigRGB, Signal sigStop)
     Route* pRouteCurrent = nullptr;
     pRouteOrig = control.GetRoute();
     if (pRouteOrig) {
-        logger.LogString(pRouteOrig->toString().c_str());
+        pLogger->LogString(pRouteOrig->toString().c_str());
         pRouteCurrent = new Route(*pRouteOrig);
     } else {
         printL(" Failed to get route.");
-        logger.LogString("Failed to get route.");
+        pLogger->LogString("Failed to get route.");
     }
 
     while (!sigStop.isSignaled()) {
-        sigRGB.waitFor(1000);
+        std::shared_ptr<CameraFrame> pNewImage;
         // Get new image and process it
-        CameraFrame frameNew;
-        if (!camera.GetFrameRGB(frameNew)) {
-            printL("runNavigator frame was not valid");
+        if (!pipeRGB.RetrieveData(pNewImage, 1000)) {
             continue;
         }
-        detector.SetNewImage(frameNew);
-        segmenter.SetNewImage(frameNew);
+        detector.SetNewImage(*pNewImage);
+        segmenter.SetNewImage(*pNewImage);
 
         if (bGridSearching) { // Habitat not visible, we're currently running search pattern
             // Good terrain visible?
@@ -510,7 +566,7 @@ void Navigator::runNavigator(Signal sigRGB, Signal sigStop)
                 } else {
                     sprintf(sc, "[delay]Grid Search -> Good Habitat %1.3f", segmenter.GetHabitatDirection());
                 }
-                logger.LogString(sc);
+                pLogger->LogString(sc);
             }
         } else { // Habitat already visible
             // Good terrain still visible?
@@ -535,16 +591,16 @@ void Navigator::runNavigator(Signal sigRGB, Signal sigStop)
                 } else {
                     sprintf(sc, "[delay]Good Habitat Change -> %1.3f", segmenter.GetHabitatDirection());
                 }
-                logger.LogString(sc);
+                pLogger->LogString(sc);
             } else { // No good terrain is visible right now
                 // So if there's been enough time we'll switch back to grid
                 if (time(nullptr) - tLastChange > tMinTimeBetweenChanges) {
                     pRouteCurrent = RestoreRoute(pRouteCurrent);
-                    logger.LogString("Good Habitat -> Grid Search");
+                    pLogger->LogString("Good Habitat -> Grid Search");
                     bGridSearching = true;
                     tLastChange = time(nullptr);
                 } else {
-                    logger.LogString("[delay]Good Habitat -> Grid Search");
+                    pLogger->LogString("[delay]Good Habitat -> Grid Search");
                 }
             }
         }
@@ -585,11 +641,11 @@ Route* Navigator::RestoreRoute(Route* pRoute)
         bool bVisit = pVisited != nullptr;
         char sc[512];
         snprintf(sc, 512, "Restoring route; VisitedPoints: %s ; NextWaypoint: %d\n", bVisit ? "YES" : "NO", iWaypoint);
-        logger.LogString(sc);
+        pLogger->LogString(sc);
     } else {
         char sc[512];
         snprintf(sc, 512, "Restoring route; VisitedPoints: %s ; NextWaypoint: NO\n", pVisited != nullptr ? "YES" : "NO");
-        logger.LogString(sc);
+        pLogger->LogString(sc);
     }
 
     pRoute = Route::CleanRoute(pRoute, pVisited, iWaypoint, iRouteCleanType == 2);
@@ -601,7 +657,7 @@ Route* Navigator::RestoreRoute(Route* pRoute)
 
     // Send message with new route to the flight controller
     control.SetRoute(*pRoute, true);
-    logger.LogString(pRoute->toString().c_str());
+    pLogger->LogString(pRoute->toString().c_str());
     
     return pRoute;
 }

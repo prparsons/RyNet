@@ -11,10 +11,10 @@ class segNet;
 
 class ObjectDetection {
 public:
-    ObjectDetection(DataLogger& logger);
+    ObjectDetection(DataLoggerWriter* pDataLogger, PipeSender_ImageData* pLocationLogger);
     ~ObjectDetection();
 
-    void SetNewImage(CameraFrame& frm);
+    void SetNewImage(const CameraFrame& frm);
     void Start();
     void SendStopSignal();
     
@@ -26,24 +26,25 @@ private:
     void run(Signal sig, Signal sigStop);
 
     int iNumSlices;
-    DataLogger& logger;
+    DataLoggerWriter* pDataLogger;
+    PipeSender_ImageData* pLocationLogger;
     detectNet* pNetwork;
     std::thread* pThread;
     ThreadMutex mt;
     Signal sigNewImage;
     Signal sigStopMain;
-    CameraFrame frmRecent;
+    CameraFrame* pFrmRecent;
 };
 
 class TerrainSegmentation {
 public:
-    TerrainSegmentation(DataLogger& logger);
+    TerrainSegmentation(DataLoggerWriter* pLogger, PipeSender_SegmentData* pSegmentLogger);
     ~TerrainSegmentation();
 
     bool IsHabitatVisible();
     float GetHabitatDirection();
     
-    void SetNewImage(CameraFrame& frm);
+    void SetNewImage(const CameraFrame& frm);
     void Start();
     void SendStopSignal();
 
@@ -75,19 +76,20 @@ private:
     uint32_t uMaskHeight;
     uint32_t uValidNumPixels;
 
-    DataLogger& logger;
+    DataLoggerWriter* pLogger;
+    PipeSender_SegmentData* pSegmentLogger;
     segNet* pNetwork;
     std::thread* pThread;
 
     ThreadMutex mt;
     Signal sigNewImage;
     Signal sigStopMain;
-    CameraFrame frmRecent;
+    CameraFrame* pFrmRecent;
 };
 
-class Navigator:public InterruptStop {
+class Navigator:public I_InterruptStop {
 public:
-    Navigator(FlightController& control, DataLogger& logger, CameraController& camera, bool bStartBatteryMonitor);
+    Navigator(FlightController& control, DataLoggerWriter* pLogger, PipeReceiver_Image* pPipeRGB, PipeSender_ImageData* pDetectionLogger, PipeSender_SegmentData* pSegmentLogger, bool bStartBatteryMonitor);
     ~Navigator();
     
     void Start();
@@ -104,7 +106,7 @@ private:
     Route* RestoreRoute(Route* pRoute);
 
     void runBattery(Signal sigStop, Signal sigStopMainThread);
-    void runNavigator(Signal sig, Signal sigStop);
+    void runNavigator(PipeReceiver_Image& pipeRGB, Signal sigStop);
 
     // ONLY access from runBattery. runNavigator will access it AFTER it has joined runBattery
     bool bSendRTL;
@@ -114,12 +116,11 @@ private:
     time_t tMinTimeBetweenChanges;
 
     FlightController& control;
-    DataLogger& logger;
-    CameraController& camera;
     Route* pRouteOrig;
 
     Signal sigStopMain;
-    Signal sigMainRGB;
+    DataLoggerWriter* pLogger;
+    PipeReceiver_Image* pPipeRGB;
     std::thread* pThread;
     ObjectDetection detector;
     TerrainSegmentation segmenter;

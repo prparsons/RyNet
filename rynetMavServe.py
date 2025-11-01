@@ -613,7 +613,7 @@ try:
         for key, mask in events:
             key.data(key.fileobj, vehicle)
 except KeyboardInterrupt:
-    print("caught keyboard interrupt, exiting")
+    print("caught keyboard interrupt, exiting: %d" % hmacVerifyMessage.salt)
 
 selectorDefault.close()
 print("Close vehicle object")

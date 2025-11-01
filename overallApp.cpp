@@ -53,6 +53,8 @@ public:
     bool bDownsampleDepth = false;
     bool bHmacUdp = false;
     bool bDepthLowRes = false;
+    bool bGpx = false;
+    bool bKml = false;
     char scVideoSimPath[512];
     char scServerAddress[32];
     char scUdpKey[33];
@@ -86,7 +88,7 @@ void handle_segfault(int iSigNum);
 // Simplest way I can think of at the moment is signal for depth to stop, let the main thread finishing joining
 // it, then we'll have a pointer to bStopNavOnDepthFail that the interrupt can set to True.
 // Or, if we used --continue then need to signal nav to stop
-InterruptStop* pSignal_interrupt = nullptr;
+I_InterruptStop* pSignal_interrupt = nullptr;
 bool* pSignal_bStopNavOnDepthFail = nullptr;
 bool* pSignal_bAbortTakeoff = nullptr;
 
@@ -117,7 +119,11 @@ int main(int argc, char** argv)
         else pCamera = CameraController::OpenCamera(uCameraFeatures);
 
         printL(">>>Getting Flight Controller");
-        FlightController* pController = FlightController::GetFlightController(logger, *pCamera);
+        FlightController* pController = FlightController::GetFlightController(logger.GetLogger(), 
+                                                                              pCamera->GetPipeDepth(),
+                                                                              pCamera->GetPipeIR(),
+                                                                              args.bGpx,
+                                                                              args.bKml);
         if (args.bManualServerAddress) pController->SetServerAddress(args.scServerAddress);
         if (args.bHmacUdp) pController->SetUdpKey(args.scUdpKey);
         if (args.iUdpTimeoutUs != -1) pController->SetUdpTimout(args.iUdpTimeoutUs);
@@ -125,7 +131,12 @@ int main(int argc, char** argv)
         if (args.iGuideExtraDistance != -1) pController->SetExtraDistance(args.iGuideExtraDistance);
 
         printL(">>>Creating Navigator");
-        Navigator nav(*pController, logger, *pCamera, args.bBatteryMonitor);
+        Navigator nav(*pController, 
+                      logger.GetLogger(),
+                      pCamera->GetPipeRGB(),
+                      pController->GetPipeDetection(),
+                      pController->GetPipeSegmentation(),
+                      args.bBatteryMonitor);
         if (args.bRunDepth) pSignal_interrupt = pCamera;
         else pSignal_interrupt = &nav;
         // If we specified a target class, need to set that now
@@ -395,6 +406,8 @@ bool Arguments::Parse()
             else if (strcmp("--battery_monitor", argv[i]) == 0) bBatteryMonitor = true;
             else if (strcmp("--depth_lowres", argv[i]) == 0) bDepthLowRes = true;
             else if (strcmp("--run_flir", argv[i]) == 0) bRunFlir = true;
+            else if (strcmp("--gpx", argv[i]) == 0) bGpx = true;
+            else if (strcmp("--kml", argv[i]) == 0) bKml = true;//todo doesnt work without log_visited
             else if (strcmp("--hmac_udp", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = UDP_KEY;
@@ -544,6 +557,10 @@ void printHelp()
     printL("    When restoring a route, either run a simple cleaning algorithm, or a 2opt");
     printL("    algorithm.");
     printL("    Target is either \"simple\" or \"2opt\".\n");
+    printL(" --gpx");
+    printL("    Save GPX file of this run.\n");
+    printL(" --kml");
+    printL("    Save KML file of this run.\n");
 }
 
 void cleanupFailure()
