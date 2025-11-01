@@ -1268,7 +1268,7 @@ std::string FlightController::GpxStartTrackSeg(std::string strSegmentType)
 std::string FlightController::GpxTrackPoint(float fLat, float fLon, float fElev)
 {
     std::stringstream ss;
-    ss << "<trkpt lat=\"" << fLat << "\" lon=\"" << fLon << "\"><ele>" << fElev << "</ele><time>";
+    ss << std::setprecision(10) << "<trkpt lat=\"" << fLat << "\" lon=\"" << fLon << "\"><ele>" << fElev << "</ele><time>";
 
     time_t timeNow = time(nullptr);
     std::tm* timeStruct = gmtime(&timeNow);
@@ -1287,7 +1287,7 @@ std::string FlightController::GpxEndTrackSeg()
 std::string FlightController::GpxWaypoint(std::string strDesc, float fLat, float fLon)
 {
     std::stringstream ss;
-    ss << "<wpt lat=\"" << fLat << "\" lon=\"" << fLon << "\"><desc>" << strDesc << "</desc></wpt>\n";
+    ss << std::setprecision(10) << "<wpt lat=\"" << fLat << "\" lon=\"" << fLon << "\"><desc>" << strDesc << "</desc></wpt>\n";
     return ss.str();
 }
 
@@ -1310,19 +1310,35 @@ std::string FlightController::KmlStartPath(std::string strDesc, KmlPathStyle sty
                     "<name>Drone Path</name>\n"\
                     "<description>";
     strPath += strDesc + "</description>\n";
-    strPath +=      "<Style id=\"yellowLineGreenPoly\">\n"\
-                        "<LineStyle>\n"\
-                            "<color>7f00ffff</color>\n"\
-                            "<width>4</width>\n"\
-                        "</LineStyle>\n"\
-                        "<PolyStyle>\n"\
-                            "<color>7f00ff00</color>\n"\
-                        "</PolyStyle>\n"\
-                    "</Style>\n";
+    switch (styleSegment) {
+        case KmlPathStyle::AUTO:
+            strPath += "<Style id=\"pathStyle\">\n"\
+                            "<LineStyle>\n"\
+                                "<color>7f00ffff</color>\n"\
+                                "<width>4</width>\n"\
+                            "</LineStyle>\n"\
+                            "<PolyStyle>\n"\
+                                "<color>7f00ff00</color>\n"\
+                            "</PolyStyle>\n"\
+                        "</Style>\n";
+            break;
+        case KmlPathStyle::GUIDED:
+            strPath += "<Style id=\"pathStyle\">\n"\
+                            "<LineStyle>\n"\
+                                "<color>7f0000ff</color>\n"\
+                                "<width>4</width>\n"\
+                            "</LineStyle>\n"\
+                            "<PolyStyle>\n"\
+                                "<color>7fff0000</color>\n"\
+                            "</PolyStyle>\n"\
+                        "</Style>\n";
+            break;
+    }
+
     strPath += "<Placemark>\n"\
                     "<name>Path</name>\n"\
                     "<description>List of points drone traveled</description>\n";
-    strPath +=      "<styleUrl>#yellowLineGreenPoly</styleUrl>\n"\
+    strPath +=      "<styleUrl>#pathStyle</styleUrl>\n"\
                     "<LineString>\n"\
                         "<extrude>1</extrude>\n"\
                         "<tessellate>1</tessellate>\n"\
@@ -1334,7 +1350,7 @@ std::string FlightController::KmlStartPath(std::string strDesc, KmlPathStyle sty
 std::pair<std::string, std::string> FlightController::KmlPathPoint(float fLat, float fLon, float fElev)
 {
     std::stringstream ss;
-    ss << fLon << "," << fLat << "," << fElev;
+    ss << std::setprecision(10) << fLon << "," << fLat << "," << fElev << " ";
 
     std::string strWpt = KmlWaypoint("Drone Path point", "", fLat, fLon, true);
 
@@ -1354,8 +1370,6 @@ std::string FlightController::KmlEndPath(std::list<std::string> strlPathPoints)
     return strPathDoc;
 }
 
-//todo<GroundOverlay>
-
 std::string FlightController::KmlWaypoint(std::string strName, std::string strDesc, float fLat, float fLon, bool bTime)
 {
     std::stringstream ss;
@@ -1370,7 +1384,8 @@ std::string FlightController::KmlWaypoint(std::string strName, std::string strDe
         ss << std::put_time(timeStruct, "%F") << "T" << std::put_time(timeStruct, "%T") << "Z";
         ss << "</when></TimeStamp>\n";
     }
-    ss <<       "<Point>\n"\
+    ss << std::setprecision(10) <<
+                "<Point>\n"\
                     "<coordinates>" << fLon << "," << fLat << /*//todo,altitude*/ "</coordinates>\n"\
                 "</Point>\n"\
             "</Placemark>\n";
@@ -1382,7 +1397,8 @@ std::string FlightController::KmlHabitatOverlay(const ImageLogData& data, std::s
 {
     //todo masks should have a way to be associated with the image
     std::stringstream ss;
-    ss << "<GroundOverlay>\n"\
+    ss << std::setprecision(10) <<
+            "<GroundOverlay>\n"\
                 "<name>" << "Habitat Detection</name>\n"\
                 "<description>Overlay of the image that triggered the habitat detection.</description>\n"\
                 "<Icon><href>images/" << strFilename << "</href></Icon>\n"\

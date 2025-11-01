@@ -59,7 +59,7 @@ CameraFrame* CameraFrame::DeepCopy()  const
     pNew->timeLast = timeLast;
     pNew->id = id;
     pNew->fLat = fLat;
-    pNew->fLon = fLat;
+    pNew->fLon = fLon;
     pNew->fHeading = fHeading;
     pNew->fAltitude = fAltitude;
     pNew->fPitch = fPitch;
@@ -493,9 +493,11 @@ void CameraController::run_simulation(PipeSender_Image& pipe, Signal* pSigStop)
         // Get data for frame creation
         float fLat = 0;
         float fLon = 0;
-        FlightController::GetPosition(fLat, fLon);
         float fAlt = 0;
-        FlightController::GetAltitude(fAlt);
+        // Must have valid lat/lon and altitude
+        if (!FlightController::GetPosition(fLat, fLon) || !FlightController::GetAltitude(fAlt)) {
+            continue;
+        }
         time_t timeNow = time(nullptr);
             
         CameraFrame* pCameraFrame = CameraFrame::CreateFrame(fLat, fLon, fAlt, timeNow, frame);  
