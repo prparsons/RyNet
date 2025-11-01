@@ -84,7 +84,7 @@ private:
     std::string GpxWaypoint(std::string strDesc, float fLat, float fLon);
 
     std::string KmlProlog();
-    std::string KmlStartPath(std::string strDesc, KmlPathStyle styleSegment);
+    std::string KmlStartPath(std::string strName, std::string strDesc, KmlPathStyle styleSegment);
     std::pair<std::string, std::string> KmlPathPoint(float fLat, float fLon, float fElev);
     std::string KmlEndPath(std::list<std::string> strlPathPoints);
     std::string KmlWaypoint(std::string strName, std::string strDesc, float fLat, float fLon, bool bTime);

@@ -597,7 +597,9 @@ void FlightController::runPointLogger(Signal sigStop)
             printL(" failed to save KML");//todo throw exception?, bail the whole thing? crash the drone?
         }
         
-        strlPathDocKml.push_back(KmlStartPath("Start of drone flight - AUTO", KmlPathStyle::AUTO));
+        strlPathDocKml.push_back(KmlStartPath("Flight Start [AUTO]",
+                                              "Beginning of flight, in AUTO following pre-programmed route",
+                                              KmlPathStyle::AUTO));
     }
     time_t& timeLastDetailPoint = timeNow;
     timeLastDetailPoint = 0;
@@ -637,7 +639,9 @@ void FlightController::runPointLogger(Signal sigStop)
                 strlTrackGpx.push_back(GpxEndTrackSeg());
                 strlTrackGpx.push_back(GpxStartTrackSeg("AUTO"));
                 strlPathDocKml.push_back(KmlEndPath(strlPathPtsKml));
-                strlPathDocKml.push_back(KmlStartPath("Drone Path - AUTO", KmlPathStyle::AUTO));
+                strlPathDocKml.push_back(KmlStartPath("[AUTO]", 
+                                                      "Switched from GUIDED back to programmed route in AUTO.", //todo clean method
+                                                      KmlPathStyle::AUTO));
                 strlPathPtsKml.clear();
 
                 mtPoints.lock();
@@ -655,7 +659,9 @@ void FlightController::runPointLogger(Signal sigStop)
                     strlTrackGpx.push_back(GpxEndTrackSeg());
                     strlTrackGpx.push_back(GpxStartTrackSeg("GUIDED"));
                     strlPathDocKml.push_back(KmlEndPath(strlPathPtsKml));
-                    strlPathDocKml.push_back(KmlStartPath("Drone Path - GUIDED", KmlPathStyle::GUIDED));
+                    strlPathDocKml.push_back(KmlStartPath("[GUIDED]",
+                                                          "Switched from AUTO to GUIDED flight to follow detected habitat.",
+                                                          KmlPathStyle::GUIDED));
                     strlPathPtsKml.clear();
 
                     mtPoints.lock();
@@ -681,7 +687,7 @@ void FlightController::runPointLogger(Signal sigStop)
             std::shared_ptr<ImageLogData> pWaypoint;
             while (pipeDetect.RetrieveData(pWaypoint, 0)) {
                 strlDetectionGpx.push_back(GpxWaypoint(pWaypoint->GetString(), pWaypoint->GetLat(), pWaypoint->GetLon()));
-                strlDetectionKml.push_back(KmlWaypoint("Detection", pWaypoint->GetString(), pWaypoint->GetLat(), pWaypoint->GetLon(), false));
+                strlDetectionKml.push_back(KmlWaypoint("Wildlife", pWaypoint->GetString(), pWaypoint->GetLat(), pWaypoint->GetLon(), false));
             }
         }
         if (pipeSegment.DataReady()) {
@@ -1302,13 +1308,12 @@ std::string FlightController::KmlProlog()
                     "</description>\n";
 }
 
-std::string FlightController::KmlStartPath(std::string strDesc, KmlPathStyle styleSegment)
+std::string FlightController::KmlStartPath(std::string strName, std::string strDesc, KmlPathStyle styleSegment)
 {
-    //todo unique name
     std::string strPath;
     strPath += "<Document>\n"\
-                    "<name>Drone Path</name>\n"\
-                    "<description>";
+                    "<name>";
+    strPath += strName + "</name>\n<description>";
     strPath += strDesc + "</description>\n";
     switch (styleSegment) {
         case KmlPathStyle::AUTO:
@@ -1342,7 +1347,7 @@ std::string FlightController::KmlStartPath(std::string strDesc, KmlPathStyle sty
                     "<LineString>\n"\
                         "<extrude>1</extrude>\n"\
                         "<tessellate>1</tessellate>\n"\
-                        "<altitudeMode>absolute</altitudeMode>\n"\
+                        "<altitudeMode>relativeToGround</altitudeMode>\n"\
                         "<coordinates>";
     return strPath;
 }
@@ -1352,7 +1357,7 @@ std::pair<std::string, std::string> FlightController::KmlPathPoint(float fLat, f
     std::stringstream ss;
     ss << std::setprecision(10) << fLon << "," << fLat << "," << fElev << " ";
 
-    std::string strWpt = KmlWaypoint("Drone Path point", "", fLat, fLon, true);
+    std::string strWpt = KmlWaypoint("Path", "Placemark for time at specific points along the path.", fLat, fLon, true);
 
     return std::make_pair(ss.str(), strWpt);
 }

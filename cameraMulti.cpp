@@ -41,6 +41,7 @@ ImageLogData::ImageLogData(const ImageLogData& other)
     fHeading = other.fHeading;
     fAltitude = other.fAltitude;
     fPitch = other.fPitch;
+    strData = other.strData;
 }
 
 CameraFrame::CameraFrame()

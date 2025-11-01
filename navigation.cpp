@@ -226,13 +226,6 @@ void TerrainSegmentation::Start()
 
 void TerrainSegmentation::run(Signal sig, Signal sigStop)
 {
-    //todo
-    /*
-    ObjectDetection::run Frames Processed:1650
-    TerrainSegmentation::run Frames Processed: 1694
-    There shouldn't be any way for above to be greater than below; possibly pipe bug, it'll let non-required receivers re-read...
-    CameraController::run_simulation Frames Read: 232
-    */
     printL("TerrainSegmentation::run");
     int iFramesProcessed = 0;
     CameraFrame* pFrmProcess = nullptr;
