@@ -540,7 +540,9 @@ void Navigator::runNavigator(PipeReceiver_Image& pipeRGB, Signal sigStop)
         std::shared_ptr<CameraFrame> pNewImage;
         // Get new image and process it
         if (!pipeRGB.RetrieveData(pNewImage, 1000)) {
-            printL("runNavigator frame was not valid");
+            if (!pNewImage) {
+                printL("runNavigator frame was not valid");
+            } // else its valid, but we've seen it already
             continue;
         }
         detector.SetNewImage(*pNewImage);
