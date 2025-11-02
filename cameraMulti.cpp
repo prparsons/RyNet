@@ -114,7 +114,8 @@ const char* CameraFrame::GetFilename() const
         struct tm* pTimeStruct = localtime(&timeLast);
         snprintf(scFileName, 
                 127, 
-                "images/%d_%d_%d_%d_%d_%d.jpg",
+                "images/%d_%d-%d-%d_%d-%d-%d.jpg",
+                id,
                 pTimeStruct->tm_year + 1900, 
                 pTimeStruct->tm_mon + 1,
                 pTimeStruct->tm_mday,
