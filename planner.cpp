@@ -1406,7 +1406,7 @@ std::string FlightController::KmlHabitatOverlay(const ImageLogData& data, std::s
             "<GroundOverlay>\n"\
                 "<name>" << "Habitat Detection</name>\n"\
                 "<description>Overlay of the image that triggered the habitat detection.</description>\n"\
-                "<Icon><href>images/" << strFilename << "</href></Icon>\n"\
+                "<Icon><href>" << strFilename << "</href></Icon>\n"\
                 "<LatLonBox>\n";
     ss <<           "<north>" << (data.GetLat() + 0.0005) << "</north>\n"\
                     "<south>" << (data.GetLat() - 0.0005) << "</south>\n"\
