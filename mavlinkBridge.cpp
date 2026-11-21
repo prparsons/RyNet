@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include <sys/wait.h>
 
 #include "mavlinkBridge.h"
@@ -9,10 +10,13 @@ MavLinkBridge::MavLinkBridge()
 
 }
 
-bool MavLinkBridge::LaunchBridge(int iPort, bool bTest, const char* scUdp)
+bool MavLinkBridge::LaunchBridge(const char* scConnect, int iPort, bool bTest, const char* scUdp)
 {
     // Set up arguments
-    const char* scConnect = "tcp:192.168.2.228:5762";//"/dev/ttyTHS0";
+    char scConnectLocal[] = "/dev/ttyTHS0";
+    if (strcmp(scConnect, "local") == 0) {
+        scConnect = scConnectLocal;
+    }
     char scPort[256];
     snprintf(scPort, 256, "%d", iPort);
     const char* args[10];

@@ -6,7 +6,7 @@ class MavLinkBridge {
 public:
     MavLinkBridge();
 
-    bool LaunchBridge(int iPort, bool bTest, const char* scUdp = nullptr);
+    bool LaunchBridge(const char* scConnect, int iPort, bool bTest, const char* scUdp = nullptr);
     void StopBridge();
     
 private:
