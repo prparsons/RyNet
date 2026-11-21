@@ -12,6 +12,7 @@
 
 #include "navigation.h"
 #include "dataLogger.h"
+#include "mavlinkBridge.h"
 
 enum OptionArgument {
     SIMULATE_VIDEO = 0,
@@ -43,6 +44,7 @@ public:
     bool bBatteryMonitor = false;
     bool bStopNavOnDepthFail = true;
     bool bSendRTL = false;
+    bool bMavlink = false;
     bool bStartPointLogger = false;
     bool bSimulateVideo = false;
     bool bManualServerAddress = false;
@@ -101,7 +103,12 @@ int main(int argc, char** argv)
     if (!args.ParseArgs(argc, argv)) {
         return 1;
     }
-    
+    // Before anything else, start mavlink script if needed
+    MavLinkBridge mavlink;
+    if (args.bMavlink) {
+        mavlink.LaunchBridge(3636, true, nullptr);
+    }
+
     try {
         DataLogger logger;
 
@@ -194,6 +201,8 @@ int main(int argc, char** argv)
         std::cout << "Sending RTL";
         cleanupFailure();
     }
+
+    if (args.bMavlink) mavlink.StopBridge();
     return 0;
 }
 
@@ -201,6 +210,7 @@ Arguments::Arguments()
 : bBatteryMonitor(false)
 , bStopNavOnDepthFail(true)
 , bSendRTL(false)
+, bMavlink(false)
 , bStartPointLogger(false)
 , bSimulateVideo(false)
 , bManualServerAddress(false)
@@ -397,6 +407,7 @@ bool Arguments::Parse()
             OptionArgumentSelection = OPTION_NONE;
         } else {
             if (strcmp("--continue", argv[i]) == 0) bStopNavOnDepthFail = false;
+            else if (strcmp("--mavlink", argv[i]) == 0) bMavlink = true;
             else if (strcmp("--rtlfinish", argv[i]) == 0) bSendRTL = true;
             else if (strcmp("--no_rgb", argv[i]) == 0) bRunRGB = false;
             else if (strcmp("--no_depth", argv[i]) == 0) bRunDepth = false;
@@ -561,6 +572,8 @@ void printHelp()
     printL("    Save GPX file of this run.\n");
     printL(" --kml");
     printL("    Save KML file of this run.\n");
+    printL(" --mavlink");
+    printL("    Launch the mavlink python script as a child process.\n");
 }
 
 void cleanupFailure()
