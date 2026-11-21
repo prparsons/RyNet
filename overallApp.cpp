@@ -111,6 +111,8 @@ int main(int argc, char** argv)
     if (args.bMavlink) {
         if (args.bHmacUdp) mavlink.LaunchBridge(MAVLINK_UDP_PORT, args.bLiveTest, args.scUdpKey);
         else mavlink.LaunchBridge(MAVLINK_UDP_PORT, args.bLiveTest, nullptr);
+        printL(">>>Launched Mavlink Bridge.\n   Wait 10sec");
+        sleep(10);
     }
 
     try {
