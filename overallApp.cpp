@@ -14,6 +14,8 @@
 #include "dataLogger.h"
 #include "mavlinkBridge.h"
 
+#define MAVLINK_UDP_PORT 3636
+
 enum OptionArgument {
     SIMULATE_VIDEO = 0,
     UDP_SERVER_ADDRESS,
@@ -45,6 +47,7 @@ public:
     bool bStopNavOnDepthFail = true;
     bool bSendRTL = false;
     bool bMavlink = false;
+    bool bLiveTest = false;
     bool bStartPointLogger = false;
     bool bSimulateVideo = false;
     bool bManualServerAddress = false;
@@ -106,7 +109,8 @@ int main(int argc, char** argv)
     // Before anything else, start mavlink script if needed
     MavLinkBridge mavlink;
     if (args.bMavlink) {
-        mavlink.LaunchBridge(3636, true, nullptr);
+        if (args.bHmacUdp) mavlink.LaunchBridge(MAVLINK_UDP_PORT, args.bLiveTest, args.scUdpKey);
+        else mavlink.LaunchBridge(MAVLINK_UDP_PORT, args.bLiveTest, nullptr);
     }
 
     try {
@@ -211,6 +215,7 @@ Arguments::Arguments()
 , bStopNavOnDepthFail(true)
 , bSendRTL(false)
 , bMavlink(false)
+, bLiveTest(false)
 , bStartPointLogger(false)
 , bSimulateVideo(false)
 , bManualServerAddress(false)
@@ -408,6 +413,7 @@ bool Arguments::Parse()
         } else {
             if (strcmp("--continue", argv[i]) == 0) bStopNavOnDepthFail = false;
             else if (strcmp("--mavlink", argv[i]) == 0) bMavlink = true;
+            else if (strcmp("--live_test", argv[i]) == 0) bLiveTest = true;
             else if (strcmp("--rtlfinish", argv[i]) == 0) bSendRTL = true;
             else if (strcmp("--no_rgb", argv[i]) == 0) bRunRGB = false;
             else if (strcmp("--no_depth", argv[i]) == 0) bRunDepth = false;
@@ -574,6 +580,8 @@ void printHelp()
     printL("    Save KML file of this run.\n");
     printL(" --mavlink");
     printL("    Launch the mavlink python script as a child process.\n");
+    printL(" --live_test");
+    printL("    Run a live system test, only send <obs> messages to drone.\n");
 }
 
 void cleanupFailure()
@@ -586,7 +594,7 @@ void cleanupFailure()
     socketDesc = socket(AF_INET, SOCK_DGRAM, 0);
     if (socketDesc < 0) return;
     addressMavLink.sin_family = AF_INET; 
-    addressMavLink.sin_port = htons(3636); 
+    addressMavLink.sin_port = htons(MAVLINK_UDP_PORT); 
     addressMavLink.sin_addr.s_addr = inet_addr(scServerAddress);
     sendto(socketDesc, "<rtl />", 7, MSG_CONFIRM, (const struct sockaddr*) &addressMavLink, sizeof(addressMavLink));
 }
