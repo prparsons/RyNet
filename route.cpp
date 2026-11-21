@@ -261,11 +261,11 @@ Route* Route::CreateRoute(char* buffer, size_t uBufferLen)
 
 Route* Route::CleanRoute(Route* pStart, CoordNode* pVisitedPoints, int16_t iNextPoint, bool b2opt)
 {
+    //todo Log the points we clean up, theres a bug leaving 1 point it shouldnt (first one), i think thats removeVisited
     if (pStart == nullptr) return nullptr;
 
     // Get rid of waypoints we've already been to
     pStart = Route::removeVisited(pStart, iNextPoint);
-
 
     //@todo get rid of non-commands?
     // If we have a list of points we've been to in guided, use that to clear out any waypoints
@@ -274,7 +274,15 @@ Route* Route::CleanRoute(Route* pStart, CoordNode* pVisitedPoints, int16_t iNext
         pStart = Route::cleanRoute(pStart, pVisitedPoints);
     }
 
-    if (!b2opt) return pStart;
+    if (!b2opt) {
+        // Re-baseline cmd.seq to start at 1 (otherwise next cleaning is wrong because our route isn't starting at 1)
+        int16_t iIndex = 1;
+        for (Route* pI = pStart; pI != nullptr; pI = pI->pNext) {
+            printf("Point[%d] is now %d\n", pI->cmd.seq, iIndex);
+            pI->cmd.seq = iIndex++;
+        }
+        return pStart;
+    }
 
     // // Now run the 2Opt algorithm on the remaining path
     float fCurrentDistance = pStart->GetDistance();
@@ -290,6 +298,13 @@ Route* Route::CleanRoute(Route* pStart, CoordNode* pVisitedPoints, int16_t iNext
         fNewDistance = pNewRoute->GetDistance();
     }
     delete pNewRoute;
+
+    // Re-baseline cmd.seq to start at 1 (otherwise next cleaning is wrong because our route isn't starting at 1)
+    int16_t iIndex = 1;
+    for (Route* pI = pStart; pI != nullptr; pI = pI->pNext) {
+        printf("Point[%d] is now %d\n", pI->cmd.seq, iIndex);
+        pI->cmd.seq = iIndex++;
+    }
     return pStart;
 }
 
@@ -298,7 +313,7 @@ Route* Route::cleanRoute(Route* pStart, CoordNode* pVisitedPoints)
     if (pStart == nullptr) return nullptr;
     if (pVisitedPoints == nullptr) return nullptr;
     
-    std::queue<Route*> closeWaypoints;
+    std::list<Route*> closeWaypoints;
     float fTooClose = 100;
     // First start off by checking each waypoint against the visited list
     for (Route* pThis = pStart; pThis != nullptr; pThis = pThis->pNext) {
@@ -308,13 +323,17 @@ Route* Route::cleanRoute(Route* pStart, CoordNode* pVisitedPoints)
             //@todo
         }
         if (pClosestPoint->GetDistance(pThis->cmd.lat, pThis->cmd.lon) < fTooClose) {
-            closeWaypoints.push(pThis);
+            closeWaypoints.push_back(pThis);
         }
     }
     
     if (closeWaypoints.size() == 0) {
         // No points to remove
+        printL("No points close by to remove");
         return pStart;
+    }
+    for (std::list<Route*>::iterator iter(closeWaypoints.begin()); iter != closeWaypoints.end(); iter++) {
+        printf("Point that was close: %d\n", (*iter)->cmd.seq);
     }
     
     // Start off seeing if we need to advance pStart as we delete the first things on the list
@@ -323,7 +342,7 @@ Route* Route::cleanRoute(Route* pStart, CoordNode* pVisitedPoints)
 
         closeWaypoints.front()->pNext = nullptr;
         delete closeWaypoints.front();
-        closeWaypoints.pop();
+        closeWaypoints.pop_front();
     }
 
     // Then just look for pNext pointers that match the queue
@@ -333,7 +352,7 @@ Route* Route::cleanRoute(Route* pStart, CoordNode* pVisitedPoints)
 
             closeWaypoints.front()->pNext = nullptr;
             delete closeWaypoints.front();
-            closeWaypoints.pop();
+            closeWaypoints.pop_front();
             continue; // Don't want to advance pThis since the new pNext might need to be deleted too
         }
         pThis = pThis->pNext;
@@ -345,8 +364,12 @@ Route* Route::cleanRoute(Route* pStart, CoordNode* pVisitedPoints)
 Route* Route::removeVisited(Route* pStart, int16_t iNextPoint)
 {
     if (pStart == nullptr) return nullptr;
+    printf("Remove Visited starting with: %d\n", iNextPoint);
+    printf("First point: %d\n", pStart->cmd.seq);
     
     while ((pStart != nullptr) && (pStart->cmd.seq < iNextPoint)) {
+        printf("Removing visited point %d\n", pStart->cmd.seq);
+
         Route* pDelete = pStart;
         pStart = pStart->pNext;
 
