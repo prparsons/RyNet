@@ -12,6 +12,9 @@
 
 #include "navigation.h"
 #include "dataLogger.h"
+#include "mavlinkBridge.h"
+
+#define MAVLINK_UDP_PORT 3636
 
 enum OptionArgument {
     SIMULATE_VIDEO = 0,
@@ -29,6 +32,7 @@ enum OptionArgument {
     GUIDE_DISTANCE,
     VALID_PIXELS,
     CLEAN_ROUTE,
+    MAVLINK,
     OPTION_NONE
 };
 
@@ -43,6 +47,8 @@ public:
     bool bBatteryMonitor = false;
     bool bStopNavOnDepthFail = true;
     bool bSendRTL = false;
+    bool bMavlink = false;
+    bool bLiveTest = false;
     bool bStartPointLogger = false;
     bool bSimulateVideo = false;
     bool bManualServerAddress = false;
@@ -58,6 +64,7 @@ public:
     char scVideoSimPath[512];
     char scServerAddress[32];
     char scUdpKey[33];
+    char scMavlink[64];
     int iTargetClass = -1;
     int iNumSlices = -1;
     int iTakeoffAltitude = -1;
@@ -101,7 +108,15 @@ int main(int argc, char** argv)
     if (!args.ParseArgs(argc, argv)) {
         return 1;
     }
-    
+    // Before anything else, start mavlink script if needed
+    MavLinkBridge mavlink;
+    if (args.bMavlink) {
+        if (args.bHmacUdp) mavlink.LaunchBridge(args.scMavlink, MAVLINK_UDP_PORT, args.bLiveTest, args.scUdpKey);
+        else mavlink.LaunchBridge(args.scMavlink, MAVLINK_UDP_PORT, args.bLiveTest, nullptr);
+        printL(">>>Launched Mavlink Bridge.\n   Wait 10sec");
+        sleep(10);
+    }
+
     try {
         DataLogger logger;
 
@@ -194,6 +209,8 @@ int main(int argc, char** argv)
         std::cout << "Sending RTL";
         cleanupFailure();
     }
+
+    if (args.bMavlink) mavlink.StopBridge();
     return 0;
 }
 
@@ -201,6 +218,8 @@ Arguments::Arguments()
 : bBatteryMonitor(false)
 , bStopNavOnDepthFail(true)
 , bSendRTL(false)
+, bMavlink(false)
+, bLiveTest(false)
 , bStartPointLogger(false)
 , bSimulateVideo(false)
 , bManualServerAddress(false)
@@ -227,6 +246,7 @@ Arguments::Arguments()
     scVideoSimPath[0] = 0;
     scServerAddress[0] = 0;
     scUdpKey[0] = 0;
+    scMavlink[0] = 0;
     
     pSignal_bStopNavOnDepthFail = &bStopNavOnDepthFail;
 }
@@ -297,6 +317,7 @@ bool Arguments::Parse()
             switch (OptionArgumentSelection) {
                 case SIMULATE_VIDEO: strncpy(scVideoSimPath, argv[i], 512); break;
                 case UDP_SERVER_ADDRESS: strncpy(scServerAddress, argv[i], 32); break;
+                case MAVLINK: strncpy(scMavlink, argv[i], 64); break;
                 case DETECT_NET: {
                     if (!ObjectDetection::SetNetwork(argv[i])) {
                         printL("Invalid Detection network specified");
@@ -397,6 +418,7 @@ bool Arguments::Parse()
             OptionArgumentSelection = OPTION_NONE;
         } else {
             if (strcmp("--continue", argv[i]) == 0) bStopNavOnDepthFail = false;
+            else if (strcmp("--live_test", argv[i]) == 0) bLiveTest = true;
             else if (strcmp("--rtlfinish", argv[i]) == 0) bSendRTL = true;
             else if (strcmp("--no_rgb", argv[i]) == 0) bRunRGB = false;
             else if (strcmp("--no_depth", argv[i]) == 0) bRunDepth = false;
@@ -411,6 +433,10 @@ bool Arguments::Parse()
             else if (strcmp("--hmac_udp", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = UDP_KEY;
+            } else if (strcmp("--mavlink", argv[i]) == 0) {
+                bMavlink = true;
+                bOptionArgument = true;
+                OptionArgumentSelection = MAVLINK;            
             } else if (strcmp("--detection_net", argv[i]) == 0) {
                 bOptionArgument = true;
                 OptionArgumentSelection = DETECT_NET;
@@ -561,6 +587,11 @@ void printHelp()
     printL("    Save GPX file of this run.\n");
     printL(" --kml");
     printL("    Save KML file of this run.\n");
+    printL(" --mavlink [XXX]");
+    printL("    Launch the mavlink python script as a child process.");
+    printL("    Target is either \"local\" or a valid connection string such as \"tcp:192.168.2.228:5762\"\n");
+    printL(" --live_test");
+    printL("    Run a live system test, only send <obs> messages to drone.\n");
 }
 
 void cleanupFailure()
@@ -573,7 +604,7 @@ void cleanupFailure()
     socketDesc = socket(AF_INET, SOCK_DGRAM, 0);
     if (socketDesc < 0) return;
     addressMavLink.sin_family = AF_INET; 
-    addressMavLink.sin_port = htons(3636); 
+    addressMavLink.sin_port = htons(MAVLINK_UDP_PORT); 
     addressMavLink.sin_addr.s_addr = inet_addr(scServerAddress);
     sendto(socketDesc, "<rtl />", 7, MSG_CONFIRM, (const struct sockaddr*) &addressMavLink, sizeof(addressMavLink));
 }
