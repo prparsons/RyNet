@@ -315,7 +315,7 @@ def parseXML(message, vehicle, UDPServerSocket, address):
     message = message[4:]
     try:
         root = ET.fromstring(message)
-        print(root)
+        #print(root)
         handleCommand(root, vehicle, UDPServerSocket, address, saltBytes)
     except:
         print("parseXML error")
