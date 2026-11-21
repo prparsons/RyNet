@@ -4,6 +4,7 @@
 #include <opencv2/videoio.hpp>
 #include <opencv2/highgui.hpp>
 #include "dataLogger.h"
+#include "planner.h"
 
     
 // wbmode=2 //exposuretimerange=\"30000000 30000000\" aelock=true
@@ -18,36 +19,154 @@ const char* scGStream_RGB_F = "nvarguscamerasrc sensor-id=0 wbmode=%d gainrange=
 const char* scGStream_IR_file = "v4l2src device=/dev/video4 ! 'video/x-raw' ! nvvidconv ! 'video/x-raw(memory:NVMM)' ! omxh264enc ! 'video/x-h264,stream-format=byte-stream' ! h264parse ! qtmux ! filesinklocation=testFlir.mp4";
 const char* scGStream_IR = "v4l2src device=/dev/video4 ! video/x-raw ! videoconvert ! video/x-raw,format=BGR ! appsink";
 
-int iUniqueId = 0;
-
 using namespace cv;
 
-CameraFrame::CameraFrame()
-: id(-1)
+ImageLogData::ImageLogData()
+: timeLast(0)
+, id(-1)
+, fLat(0)
+, fLon(0)
+, fHeading(0)
+, fAltitude(0)
+, fPitch(0)
 {
-
 }
 
-CameraFrame& CameraFrame::operator=(Mat& source)
+ImageLogData::ImageLogData(const ImageLogData& other)
 {
-    id = iUniqueId++;
-    source.copyTo(matrix);
-}
-
-CameraFrame& CameraFrame::operator=(CameraFrame& other)
-{
+    timeLast = other.timeLast;
     id = other.id;
-    matrix = other.matrix;
+    fLat = other.fLat;
+    fLon = other.fLon;
+    fHeading = other.fHeading;
+    fAltitude = other.fAltitude;
+    fPitch = other.fPitch;
+    strData = other.strData;
 }
 
-void CameraFrame::DeepCopy(CameraFrame& source)
+CameraFrame::CameraFrame()
+: ImageLogData()
+, bIsDeepCopy(false)
 {
-    id = source.id;
-    source.matrix.copyTo(matrix);
+    scFileName[0] = 0;
+}
+
+CameraFrame* CameraFrame::DeepCopy()  const
+{
+    std::unique_lock<ThreadMutex> lock(mutex);
+    CameraFrame* pNew = new CameraFrame();
+    pNew->bIsDeepCopy = true;
+
+    pNew->timeLast = timeLast;
+    pNew->id = id;
+    pNew->fLat = fLat;
+    pNew->fLon = fLon;
+    pNew->fHeading = fHeading;
+    pNew->fAltitude = fAltitude;
+    pNew->fPitch = fPitch;
+    matrix.copyTo(pNew->matrix);
+    return pNew;
+}
+CameraFrame* CameraFrame::CreateFrame(float fLat, float fLon, float fAlt, time_t time, cv::Mat& source)
+{
+    static int iUniqueId = 0;
+    CameraFrame* pBrandNewFrame = new CameraFrame();
+    pBrandNewFrame->id = iUniqueId++;
+    pBrandNewFrame->fLat = fLat;
+    pBrandNewFrame->fLon = fLon;
+    pBrandNewFrame->fAltitude = fAlt;
+    pBrandNewFrame->timeLast = time;
+    source.copyTo(pBrandNewFrame->matrix);
+
+    return pBrandNewFrame;
+}
+
+void CameraFrame::SetString(std::string _strData)
+{
+    std::unique_lock<ThreadMutex> lock(mutex);
+    strData = _strData;
+}
+
+std::string CameraFrame::GetString() const
+{
+    std::unique_lock<ThreadMutex> lock(mutex);
+    return strData;
+}
+
+const cv::Mat& CameraFrame::GetMatrixConst()
+{
+    return matrix;
+}
+
+cv::Mat& CameraFrame::GetMatrix()
+{
+    std::unique_lock<ThreadMutex> lock(mutex);
+    if (bIsDeepCopy) {
+        return matrix;
+    }
+    return matrixEmpty;
+}
+
+const char* CameraFrame::GetFilename() const
+{
+    std::unique_lock<ThreadMutex> lock(mutex);
+    if (scFileName[0] == 0) {
+        struct tm* pTimeStruct = localtime(&timeLast);
+        snprintf(scFileName, 
+                127, 
+                "images/%d_%d-%d-%d_%d-%d-%d.jpg",
+                id,
+                pTimeStruct->tm_year + 1900, 
+                pTimeStruct->tm_mon + 1,
+                pTimeStruct->tm_mday,
+                pTimeStruct->tm_hour,
+                pTimeStruct->tm_min,
+                pTimeStruct->tm_sec);
+    }
+    return scFileName;
+}
+
+cameraFrame_depth::cameraFrame_depth()
+: pFrame(nullptr)
+, pDownsample(nullptr)
+{
+}
+
+cameraFrame_depth::cameraFrame_depth(cameraFrame_depth& other)
+: pFrame(nullptr)
+, pDownsample(nullptr)
+{
+    if (other.pFrame != nullptr) {
+        pFrame = new rs2::depth_frame(*other.pFrame);
+    }
+}
+
+float cameraFrame_depth::getMetersPerUnit() const
+{
+    if (pFrame == nullptr) return 0;
+    return pFrame->get_units();
+}
+
+int cameraFrame_depth::getWidth() const
+{
+    if (pFrame == nullptr) return 0;
+    return pFrame->get_width();
+}
+
+int cameraFrame_depth::getHeight() const
+{
+    if (pFrame == nullptr) return 0;
+    return pFrame->get_height();
+}
+
+const uint16_t* cameraFrame_depth::getData() const
+{
+    if (pFrame == nullptr) return nullptr;
+    return (const uint16_t*)(pFrame->get_data());
 }
 
 cameraFrame_depth::cameraFrame_depth(const rs2::depth_frame& _frame)
-: rs2::depth_frame(_frame)
+: pFrame(new rs2::depth_frame(_frame))
 , pDownsample(nullptr)
 {
 
@@ -58,14 +177,18 @@ cameraFrame_depth::~cameraFrame_depth()
     if (pDownsample) {
         delete pDownsample;
     }
+    if (pFrame) {
+        delete pFrame;
+    }
 }
 
 void cameraFrame_depth::applyDecimationFilter()
 {
+    if (pFrame == nullptr) return;
     if (pDownsample == nullptr) {
         pDownsample = new rs2::decimation_filter(8);
     }
-    *this = apply_filter(*pDownsample).as<rs2::depth_frame>();
+    *this = pFrame->apply_filter(*pDownsample).as<rs2::depth_frame>();
 }
 
 // ***********
@@ -77,66 +200,29 @@ CameraController* CameraController::OpenCamera(uint32_t features, const char* sc
     return pReturn;
 }
 
-cameraFrame_depth* CameraController::GetFrameDepth()
+PipeReceiver_Image* CameraController::GetPipeRGB()
 {
-    m.lock();
-    if (pFrameCurrentDepth == nullptr) {
-        m.unlock();
-        return nullptr;
-    }
-    cameraFrame_depth* pFrameReturn = new cameraFrame_depth(*pFrameCurrentDepth);
-    m.unlock();
-    return pFrameReturn;
+    return pipeRGB.CreateReceiver(false);
 }
 
-rs2_vector CameraController::GetFrameAccel()
+PipeReceiver_Image* CameraController::GetPipeIR()
 {
-    m.lock();
-    rs2_vector ret = FrameCurrentAccel;
-    m.unlock();
-    return ret;
+    return pipeIR.CreateReceiver(true);
 }
 
-bool CameraController::GetFrameRGB(CameraFrame& frmCopy)
+PipeReceiverDepth* CameraController::GetPipeDepth()
 {
-    bool bReturn = true;
-    m.lock();
-    if (FrameCurrentRGB.empty()) bReturn = false;
-    else frmCopy = FrameCurrentRGB;
-    m.unlock();
-    return bReturn;
-}
-
-bool CameraController::GetFrameIR(CameraFrame& frmCopy)
-{
-    bool bReturn = true;
-    m.lock();
-    if (FrameCurrentIR.empty()) bReturn = false;
-    else frmCopy = FrameCurrentIR;
-    m.unlock();
-    return true;
-}
-
-Signal CameraController::GetSignalDepth()
-{
-    return sigDepth;
-}
-
-Signal CameraController::GetSignalRGB()
-{
-    return sigRGB;
-}
-
-Signal CameraController::GetSignalIR()
-{
-    return sigIR;
+    return pipeDepth.CreateReceiver(true);
 }
 
 CameraController::CameraController(uint32_t _features, const char* _scSimulationFile)
 : pFrameCurrentDepth(nullptr)
 , pCameraRS(nullptr)
 , features(_features)
-, iSimulationFrameDelay(33)
+, iSimulationFrameDelay(100)
+, pipeDepth(4)
+, pipeRGB(2)
+, pipeIR(4)
 {
     printL("CameraController::CameraController");
 
@@ -196,14 +282,14 @@ void CameraController::Start()
     if (features & CameraController_RGBSimulation) {
         printf("CameraController::Start starting simulation using file: %s\n", scSimulationFile);
         if (pthrCamera[1] == nullptr) {
-            pthrCamera[1] = new std::thread(&CameraController::run_simulation, this, &FrameCurrentRGB, &sigRGB, &arSigStop[1]);
+            pthrCamera[1] = new std::thread(&CameraController::run_simulation, this, std::ref(pipeRGB), &arSigStop[1]);
         } else {
             printL("CameraController::Start pthrCamera[1] already started");
         }
     } else if (features & CameraController_RGB) { // Can't run actual RGB camera if the simulation is enabled
         printL("CameraController::Start starting RGB");
         if (pthrCamera[1] == nullptr) {
-            pthrCamera[1] = new std::thread(&CameraController::run_CV, this, scGStream_RGB, &FrameCurrentRGB, &sigRGB, &arSigStop[1]);
+            pthrCamera[1] = new std::thread(&CameraController::run_CV, this, scGStream_RGB, std::ref(pipeRGB), &arSigStop[1]);
         } else {
             printL("CameraController::Start cv1 already started");
         }
@@ -211,7 +297,7 @@ void CameraController::Start()
 
     if (features & CameraController_IR) {
         if (pthrCamera[2] == nullptr) {
-            pthrCamera[2] = new std::thread(&CameraController::run_CV, this, scGStream_IR, &FrameCurrentIR, &sigIR, &arSigStop[2]);
+            pthrCamera[2] = new std::thread(&CameraController::run_CV, this, scGStream_IR, std::ref(pipeIR), &arSigStop[2]);
         } else {
             printL("CameraController::Start cv2 already started");
         }
@@ -315,7 +401,6 @@ void CameraController::run_RS()
                 m.unlock();
             }
 
-            sigDepth.signal();
         } while (!arSigStop[0].isSignaled());
         pCameraRS->pipe.stop();
     } catch (rs2::error e) {
@@ -325,17 +410,9 @@ void CameraController::run_RS()
     }
 }
 
-void CameraController::run_CV(const char* scGStream, Mat* pFrameCurrent, Signal* pSig, Signal* pSigStop)
+void CameraController::run_CV(const char* scGStream, PipeSender_Image& pipe, Signal* pSigStop)
 {
     printL("CameraController::run_CV");
-    if (pFrameCurrent == nullptr) {
-        printL("CameraController::run_CV current fame nullptr");
-        return;
-    }
-    if (pSig == nullptr) {
-        printL("CameraController::run_CV Signal nullptr");
-        return;
-    }
     if (pSigStop == nullptr) {
         printL("CameraController::run_CV Stop Signal nullptr");
         return;
@@ -369,31 +446,29 @@ void CameraController::run_CV(const char* scGStream, Mat* pFrameCurrent, Signal*
             }
             continue;
         }
-        // Do something with frame
-        m.lock();
-        frame.copyTo(*pFrameCurrent);
-        m.unlock();
-
-        pSig->signal();
+        // Get data for frame creation
+        float fLat = 0;
+        float fLon = 0;
+        FlightController::GetPosition(fLat, fLon);
+        float fAlt = 0;
+        FlightController::GetAltitude(fAlt);
+        time_t timeNow = time(nullptr);
+            
+        CameraFrame* pCameraFrame = CameraFrame::CreateFrame(fLat, fLon, fAlt, timeNow, frame);
+        if (!pipe.AddData(pCameraFrame, 0)) { // No point in waiting to send, cameras are fast enough
+            delete pCameraFrame;
+        }
     }
     // According to opencv: the camera will be deinitialized automatically in VideoCapture destructor
     delete pCap;
 }
 
-void CameraController::run_simulation(cv::Mat* pFrameCurrent, Signal* pSig, Signal* pSigStop)
+void CameraController::run_simulation(PipeSender_Image& pipe, Signal* pSigStop)
 {
     cv::VideoCapture cap(scSimulationFile);
     if (!cap.isOpened()) {
         printL("CameraController::run_simulation failed to open file");
         throw std::invalid_argument("cv::VideoCapture failed");
-        return;
-    }
-    if (pFrameCurrent == nullptr) {
-        printL("CameraController::run_simulation current fame nullptr");
-        return;
-    }
-    if (pSig == nullptr) {
-        printL("CameraController::run_simulation Signal nullptr");
         return;
     }
     if (pSigStop == nullptr) {
@@ -416,12 +491,23 @@ void CameraController::run_simulation(cv::Mat* pFrameCurrent, Signal* pSig, Sign
         }
         uFrameFail = 0; // Reset this now that we got a frame
         iFramesRead++;
-        
-        m.lock();
-        frame.copyTo(*pFrameCurrent);
-        m.unlock();
 
-        pSig->signal();
+        // Get data for frame creation
+        float fLat = 0;
+        float fLon = 0;
+        float fAlt = 0;
+        // Must have valid lat/lon and altitude
+        if (!FlightController::GetPosition(fLat, fLon) || !FlightController::GetAltitude(fAlt)) {
+            continue;
+        }
+        time_t timeNow = time(nullptr);
+            
+        CameraFrame* pCameraFrame = CameraFrame::CreateFrame(fLat, fLon, fAlt, timeNow, frame);  
+        if (!pipe.AddData(pCameraFrame, 100)) {
+            // If the add failed, then delete the frame
+            delete pCameraFrame;
+        }
+
         std::this_thread::sleep_for(std::chrono::milliseconds(iSimulationFrameDelay));
     }
     printf("CameraController::run_simulation Frames Read: %d\n", iFramesRead);

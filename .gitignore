@@ -6,6 +6,7 @@ logUDP.txt
 
 #VSCode files
 settings.json
+launch.json
 
 #python cache stuff
 __pycache__/

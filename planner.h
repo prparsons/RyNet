@@ -16,12 +16,16 @@
 
 */
 
+enum class KmlPathStyle {
+    GUIDED,
+    AUTO
+};//todo there's other places looking for guided/auto
 
 class FlightController {
 public:
     ~FlightController();
 
-    static FlightController* GetFlightController(DataLogger& logger, CameraController& camera);
+    static FlightController* GetFlightController(DataLoggerWriter* pLogger, PipeReceiverDepth* pPipeDepth, PipeReceiver_Image* pPipeIR, bool bGpx, bool bKml);
     static void DestroyFlightController();
 
     void WaitForTakeoff(int iAltitude, const bool& bAbort);
@@ -40,6 +44,8 @@ public:
     int GetBattery();
     Route* GetRoute(); // Returns the current route. Caller owns object
     CoordNode* GetVisitedPoints(); // From point logger thread
+    PipeSender_ImageData* GetPipeDetection();
+    PipeSender_SegmentData* GetPipeSegmentation();
     static bool GetNextWaypoint(int16_t& iNextPoint);
 
     // Can we travel in the indicated direction for the indicated time.
@@ -56,7 +62,7 @@ public:
     void SetUdpKey(const char* scUdpKey);
 
 private:
-    FlightController(DataLogger& logger, CameraController& camera);
+    FlightController(DataLoggerWriter* pLogger, PipeReceiverDepth* pPipeDepth, PipeReceiver_Image* pPipeIR, bool bGpx, bool bKml);
 
     void SaveRoute();
     void SendXML(const char* sc);
@@ -65,22 +71,36 @@ private:
     bool VerifyMessage(const char* _scMessage, uint32_t uMessageLength);
     void ConnectMavLink();
 
-    void runDepth(Signal sig, Signal ss); // Thread function to continuously send depth info for obstacle avoidance
-    void runPointLogger(Signal ss); // Thread function to continuously retrieve and store visited points when in guided mode
-    void runIr(Signal sig, Signal ss);
+    void runDepth(PipeReceiverDepth& pipeDepth, Signal ss); // Thread function to continuously send depth info for obstacle avoidance
+    void runPointLogger(Signal sigStop); // Thread function to continuously retrieve and store visited points when in guided mode
+    void runIr(PipeReceiver_Image& pipeIR, Signal ss);
     void runRecv(Signal ss); // Thread that recv's UDP packet and stores them in a map according to salt
     char* recvUdp(); // Contains the udp code itself for runRecv()
 
-    DataLogger& logger;
-    CameraController& camera;
+    std::string GpxProlog();
+    std::string GpxStartTrackSeg(std::string strSegmentType);
+    std::string GpxTrackPoint(float fLat, float fLon, float fElev);
+    std::string GpxEndTrackSeg();
+    std::string GpxWaypoint(std::string strDesc, float fLat, float fLon);
+
+    std::string KmlProlog();
+    std::string KmlStartPath(std::string strName, std::string strDesc, KmlPathStyle styleSegment);
+    std::pair<std::string, std::string> KmlPathPoint(float fLat, float fLon, float fElev);
+    std::string KmlEndPath(std::list<std::string> strlPathPoints);
+    std::string KmlWaypoint(std::string strName, std::string strDesc, float fLat, float fLon, bool bTime);
+    std::string KmlHabitatOverlay(const ImageLogData& data, std::string strFilename);
+
+    DataLoggerWriter* pLogger;
     CoordNode startLocation;
     std::thread* pThreadDepth;
     std::thread* pThreadPoint;
     std::thread* pThreadIr;
     std::thread* pThreadRecv;
     
-    Signal sigCameraDepth;
-    Signal sigIr;
+    PipeReceiverDepth* pPipeDepth;
+    PipeReceiver_Image* pPipeIR;
+    PipeReceiver_ImageData pipeDetect;
+    PipeReceiver_SegmentData pipeSegment;
     Signal sigDepthStop;
     Signal sigPtLogStop;
     Signal sigIrStop;
@@ -89,6 +109,8 @@ private:
     ThreadMutex mtRecv;
     ThreadMutex mtPoints;
 
+    bool bGpx;
+    bool bKml;
     struct sockaddr_in addressMavLink;
     int socketDesc;
     int iUdpTimeoutUs;
